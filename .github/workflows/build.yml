@@ -1,51 +1,65 @@
+# 构建工作流：在 macOS 和 Windows 上构建 Tauri 应用并上传产物
 name: Build
 
 on:
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - 'v*' # 匹配 v 开头的 tag（如 v0.1.0），推送 tag 时自动触发
+  workflow_dispatch: # 支持在 GitHub Actions 页面手动触发
 
 jobs:
   build:
     strategy:
       matrix:
         include:
+          # macOS 构建：生成通用二进制（同时支持 Intel 和 Apple Silicon）
           - platform: macos-latest
             args: --target universal-apple-darwin
+          # Windows 构建：默认 target，无需额外参数
           - platform: windows-latest
             args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
+      # 拉取代码，fetch-depth: 0 获取完整历史（Tauri 构建需要 git 历史来确定版本号）
+      - uses: actions/checkout@v6
         with:
-          version: 10
+          fetch-depth: 0
 
+      # 安装 pnpm 包管理器（项目使用 pnpm 管理依赖）
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10 # 指定 pnpm 大版本号
+
+      # 安装 Node.js（前端构建需要）
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
+      # 安装 Rust 工具链（Tauri 后端使用 Rust 编写）
       - name: Install Rust stable
-        uses: dtolnay/rust-action/setup@v1
+        uses: dtolnay/rust-toolchain@v1
 
+      # 添加 macOS 多架构编译目标（x86_64 = Intel, aarch64 = Apple Silicon）
       - name: Install macOS targets
         if: matrix.platform == 'macos-latest'
         run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
+      # 安装前端及 Tauri 依赖
       - name: Install app dependencies
         run: pnpm install
 
+      # 执行 Tauri 构建，实际执行 pnpm tauri build（action 内部会自动拼接 build 子命令）
       - name: Build
         uses: tauri-apps/tauri-action@v0
         env:
+          # GitHub 自动提供的 token，无需额外配置，用于 tauri-action 访问仓库 API
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tauriScript: pnpm tauri
-          args: ${{ matrix.args }}
+          tauriScript: pnpm tauri # 指定 Tauri CLI 入口命令
+          args: ${{ matrix.args }} # 传递构建参数（如 macOS 的 --target universal-apple-darwin）
 
+      # 重命名 macOS 产物为统一格式：WeHealthTick-{版本号}-macos-universal.dmg
       - name: Rename macOS artifacts
         if: matrix.platform == 'macos-latest'
         run: |
@@ -57,6 +71,7 @@ jobs:
             echo "Renamed: $f -> $new_name"
           done
 
+      # 重命名 Windows 产物为统一格式：WeHealthTick-{版本号}-windows-x64-setup.exe
       - name: Rename Windows artifacts
         if: matrix.platform == 'windows-latest'
         shell: pwsh
@@ -69,6 +84,7 @@ jobs:
             Write-Host "Renamed: $($_.Name) -> $newName"
           }
 
+      # 上传构建产物到 GitHub Actions Artifacts，可在 workflow 运行页面下载
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
