@@ -28,8 +28,10 @@ jobs:
 
       # 安装 pnpm 包管理器（项目使用 pnpm 管理依赖）
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10 # 指定 pnpm 大版本号
+        # with:
+        #   version: 10
+        # 移除 version 参数：pnpm/action-setup@v6 会自动从 package.json 的 packageManager 字段读取版本号，
+        # 同时指定两处会导致 "Multiple versions of pnpm specified" 错误
 
       # 安装 Node.js（前端构建需要）
       - uses: actions/setup-node@v4
