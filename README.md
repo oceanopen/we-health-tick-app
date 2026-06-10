@@ -1,4 +1,4 @@
-# WeHealth Tick
+# We Health Tick
 
 健康打卡桌面应用。
 
@@ -70,19 +70,44 @@ pnpm tauri dev
 
 ## 构建打包
 
-构建生产版本：
+### macOS（本地构建）
+
+构建 macOS Universal Binary（同时支持 Intel 和 Apple Silicon）：
+
+```bash
+# 确保已安装两个 target
+rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+# 构建
+pnpm tauri build --target universal-apple-darwin
+```
+
+产物位于 `src-tauri/target/universal-apple-darwin/release/bundle/dmg/`。
+
+如果只需要当前架构的构建：
 
 ```bash
 pnpm tauri build
 ```
 
-产物位于 `src-tauri/target/release/bundle/`：
+### Windows
 
-| 平台 | 产物 |
-|------|------|
-| macOS | `.dmg` / `.app` |
-| Windows | `.msi` / `.exe` |
-| Linux | `.deb` / `.AppImage` |
+Windows 构建需要在 Windows 环境下执行，macOS 无法直接交叉编译。推荐通过 GitHub Actions CI 自动构建。
+
+### CI 自动构建（macOS + Windows）
+
+项目配置了 GitHub Actions 工作流（`.github/workflows/build.yml`），支持自动构建多平台产物：
+
+- **触发方式**：推送 `v*` 格式的 tag，或手动触发 workflow
+- **产物命名**：
+  - macOS: `WeHealthTick-{version}-macos-universal.dmg`
+  - Windows: `WeHealthTick-{version}-windows-x64-setup.exe`
+
+```bash
+# 触发自动构建
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 ## 项目结构
 
