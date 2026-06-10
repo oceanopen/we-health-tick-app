@@ -1,4 +1,4 @@
-/**
+/*
  * main.rs — 程序入口文件
  *
  * 【Rust 项目的入口】
@@ -18,8 +18,7 @@
  * #[]  → 属性（attribute），作用于紧随其后的项（函数、结构体等）
  */
 
-/**
- * #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+/* #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
  *
  * 作用：在 Windows 上隐藏控制台窗口（黑色的 cmd 窗口）。
  * 这是一个全局属性（#![...] 表示作用域是整个文件）。
@@ -60,8 +59,7 @@
  *   main.rs → we_health_tick_lib::run() → lib.rs 中的 pub fn run()
  */
 fn main() {
-  /**
-   * 调用 lib.rs 中定义的 run() 函数来启动 Tauri 应用
+  /* 调用 lib.rs 中定义的 run() 函数来启动 Tauri 应用
    * `we_health_tick_lib` 是 crate 名（在 Cargo.toml 的 [lib].name 中定义）
    * `::run()` 是该 crate 中导出的公开函数
    */

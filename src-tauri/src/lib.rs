@@ -1,4 +1,4 @@
-/**
+/*
  * lib.rs — 库文件（Library Crate）
  *
  * 【什么是 lib.rs？】
@@ -51,8 +51,7 @@
  * 实际上函数最后执行 `.expect(...)` 时如果成功返回 `()`，如果失败会 panic（崩溃）
  */
 pub fn run() {
-  /**
-   * tauri::Builder::default()
+  /* tauri::Builder::default()
    *
    * 【建造者模式（Builder Pattern）】
    * Tauri 使用建造者模式来创建应用。步骤是：
@@ -69,9 +68,7 @@ pub fn run() {
    *                     trait 类似其他语言的 interface（接口）
    */
   tauri::Builder::default()
-
-    /**
-     * .setup(|app| { ... })
+    /* .setup(|app| { ... })
      *
      * 【setup 方法】
      * 在 Tauri 应用启动后、窗口创建前执行的初始化回调。
@@ -90,9 +87,7 @@ pub fn run() {
      * setup 返回 Result 类型，所以闭包里需要返回 Ok(()) 或 Err(...)
      */
     .setup(|app| {
-
-      /**
-       * cfg!(debug_assertions)
+      /* cfg!(debug_assertions)
        *
        * `cfg!()` 是一个 **宏**（注意感叹号），在编译时求值，返回 true/false。
        *   debug 模式（cargo build）            → true
@@ -104,9 +99,7 @@ pub fn run() {
        * 为什么要判断？因为日志插件只在开发时有用，发布给用户时不需要。
        */
       if cfg!(debug_assertions) {
-
-        /**
-         * app.handle()
+        /* app.handle()
          *
          * 获取 App 的句柄（handle）。句柄是对 App 的一个"弱引用"，
          * 可以在 App 生命周期的任何地方使用，不需要持有 App 的所有权。
@@ -116,23 +109,20 @@ pub fn run() {
          *   后续需要通过 handle 来访问应用状态。
          */
 
-        /**
-         * .plugin(...)
+        /* .plugin(...)
          *
          * 向 Tauri 应用注册一个插件。
          * Tauri 的插件系统允许扩展应用功能，比如日志、通知、文件系统访问等。
          * 每个插件都是一个实现了 Plugin trait 的结构体。
          */
 
-        /**
-         * tauri_plugin_log::Builder::default()
+        /* tauri_plugin_log::Builder::default()
          *
          * 日志插件的建造者，用于配置日志行为。
          * 同样使用建造者模式：创建 → 配置 → 构建
          */
 
-        /**
-         * .level(log::LevelFilter::Info)
+        /* .level(log::LevelFilter::Info)
          *
          * 设置日志级别为 Info。日志级别从低到高：
          *   Trace（最详细）→ Debug → Info → Warn → Error → Off（关闭）
@@ -144,8 +134,7 @@ pub fn run() {
          * `LevelFilter` 是它定义的日志级别枚举（enum）。
          */
 
-        /**
-         * .build()
+        /* .build()
          *
          * 构建日志插件实例，返回一个实现了 Plugin trait 的对象。
          */
@@ -154,9 +143,7 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
-
-        /**
-         * `?` 操作符
+        /* `?` 操作符
          *
          * Rust 的错误传播操作符。它的含义是：
          *   如果结果是 Ok → 取出 Ok 里的值，继续执行
@@ -172,9 +159,7 @@ pub fn run() {
          * 所以用 `?` 可以把 plugin 注册的潜在错误向上传播。
          */
       }
-
-      /**
-       * Ok(())
+      /* Ok(())
        *
        * Rust 中表示"操作成功，没有返回值"的标准方式。
        *   Ok   → Result 枚举的变体，表示成功
@@ -185,9 +170,7 @@ pub fn run() {
        */
       Ok(())
     })
-
-    /**
-     * .run(tauri::generate_context!())
+    /* .run(tauri::generate_context!())
      *
      * 【run 方法】
      * 启动 Tauri 应用！这一步会：
@@ -208,9 +191,7 @@ pub fn run() {
      * 宏和函数的区别：宏在编译时展开代码，函数在运行时调用。
      */
     .run(tauri::generate_context!())
-
-    /**
-     * .expect("error while running tauri application")
+    /* .expect("error while running tauri application")
      *
      * 【expect 方法】
      * 处理 run() 的返回值。run() 返回 Result 类型：
