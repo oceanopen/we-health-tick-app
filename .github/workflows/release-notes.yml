@@ -1,5 +1,5 @@
 # 发布工作流：基于 changelogithub 自动生成 GitHub Release 及更新日志
-name: Release
+name: Release Notes
 
 on:
   push:
