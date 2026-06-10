@@ -1,0 +1,78 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-action/setup@v1
+
+      - name: Install macOS targets
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+      - name: Install app dependencies
+        run: pnpm install
+
+      - name: Build
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }}
+
+      - name: Rename macOS artifacts
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd src-tauri/target/universal-apple-darwin/release/bundle/dmg
+          for f in *.dmg; do
+            version=$(echo "$f" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            new_name="WeHealthTick-${version}-macos-universal.dmg"
+            mv "$f" "$new_name"
+            echo "Renamed: $f -> $new_name"
+          done
+
+      - name: Rename Windows artifacts
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          cd src-tauri/target/release/bundle/nsis
+          Get-ChildItem *.exe | ForEach-Object {
+            $version = if ($_.Name -match '(\d+\.\d+\.\d+)') { $matches[1] } else { '0.0.0' }
+            $newName = "WeHealthTick-${version}-windows-x64-setup.exe"
+            Rename-Item $_.Name $newName
+            Write-Host "Renamed: $($_.Name) -> $newName"
+          }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WeHealthTick-${{ matrix.platform }}
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/nsis/*.exe
