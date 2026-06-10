@@ -1,5 +1,5 @@
 # 构建工作流：在 macOS 和 Windows 上构建 Tauri 应用并上传产物
-name: Build
+name: Release Assets
 
 on:
   push:
