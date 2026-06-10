@@ -38,7 +38,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
 
       # 安装 Rust 工具链（Tauri 后端使用 Rust 编写）
       - name: Install Rust stable
@@ -46,13 +45,6 @@ jobs:
         with:
           # toolchain: 1.96.0
           toolchain: stable
-
-      # 缓存 Rust 编译产物，避免每次全量重新编译依赖
-      # workspaces 格式为 "workspace路径 -> target目录名"，
-      # 表示 Rust 代码在 src-tauri/ 目录下，编译产物在 src-tauri/target/
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
 
       # 添加 macOS 多架构编译目标（x86_64 = Intel, aarch64 = Apple Silicon）
       - name: Install macOS targets
