@@ -27,6 +27,7 @@ jobs:
           fetch-depth: 0
 
       # 安装 pnpm 包管理器（项目使用 pnpm 管理依赖）
+      # 必须在 setup-node 之前：setup-node 的 cache: pnpm 需要调用 pnpm 读取 lockfile 来设置缓存 key
       - uses: pnpm/action-setup@v6
         # with:
         #   version: 10
@@ -34,9 +35,10 @@ jobs:
         # 同时指定两处会导致 "Multiple versions of pnpm specified" 错误
 
       # 安装 Node.js（前端构建需要）
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
+          cache: pnpm
 
       # 安装 Rust 工具链（Tauri 后端使用 Rust 编写）
       - name: Install Rust stable
@@ -44,6 +46,13 @@ jobs:
         with:
           # toolchain: 1.96.0
           toolchain: stable
+
+      # 缓存 Rust 编译产物，避免每次全量重新编译依赖
+      # workspaces 格式为 "workspace路径 -> target目录名"，
+      # 表示 Rust 代码在 src-tauri/ 目录下，编译产物在 src-tauri/target/
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
       # 添加 macOS 多架构编译目标（x86_64 = Intel, aarch64 = Apple Silicon）
       - name: Install macOS targets
@@ -91,7 +100,7 @@ jobs:
 
       # 上传构建产物到 GitHub Actions Artifacts，可在 workflow 运行页面下载
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: WeHealthTick-${{ matrix.platform }}
           path: |
