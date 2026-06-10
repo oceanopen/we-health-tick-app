@@ -98,11 +98,11 @@ jobs:
             Write-Host "Renamed: $($_.Name) -> $newName"
           }
 
-      # 上传构建产物到 GitHub Actions Artifacts，可在 workflow 运行页面下载
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+      # 将构建产物上传到 GitHub Release 页面
+      - name: Upload to GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v3
         with:
-          name: WeHealthTick-${{ matrix.platform }}
-          path: |
+          files: |
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/nsis/*.exe
