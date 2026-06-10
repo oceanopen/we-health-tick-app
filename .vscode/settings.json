@@ -14,5 +14,18 @@
   // md 文件按 prettier 规范格式化
   "[md]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+
+  // Enable eslint for all supported languages
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact",
+    "vue",
+    "html",
+    "css",
+    "less",
+    "scss"
+  ]
 }
