@@ -94,6 +94,20 @@ pnpm tauri build
 
 Windows 构建需要在 Windows 环境下执行，macOS 无法直接交叉编译。推荐通过 GitHub Actions CI 自动构建。
 
+### 版本发布
+
+使用 `pnpm release` 自动管理版本号（基于 [bumpp](https://github.com/antfu/bumpp)），会同步更新以下文件：
+
+- `package.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+```bash
+pnpm release
+```
+
+交互式选择版本号后，自动完成：修改版本号 → 创建 git commit → 创建 `v*` tag。
+
 ### CI 自动构建（macOS + Windows）
 
 项目配置了 GitHub Actions 工作流（`.github/workflows/build.yml`），支持自动构建多平台产物：
@@ -104,7 +118,7 @@ Windows 构建需要在 Windows 环境下执行，macOS 无法直接交叉编译
   - Windows: `WeHealthTick-{version}-windows-x64-setup.exe`
 
 ```bash
-# 触发自动构建
+# 手动触发自动构建
 git tag v0.1.0
 git push origin v0.1.0
 ```

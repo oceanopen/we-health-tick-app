@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",
-    "release": "bumpp"
+    "release": "bumpp",
+    "release:dry": "bumpp --commit false --tag false --push false"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
