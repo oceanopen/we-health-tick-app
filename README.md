@@ -4,15 +4,15 @@
 
 ## 技术栈
 
-| 层级 | 技术 | 版本 |
-|------|------|------|
-| 桌面框架 | [Tauri](https://v2.tauri.app/) | v2 |
-| 前端框架 | [React](https://react.dev/) | 19 |
-| 类型系统 | [TypeScript](https://www.typescriptlang.org/) | 6 |
-| 构建工具 | [Vite](https://vite.dev/) | 8 |
-| 运行时 | [Node.js](https://nodejs.org/) | 20+ |
-| 后端语言 | [Rust](https://www.rust-lang.org/) | Edition 2021 (MSRV 1.77.2) |
-| 包管理 | [pnpm](https://pnpm.io/) | 10 |
+| 层级     | 技术                                          | 版本                       |
+| -------- | --------------------------------------------- | -------------------------- |
+| 桌面框架 | [Tauri](https://v2.tauri.app/)                | v2                         |
+| 前端框架 | [React](https://react.dev/)                   | 19                         |
+| 类型系统 | [TypeScript](https://www.typescriptlang.org/) | 6                          |
+| 构建工具 | [Vite](https://vite.dev/)                     | 8                          |
+| 运行时   | [Node.js](https://nodejs.org/)                | 20+                        |
+| 后端语言 | [Rust](https://www.rust-lang.org/)            | Edition 2021 (MSRV 1.77.2) |
+| 包管理   | [pnpm](https://pnpm.io/)                      | 10                         |
 
 ## 环境准备
 
