@@ -21,7 +21,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![exit_app, tray::show_main_window])
+        .invoke_handler(tauri::generate_handler![exit_app, tray::show_main_window, tray::fit_panel])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

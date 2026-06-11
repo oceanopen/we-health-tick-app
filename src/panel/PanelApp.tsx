@@ -10,6 +10,7 @@ import { useTimer } from './hooks/useTimer';
 export default function PanelApp() {
   const { isPaused, isExpired, displayTime, progress, toggle, reset } = useTimer();
   const hidingRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const currentWin = getCurrentWindow();
@@ -25,6 +26,13 @@ export default function PanelApp() {
     };
   }, []);
 
+  useEffect(() => {
+    if (rootRef.current) {
+      const height = rootRef.current.scrollHeight;
+      invoke('fit_panel', { height });
+    }
+  }, []);
+
   const handleSettings = useCallback(async () => {
     hidingRef.current = true;
     await invoke('show_main_window');
@@ -36,6 +44,7 @@ export default function PanelApp() {
 
   return (
     <Box
+      ref={rootRef}
       data-tauri-drag-region
       sx={{
         width: 240,

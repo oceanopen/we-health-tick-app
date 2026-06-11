@@ -1,10 +1,10 @@
 use tauri::{
-    LogicalPosition, Manager, Position, WebviewUrl, WebviewWindowBuilder,
+    LogicalPosition, LogicalSize, Manager, Position, WebviewUrl, WebviewWindowBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
 const PANEL_WIDTH: f64 = 240.0;
-const PANEL_HEIGHT: f64 = 320.0;
+const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
 
 struct MonitorInfo {
     scale_factor: f64,
@@ -29,7 +29,7 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
         .expect("failed to load tray icon");
 
-    TrayIconBuilder::new()
+    TrayIconBuilder::with_id("tray")
         .icon(icon)
         .tooltip("We Health Tick")
         .on_tray_icon_event(|tray, event| {
@@ -68,8 +68,13 @@ fn position_panel(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
         let pos = rect.position.to_logical::<f64>(sf);
         let size = rect.size.to_logical::<f64>(sf);
 
+        let panel_height = panel
+            .inner_size()
+            .map(|s| s.to_logical::<f64>(sf).height)
+            .unwrap_or(DEFAULT_PANEL_HEIGHT);
+
         let (x, y) = if let Some(m) = &monitor {
-            compute_panel_position(m, pos.x, pos.y, size.width, size.height)
+            compute_panel_position(m, pos.x, pos.y, size.width, size.height, panel_height)
         } else {
             (pos.x, pos.y + size.height)
         };
@@ -143,16 +148,17 @@ fn compute_panel_position(
     icon_y: f64,
     icon_w: f64,
     icon_h: f64,
+    panel_height: f64,
 ) -> (f64, f64) {
     let (x, y) = match detect_taskbar_edge(monitor, icon_x, icon_y, icon_w, icon_h) {
         TaskbarEdge::Top => (icon_x, icon_y + icon_h),
-        TaskbarEdge::Bottom => (icon_x, icon_y - PANEL_HEIGHT),
+        TaskbarEdge::Bottom => (icon_x, icon_y - panel_height),
         TaskbarEdge::Left => (icon_x + icon_w, icon_y),
         TaskbarEdge::Right => (icon_x - PANEL_WIDTH, icon_y),
     };
 
     let x = x.clamp(monitor.wa_x, monitor.wa_x + monitor.wa_width - PANEL_WIDTH);
-    let y = y.clamp(monitor.wa_y, monitor.wa_y + monitor.wa_height - PANEL_HEIGHT);
+    let y = y.clamp(monitor.wa_y, monitor.wa_y + monitor.wa_height - panel_height);
 
     (x, y)
 }
@@ -193,6 +199,17 @@ pub fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn fit_panel(app: tauri::AppHandle, height: f64) -> Result<(), String> {
+    let panel = app.get_webview_window("panel").ok_or("panel not found")?;
+    let tray = app.tray_by_id("tray").ok_or("tray not found")?;
+
+    let _ = panel.set_size(LogicalSize::new(PANEL_WIDTH, height));
+    position_panel(&tray, &panel);
+
+    Ok(())
+}
+
 fn create_panel(app: &tauri::AppHandle, tray: &tauri::tray::TrayIcon) {
     let panel = WebviewWindowBuilder::new(app, "panel", WebviewUrl::App("panel.html".into()))
         .decorations(false)
@@ -200,7 +217,7 @@ fn create_panel(app: &tauri::AppHandle, tray: &tauri::tray::TrayIcon) {
         .always_on_top(true)
         .shadow(false)
         .focused(true)
-        .inner_size(240.0, 320.0);
+        .inner_size(240.0, DEFAULT_PANEL_HEIGHT);
 
     if let Ok(w) = panel.build() {
         position_panel(tray, &w);
