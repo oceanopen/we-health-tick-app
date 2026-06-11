@@ -157,6 +157,42 @@ fn compute_panel_position(
     (x, y)
 }
 
+#[tauri::command]
+pub fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    let main_win = app
+        .get_webview_window("main")
+        .ok_or("main window not found")?;
+
+    if let Some(panel) = app.get_webview_window("panel") {
+        if let Ok(Some(monitor)) = panel.current_monitor() {
+            let sf = monitor.scale_factor();
+            let wa = monitor.work_area();
+            let wa_w = wa.size.width as f64 / sf;
+            let wa_h = wa.size.height as f64 / sf;
+            let wa_x = wa.position.x as f64 / sf;
+            let wa_y = wa.position.y as f64 / sf;
+
+            let main_sf = main_win.scale_factor().unwrap_or(sf);
+            let main_size = main_win
+                .inner_size()
+                .map(|s| s.to_logical::<f64>(main_sf))
+                .unwrap_or_else(|_| tauri::LogicalSize::new(800.0, 600.0));
+
+            let x = wa_x + (wa_w - main_size.width) / 2.0;
+            let y = wa_y + (wa_h - main_size.height) / 2.0;
+
+            let _ = main_win.set_position(LogicalPosition::new(x, y));
+        }
+        let _ = panel.hide();
+    }
+
+    let _ = main_win.show();
+    let _ = main_win.unminimize();
+    let _ = main_win.set_focus();
+
+    Ok(())
+}
+
 fn create_panel(app: &tauri::AppHandle, tray: &tauri::tray::TrayIcon) {
     let panel = WebviewWindowBuilder::new(app, "panel", WebviewUrl::App("panel.html".into()))
         .decorations(false)

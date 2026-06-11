@@ -1,8 +1,7 @@
 import { Box } from '@mui/material';
 import { invoke } from '@tauri-apps/api/core';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { ActionButtons } from './components/ActionButtons';
 import { CountdownRing } from './components/CountdownRing';
 import { ExitButton } from './components/ExitButton';
@@ -10,12 +9,15 @@ import { useTimer } from './hooks/useTimer';
 
 export default function PanelApp() {
   const { isPaused, isExpired, displayTime, progress, toggle, reset } = useTimer();
+  const hidingRef = useRef(false);
 
   useEffect(() => {
     const currentWin = getCurrentWindow();
     const unlisten = currentWin.onFocusChanged(({ payload: focused }) => {
-      if (!focused) {
+      if (!focused && !hidingRef.current) {
         currentWin.hide();
+      } else if (focused) {
+        hidingRef.current = false;
       }
     });
     return () => {
@@ -24,11 +26,8 @@ export default function PanelApp() {
   }, []);
 
   const handleSettings = useCallback(async () => {
-    const mainWin = await WebviewWindow.getByLabel('main');
-    if (mainWin) {
-      await mainWin.show();
-      await mainWin.setFocus();
-    }
+    hidingRef.current = true;
+    await invoke('show_main_window');
   }, []);
 
   const handleExit = useCallback(async () => {
