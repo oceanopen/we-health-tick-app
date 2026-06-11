@@ -1,5 +1,5 @@
 use tauri::{
-    Manager, WebviewUrl, WebviewWindowBuilder,
+    Manager, PhysicalPosition, Position, WebviewUrl, WebviewWindowBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
@@ -22,11 +22,12 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
                     if panel.is_visible().unwrap_or(false) {
                         let _ = panel.hide();
                     } else {
+                        position_panel(tray, &panel);
                         let _ = panel.show();
                         let _ = panel.set_focus();
                     }
                 } else {
-                    create_panel(app);
+                    create_panel(app, tray);
                 }
             }
         })
@@ -35,7 +36,19 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-fn create_panel(app: &tauri::AppHandle) {
+fn position_panel(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
+    if let Ok(Some(rect)) = tray.rect() {
+        let sf = panel.scale_factor().unwrap_or(1.0);
+        let pos = rect.position.to_physical::<i32>(sf);
+        let size = rect.size.to_physical::<i32>(sf);
+        let _ = panel.set_position(Position::Physical(PhysicalPosition::new(
+            pos.x,
+            pos.y + size.height,
+        )));
+    }
+}
+
+fn create_panel(app: &tauri::AppHandle, tray: &tauri::tray::TrayIcon) {
     let panel = WebviewWindowBuilder::new(app, "panel", WebviewUrl::App("panel.html".into()))
         .decorations(false)
         .transparent(true)
@@ -45,6 +58,7 @@ fn create_panel(app: &tauri::AppHandle) {
         .inner_size(240.0, 320.0);
 
     if let Ok(w) = panel.build() {
+        position_panel(tray, &w);
         let _ = w.show();
         let _ = w.set_focus();
     }
