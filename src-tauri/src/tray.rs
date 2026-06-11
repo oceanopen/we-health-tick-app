@@ -165,9 +165,27 @@ fn compute_panel_position(
 
 #[tauri::command]
 pub fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
-    let main_win = app
-        .get_webview_window("main")
-        .ok_or("main window not found")?;
+    let main_win = match app.get_webview_window("main") {
+        Some(w) => w,
+        None => {
+            let win =
+                WebviewWindowBuilder::new(&app, "main", WebviewUrl::App("index.html".into()))
+                    .title("We Health Tick")
+                    .inner_size(800.0, 600.0)
+                    .build()
+                    .map_err(|e| e.to_string())?;
+
+            let w = win.clone();
+            win.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = w.hide();
+                }
+            });
+
+            win
+        }
+    };
 
     if let Some(panel) = app.get_webview_window("panel") {
         if let Ok(Some(monitor)) = panel.current_monitor() {
