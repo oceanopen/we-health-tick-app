@@ -3,6 +3,24 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
+const PANEL_WIDTH: f64 = 240.0;
+const PANEL_HEIGHT: f64 = 320.0;
+
+struct MonitorInfo {
+    scale_factor: f64,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+enum TaskbarEdge {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
 pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
         .expect("failed to load tray icon");
@@ -38,19 +56,31 @@ pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>
 
 fn position_panel(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
     if let Ok(Some(rect)) = tray.rect() {
-        let sf = monitor_scale_for_rect(tray.app_handle(), &rect)
-            .unwrap_or_else(|| panel.scale_factor().unwrap_or(1.0));
+        let sf = panel.scale_factor().unwrap_or(1.0);
+
+        let monitor = find_monitor_for_rect(tray.app_handle(), &rect);
+        let sf = monitor.as_ref().map_or(sf, |m| m.scale_factor);
 
         let pos = rect.position.to_logical::<f64>(sf);
         let size = rect.size.to_logical::<f64>(sf);
-        let _ = panel.set_position(Position::Logical(LogicalPosition::new(
-            pos.x,
-            pos.y + size.height,
-        )));
+
+        let (x, y) = if let Some(m) = &monitor {
+            let edge = detect_taskbar_edge(m, pos.x, pos.y, size.width, size.height);
+            match edge {
+                TaskbarEdge::Top => (pos.x, pos.y + size.height),
+                TaskbarEdge::Bottom => (pos.x, pos.y - PANEL_HEIGHT),
+                TaskbarEdge::Left => (pos.x + size.width, pos.y),
+                TaskbarEdge::Right => (pos.x - PANEL_WIDTH, pos.y),
+            }
+        } else {
+            (pos.x, pos.y + size.height)
+        };
+
+        let _ = panel.set_position(Position::Logical(LogicalPosition::new(x, y)));
     }
 }
 
-fn monitor_scale_for_rect(app: &tauri::AppHandle, rect: &tauri::Rect) -> Option<f64> {
+fn find_monitor_for_rect(app: &tauri::AppHandle, rect: &tauri::Rect) -> Option<MonitorInfo> {
     let (x, y) = match &rect.position {
         Position::Physical(p) => (p.x, p.y),
         Position::Logical(_) => return None,
@@ -64,10 +94,44 @@ fn monitor_scale_for_rect(app: &tauri::AppHandle, rect: &tauri::Rect) -> Option<
             && y >= mp.y
             && y < mp.y + ms.height as i32
         {
-            return Some(m.scale_factor());
+            let sf = m.scale_factor();
+            return Some(MonitorInfo {
+                scale_factor: sf,
+                x: mp.x as f64 / sf,
+                y: mp.y as f64 / sf,
+                width: ms.width as f64 / sf,
+                height: ms.height as f64 / sf,
+            });
         }
     }
     None
+}
+
+fn detect_taskbar_edge(
+    monitor: &MonitorInfo,
+    icon_x: f64,
+    icon_y: f64,
+    icon_w: f64,
+    icon_h: f64,
+) -> TaskbarEdge {
+    let cx = icon_x + icon_w / 2.0;
+    let cy = icon_y + icon_h / 2.0;
+
+    let d_top = (cy - monitor.y).abs();
+    let d_bottom = (monitor.y + monitor.height - cy).abs();
+    let d_left = (cx - monitor.x).abs();
+    let d_right = (monitor.x + monitor.width - cx).abs();
+
+    let min = d_top.min(d_bottom).min(d_left).min(d_right);
+    if (d_top - min).abs() < f64::EPSILON {
+        TaskbarEdge::Top
+    } else if (d_bottom - min).abs() < f64::EPSILON {
+        TaskbarEdge::Bottom
+    } else if (d_left - min).abs() < f64::EPSILON {
+        TaskbarEdge::Left
+    } else {
+        TaskbarEdge::Right
+    }
 }
 
 fn create_panel(app: &tauri::AppHandle, tray: &tauri::tray::TrayIcon) {
