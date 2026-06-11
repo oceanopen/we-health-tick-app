@@ -12,6 +12,10 @@ struct MonitorInfo {
     y: f64,
     width: f64,
     height: f64,
+    wa_x: f64,
+    wa_y: f64,
+    wa_width: f64,
+    wa_height: f64,
 }
 
 enum TaskbarEdge {
@@ -65,13 +69,7 @@ fn position_panel(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
         let size = rect.size.to_logical::<f64>(sf);
 
         let (x, y) = if let Some(m) = &monitor {
-            let edge = detect_taskbar_edge(m, pos.x, pos.y, size.width, size.height);
-            match edge {
-                TaskbarEdge::Top => (pos.x, pos.y + size.height),
-                TaskbarEdge::Bottom => (pos.x, pos.y - PANEL_HEIGHT),
-                TaskbarEdge::Left => (pos.x + size.width, pos.y),
-                TaskbarEdge::Right => (pos.x - PANEL_WIDTH, pos.y),
-            }
+            compute_panel_position(m, pos.x, pos.y, size.width, size.height)
         } else {
             (pos.x, pos.y + size.height)
         };
@@ -95,12 +93,17 @@ fn find_monitor_for_rect(app: &tauri::AppHandle, rect: &tauri::Rect) -> Option<M
             && y < mp.y + ms.height as i32
         {
             let sf = m.scale_factor();
+            let wa = m.work_area();
             return Some(MonitorInfo {
                 scale_factor: sf,
                 x: mp.x as f64 / sf,
                 y: mp.y as f64 / sf,
                 width: ms.width as f64 / sf,
                 height: ms.height as f64 / sf,
+                wa_x: wa.position.x as f64 / sf,
+                wa_y: wa.position.y as f64 / sf,
+                wa_width: wa.size.width as f64 / sf,
+                wa_height: wa.size.height as f64 / sf,
             });
         }
     }
@@ -132,6 +135,26 @@ fn detect_taskbar_edge(
     } else {
         TaskbarEdge::Right
     }
+}
+
+fn compute_panel_position(
+    monitor: &MonitorInfo,
+    icon_x: f64,
+    icon_y: f64,
+    icon_w: f64,
+    icon_h: f64,
+) -> (f64, f64) {
+    let (x, y) = match detect_taskbar_edge(monitor, icon_x, icon_y, icon_w, icon_h) {
+        TaskbarEdge::Top => (icon_x, icon_y + icon_h),
+        TaskbarEdge::Bottom => (icon_x, icon_y - PANEL_HEIGHT),
+        TaskbarEdge::Left => (icon_x + icon_w, icon_y),
+        TaskbarEdge::Right => (icon_x - PANEL_WIDTH, icon_y),
+    };
+
+    let x = x.clamp(monitor.wa_x, monitor.wa_x + monitor.wa_width - PANEL_WIDTH);
+    let y = y.clamp(monitor.wa_y, monitor.wa_y + monitor.wa_height - PANEL_HEIGHT);
+
+    (x, y)
 }
 
 fn create_panel(app: &tauri::AppHandle, tray: &tauri::tray::TrayIcon) {
