@@ -6,5 +6,5 @@ export default defineConfig({
     'src-tauri/Cargo.toml',
     'src-tauri/tauri.conf.json',
   ],
-  execute: 'cargo generate-lockfile --manifest-path src-tauri/Cargo.toml',
+  execute: 'cargo generate-lockfile --manifest-path src-tauri/Cargo.toml && git add src-tauri/Cargo.lock',
 });
