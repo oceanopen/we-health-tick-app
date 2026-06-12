@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { defineConfig } from 'bumpp';
 
 export default defineConfig({
@@ -7,8 +7,15 @@ export default defineConfig({
     'src-tauri/Cargo.toml',
     'src-tauri/tauri.conf.json',
   ],
-  execute: () => {
-    execSync('cargo generate-lockfile --manifest-path src-tauri/Cargo.toml', { stdio: 'inherit' });
-    execSync('git add src-tauri/Cargo.lock', { stdio: 'inherit' });
+  execute: (operation) => {
+    const { newVersion } = operation.state;
+    const lockPath = 'src-tauri/Cargo.lock';
+    const lockContent = readFileSync(lockPath, 'utf-8');
+    const updated = lockContent.replace(
+      /(name = "we-health-tick"\nversion = ")[^"]*(")/,
+      `$1${newVersion}$2`,
+    );
+    writeFileSync(lockPath, updated);
+    operation.state.updatedFiles.push(lockPath);
   },
 });
