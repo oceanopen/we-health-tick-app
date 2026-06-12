@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'bumpp';
 
 export default defineConfig({
@@ -6,5 +7,8 @@ export default defineConfig({
     'src-tauri/Cargo.toml',
     'src-tauri/tauri.conf.json',
   ],
-  execute: 'cargo generate-lockfile --manifest-path src-tauri/Cargo.toml && git add src-tauri/Cargo.lock',
+  execute: () => {
+    execSync('cargo generate-lockfile --manifest-path src-tauri/Cargo.toml', { stdio: 'inherit' });
+    execSync('git add src-tauri/Cargo.lock', { stdio: 'inherit' });
+  },
 });
