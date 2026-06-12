@@ -56,15 +56,19 @@ function AboutPage() {
 
       <Typography
         component="a"
-        href="https://github.com/oceanopen/we-health-tick-app"
-        target="_blank"
-        rel="noopener noreferrer"
+        role="button"
         variant="body2"
         color="primary"
         sx={{
           'textDecoration': 'none',
+          'cursor': 'pointer',
           '&:hover': { textDecoration: 'underline' },
           'mt': 1,
+        }}
+        onClick={() => {
+          import('@tauri-apps/plugin-shell').then(({ open }) => {
+            open('https://github.com/oceanopen/we-health-tick-app');
+          });
         }}
       >
         GitHub
