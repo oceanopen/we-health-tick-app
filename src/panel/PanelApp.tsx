@@ -35,7 +35,7 @@ export default function PanelApp() {
 
   const handleSettings = useCallback(async () => {
     hidingRef.current = true;
-    await invoke('show_main_window');
+    await invoke('show_settings_window');
   }, []);
 
   const handleExit = useCallback(async () => {

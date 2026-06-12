@@ -1,4 +1,5 @@
-mod tray;
+mod panel;
+mod settings;
 
 #[tauri::command]
 fn exit_app(app: tauri::AppHandle) {
@@ -17,11 +18,15 @@ pub fn run() {
                 )?;
             }
 
-            tray::setup_tray(app)?;
+            panel::setup(app)?;
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![exit_app, tray::show_main_window, tray::fit_panel])
+        .invoke_handler(tauri::generate_handler![
+            exit_app,
+            settings::show_settings_window,
+            panel::fit_panel
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

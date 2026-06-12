@@ -25,7 +25,7 @@ enum TaskbarEdge {
     Right,
 }
 
-pub fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
         .expect("failed to load tray icon");
 
@@ -161,60 +161,6 @@ fn compute_panel_position(
     let y = y.clamp(monitor.wa_y, monitor.wa_y + monitor.wa_height - panel_height);
 
     (x, y)
-}
-
-#[tauri::command]
-pub fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
-    let main_win = match app.get_webview_window("main") {
-        Some(w) => w,
-        None => {
-            let win =
-                WebviewWindowBuilder::new(&app, "main", WebviewUrl::App("index.html".into()))
-                    .title("We Health Tick")
-                    .inner_size(800.0, 600.0)
-                    .build()
-                    .map_err(|e| e.to_string())?;
-
-            let w = win.clone();
-            win.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = w.hide();
-                }
-            });
-
-            win
-        }
-    };
-
-    if let Some(panel) = app.get_webview_window("panel") {
-        if let Ok(Some(monitor)) = panel.current_monitor() {
-            let sf = monitor.scale_factor();
-            let wa = monitor.work_area();
-            let wa_w = wa.size.width as f64 / sf;
-            let wa_h = wa.size.height as f64 / sf;
-            let wa_x = wa.position.x as f64 / sf;
-            let wa_y = wa.position.y as f64 / sf;
-
-            let main_sf = main_win.scale_factor().unwrap_or(sf);
-            let main_size = main_win
-                .inner_size()
-                .map(|s| s.to_logical::<f64>(main_sf))
-                .unwrap_or_else(|_| tauri::LogicalSize::new(800.0, 600.0));
-
-            let x = wa_x + (wa_w - main_size.width) / 2.0;
-            let y = wa_y + (wa_h - main_size.height) / 2.0;
-
-            let _ = main_win.set_position(LogicalPosition::new(x, y));
-        }
-        let _ = panel.hide();
-    }
-
-    let _ = main_win.show();
-    let _ = main_win.unminimize();
-    let _ = main_win.set_focus();
-
-    Ok(())
 }
 
 #[tauri::command]
