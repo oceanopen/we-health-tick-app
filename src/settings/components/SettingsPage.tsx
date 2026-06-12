@@ -4,7 +4,6 @@ import {
   Box,
   Divider,
   FormControl,
-  InputLabel,
   MenuItem,
   Select,
   Typography,
@@ -59,10 +58,8 @@ function SettingsPage() {
             <Typography>语言</Typography>
           </Box>
           <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel>语言</InputLabel>
             <Select
               value={language}
-              label="语言"
               onChange={e => setLanguage(e.target.value as Language)}
             >
               {languageOptions.map(opt => (
@@ -91,10 +88,8 @@ function SettingsPage() {
             <Typography>外观</Typography>
           </Box>
           <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel>外观</InputLabel>
             <Select
               value={themeMode}
-              label="外观"
               onChange={e => setThemeMode(e.target.value as ThemeMode)}
             >
               {themeOptions.map(opt => (

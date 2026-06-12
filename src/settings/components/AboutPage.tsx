@@ -3,7 +3,7 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import { Box, Button, Chip, Typography } from '@mui/material';
 import appIcon from '../../assets/app-icon.png';
 
-const APP_VERSION = 'v0.1.9';
+declare const __APP_VERSION__: string;
 
 function AboutPage() {
   return (
@@ -39,7 +39,7 @@ function AboutPage() {
         健康打卡
       </Typography>
 
-      <Chip label={APP_VERSION} size="small" />
+      <Chip label={`v${__APP_VERSION__}`} size="small" />
 
       <Typography variant="body2" color="text.secondary">
         久坐提醒 · 强制休息 · 习惯养成
