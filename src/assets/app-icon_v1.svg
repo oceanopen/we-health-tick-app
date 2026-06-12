@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="lightning" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+
+  <!-- Clock face -->
+  <circle cx="240" cy="250" r="140" fill="none" stroke="white" stroke-width="18" opacity="0.9"/>
+
+  <!-- Clock center dot -->
+  <circle cx="240" cy="250" r="10" fill="white" opacity="0.9"/>
+
+  <!-- Clock hour hand (pointing to ~10) -->
+  <line x1="240" y1="250" x2="240" y2="160" stroke="white" stroke-width="14" stroke-linecap="round" opacity="0.9" transform="rotate(-60 240 250)"/>
+
+  <!-- Clock minute hand (pointing to ~2) -->
+  <line x1="240" y1="250" x2="240" y2="140" stroke="white" stroke-width="10" stroke-linecap="round" opacity="0.9" transform="rotate(60 240 250)"/>
+
+  <!-- Lightning bolt (overlapping clock, positioned to the right) -->
+  <polygon
+    points="340,140 300,260 340,260 280,380 380,230 340,230 380,140"
+    fill="url(#lightning)"
+    opacity="0.95"
+  />
+
+  <!-- Tick marks on clock (12, 3, 6, 9 o'clock) -->
+  <line x1="240" y1="118" x2="240" y2="130" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.7"/>
+  <line x1="240" y1="370" x2="240" y2="382" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.7"/>
+  <line x1="108" y1="250" x2="120" y2="250" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.7"/>
+  <line x1="360" y1="250" x2="372" y2="250" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.7"/>
+</svg>

@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "tauri": "tauri",
+    "genAppIcons": "tauri icon src/assets/app-icon.svg",
     "release": "bumpp",
     "release:dry": "bumpp --commit false --tag false --push false"
   },
