@@ -2,7 +2,7 @@
 name = "we-health-tick"
 version = "0.1.13"
 description = "We Health Tick Desktop App"
-authors = ["you"]
+authors = ["oceangao"]
 license = ""
 repository = ""
 edition = "2024"
