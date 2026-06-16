@@ -1,11 +1,14 @@
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import { Box, Button, Chip, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import appIcon from '../../assets/app-icon.png';
 
 declare const __APP_VERSION__: string;
 
 function AboutPage() {
+  const { t } = useTranslation();
+
   return (
     <Box
       sx={{
@@ -22,7 +25,7 @@ function AboutPage() {
       <Box
         component="img"
         src={appIcon}
-        alt="We Health Tick"
+        alt={t('common:brand')}
         sx={{
           width: 80,
           height: 80,
@@ -32,17 +35,17 @@ function AboutPage() {
       />
 
       <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-        We Health Tick
+        {t('common:brand')}
       </Typography>
 
       <Typography variant="body2" color="text.secondary">
-        健康打卡
+        {t('about:subtitle')}
       </Typography>
 
       <Chip label={`v${__APP_VERSION__}`} size="small" />
 
       <Typography variant="body2" color="text.secondary">
-        久坐提醒 · 强制休息 · 习惯养成
+        {t('about:slogan')}
       </Typography>
 
       <Button
@@ -51,7 +54,7 @@ function AboutPage() {
         startIcon={<AutorenewIcon />}
         sx={{ mt: 1, textTransform: 'none' }}
       >
-        检查更新
+        {t('about:checkUpdate')}
       </Button>
 
       <Typography
@@ -76,11 +79,11 @@ function AboutPage() {
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 'auto', pt: 2 }}>
         <Typography variant="caption" color="text.secondary">
-          Made with
+          {t('about:madeWith')}
         </Typography>
         <FavoriteIcon sx={{ fontSize: 12, color: 'error.main' }} />
         <Typography variant="caption" color="text.secondary">
-          for your health
+          {t('about:forHealth')}
         </Typography>
       </Box>
     </Box>

@@ -21,8 +21,10 @@
     "@mui/material": "^9.1.0",
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
+    "i18next": "^26.3.1",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "react-i18next": "^17.0.8"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.0.0",

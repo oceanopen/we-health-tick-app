@@ -1,0 +1,10 @@
+{
+  "action": {
+    "resume": "恢复",
+    "pause": "暂停",
+    "reset": "重置",
+    "resetTimerAria": "重置计时器",
+    "settings": "设置"
+  },
+  "exit": "退出"
+}

@@ -1,0 +1,10 @@
+{
+  "action": {
+    "resume": "Resume",
+    "pause": "Pause",
+    "reset": "Reset",
+    "resetTimerAria": "Reset timer",
+    "settings": "Settings"
+  },
+  "exit": "Exit"
+}

@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import AppI18nProvider from '../shared/AppI18nProvider';
 import AppThemeProvider from '../shared/AppThemeProvider';
 import PanelApp from './PanelApp';
 import './PanelApp.css';
@@ -7,7 +8,9 @@ import './PanelApp.css';
 createRoot(document.getElementById('panel-root')!).render(
   <StrictMode>
     <AppThemeProvider>
-      <PanelApp />
+      <AppI18nProvider>
+        <PanelApp />
+      </AppI18nProvider>
     </AppThemeProvider>
   </StrictMode>,
 );

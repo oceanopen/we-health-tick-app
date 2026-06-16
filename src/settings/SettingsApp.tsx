@@ -11,19 +11,21 @@ import {
   useTheme,
 } from '@mui/material';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import AboutPage from './components/AboutPage';
 import SettingsPage from './components/SettingsPage';
 
 type MenuKey = 'settings' | 'about';
 
-const menuItems: { key: MenuKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'settings', label: '系统设置', icon: <SettingsOutlinedIcon /> },
-  { key: 'about', label: '关于', icon: <InfoOutlinedIcon /> },
-];
-
 function SettingsApp() {
+  const { t } = useTranslation();
   const [activeMenu, setActiveMenu] = useState<MenuKey>('settings');
   const theme = useTheme();
+
+  const menuItems: { key: MenuKey; label: string; icon: React.ReactNode }[] = [
+    { key: 'settings', label: t('settings:menu.settings'), icon: <SettingsOutlinedIcon /> },
+    { key: 'about', label: t('settings:menu.about'), icon: <InfoOutlinedIcon /> },
+  ];
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -40,7 +42,7 @@ function SettingsApp() {
       >
         <Box sx={{ p: 2, textAlign: 'center' }}>
           <Typography variant="body2" sx={{ fontWeight: 600 }} color="text.secondary">
-            We Health Tick
+            {t('common:brand')}
           </Typography>
         </Box>
         <List sx={{ px: 1 }}>
