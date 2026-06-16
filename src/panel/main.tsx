@@ -1,20 +1,13 @@
-import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import AppThemeProvider from '../shared/AppThemeProvider';
 import PanelApp from './PanelApp';
 import './PanelApp.css';
 
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-  },
-});
-
 createRoot(document.getElementById('panel-root')!).render(
   <StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <AppThemeProvider>
       <PanelApp />
-    </ThemeProvider>
+    </AppThemeProvider>
   </StrictMode>,
 );

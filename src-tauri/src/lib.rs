@@ -1,3 +1,4 @@
+mod config;
 mod panel;
 mod settings;
 
@@ -20,13 +21,16 @@ pub fn run() {
             }
 
             panel::setup(app)?;
+            config::init(app)?;
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             exit_app,
             settings::show_settings_window,
-            panel::fit_panel
+            panel::fit_panel,
+            config::get_config,
+            config::set_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

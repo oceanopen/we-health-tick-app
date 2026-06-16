@@ -17,13 +17,6 @@ body {
   background: transparent;
 }
 
-body {
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: rgba(30, 30, 40, 0.75);
-  border-radius: 12px;
-}
-
 [data-tauri-drag-region] {
   -webkit-user-select: none;
   user-select: none;

@@ -7,16 +7,15 @@ interface ExitButtonProps {
 export function ExitButton({ onExit }: ExitButtonProps) {
   return (
     <>
-      <Divider sx={{ width: '100%', borderColor: 'rgba(255,255,255,0.1)' }} />
+      <Divider sx={{ width: '100%' }} />
       <Button
         onClick={onExit}
         fullWidth
         size="small"
+        color="secondary"
         sx={{
-          'color': 'rgba(255,255,255,0.6)',
-          'textTransform': 'none',
-          'fontSize': 13,
-          '&:hover': { color: 'rgba(255,255,255,0.9)' },
+          textTransform: 'none',
+          fontSize: 13,
         }}
       >
         退出

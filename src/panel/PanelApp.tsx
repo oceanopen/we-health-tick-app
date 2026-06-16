@@ -1,4 +1,4 @@
-import { Box } from '@mui/material';
+import { alpha, Box } from '@mui/material';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useCallback, useEffect, useRef } from 'react';
@@ -46,7 +46,7 @@ export default function PanelApp() {
     <Box
       ref={rootRef}
       data-tauri-drag-region
-      sx={{
+      sx={theme => ({
         width: 240,
         display: 'flex',
         flexDirection: 'column',
@@ -55,7 +55,10 @@ export default function PanelApp() {
         px: 1.5,
         gap: 1.5,
         userSelect: 'none',
-      }}
+        bgcolor: alpha(theme.palette.background.default, 0.75),
+        backdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: '12px',
+      })}
     >
       <CountdownRing displayTime={displayTime} progress={progress} isExpired={isExpired} />
       <ActionButtons

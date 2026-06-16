@@ -1,4 +1,4 @@
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, useTheme } from '@mui/material';
 import CircularProgress from '@mui/material/CircularProgress';
 
 interface CountdownRingProps {
@@ -8,6 +8,7 @@ interface CountdownRingProps {
 }
 
 export function CountdownRing({ displayTime, progress, isExpired }: CountdownRingProps) {
+  const theme = useTheme();
   return (
     <Box sx={{ position: 'relative', display: 'inline-flex', mt: 1 }}>
       <CircularProgress
@@ -15,7 +16,7 @@ export function CountdownRing({ displayTime, progress, isExpired }: CountdownRin
         value={100}
         size={120}
         thickness={3}
-        sx={{ color: 'rgba(255,255,255,0.1)', position: 'absolute' }}
+        sx={{ color: 'divider', position: 'absolute' }}
       />
       <CircularProgress
         variant="determinate"
@@ -23,7 +24,9 @@ export function CountdownRing({ displayTime, progress, isExpired }: CountdownRin
         size={120}
         thickness={3}
         sx={{
-          color: isExpired ? 'grey.500' : '#c084fc',
+          color: isExpired
+            ? theme.palette.error.main
+            : theme.palette.mode === 'light' ? '#16a34a' : '#4ade80',
           transition: 'color 0.3s',
         }}
       />
