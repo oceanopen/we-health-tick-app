@@ -1,5 +1,4 @@
 import { Box, Typography, useTheme } from '@mui/material';
-import CircularProgress from '@mui/material/CircularProgress';
 
 interface CountdownRingProps {
   displayTime: string;
@@ -7,36 +6,48 @@ interface CountdownRingProps {
   isExpired: boolean;
 }
 
+const SIZE = 120;
+const STROKE_WIDTH = 3;
+const RADIUS = (SIZE - STROKE_WIDTH) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
 export function CountdownRing({ displayTime, progress, isExpired }: CountdownRingProps) {
   const theme = useTheme();
+  const progressColor = isExpired
+    ? theme.palette.error.main
+    : theme.palette.mode === 'light' ? '#16a34a' : '#4ade80';
+  const clamped = isExpired ? 0 : Math.min(100, Math.max(0, progress));
+  const dashOffset = CIRCUMFERENCE * (1 - clamped / 100);
+
   return (
-    <Box sx={{ position: 'relative', display: 'inline-flex', mt: 1 }}>
-      <CircularProgress
-        variant="determinate"
-        value={100}
-        size={120}
-        thickness={3}
-        sx={{ color: 'divider', position: 'absolute' }}
-      />
-      <CircularProgress
-        variant="determinate"
-        value={isExpired ? 0 : progress}
-        size={120}
-        thickness={3}
-        sx={{
-          color: isExpired
-            ? theme.palette.error.main
-            : theme.palette.mode === 'light' ? '#16a34a' : '#4ade80',
-          transition: 'color 0.3s',
-        }}
-      />
+    <Box sx={{ position: 'relative', display: 'inline-flex', mt: 1, width: SIZE, height: SIZE }}>
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          fill="none"
+          stroke={theme.palette.divider}
+          strokeWidth={STROKE_WIDTH}
+        />
+        <circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={RADIUS}
+          fill="none"
+          stroke={progressColor}
+          strokeWidth={STROKE_WIDTH}
+          strokeLinecap="round"
+          strokeDasharray={CIRCUMFERENCE}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+          style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s' }}
+        />
+      </svg>
       <Box
         sx={{
-          top: 0,
-          left: 0,
-          bottom: 0,
-          right: 0,
           position: 'absolute',
+          inset: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
