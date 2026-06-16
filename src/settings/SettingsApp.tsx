@@ -1,4 +1,5 @@
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import {
   alpha,
@@ -13,9 +14,10 @@ import {
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AboutPage from './components/AboutPage';
+import PlanPage from './components/PlanPage';
 import SettingsPage from './components/SettingsPage';
 
-type MenuKey = 'settings' | 'about';
+type MenuKey = 'settings' | 'plan' | 'about';
 
 function SettingsApp() {
   const { t } = useTranslation();
@@ -24,6 +26,7 @@ function SettingsApp() {
 
   const menuItems: { key: MenuKey; label: string; icon: React.ReactNode }[] = [
     { key: 'settings', label: t('settings:menu.settings'), icon: <SettingsOutlinedIcon /> },
+    { key: 'plan', label: t('plan:menu.plan'), icon: <ScheduleOutlinedIcon /> },
     { key: 'about', label: t('settings:menu.about'), icon: <InfoOutlinedIcon /> },
   ];
 
@@ -89,6 +92,7 @@ function SettingsApp() {
         }}
       >
         {activeMenu === 'settings' && <SettingsPage />}
+        {activeMenu === 'plan' && <PlanPage />}
         {activeMenu === 'about' && <AboutPage />}
       </Box>
     </Box>

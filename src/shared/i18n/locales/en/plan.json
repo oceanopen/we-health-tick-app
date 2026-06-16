@@ -1,0 +1,38 @@
+{
+  "menu": {
+    "plan": "Plan"
+  },
+  "page": {
+    "title": "Plan"
+  },
+  "card": {
+    "timer": "Timer",
+    "schedule": "Schedule"
+  },
+  "row": {
+    "workDuration": "Work Duration",
+    "breakDuration": "Break Duration",
+    "dailyGoal": "Daily Goal",
+    "longBreakEnabled": "Long Break",
+    "longBreakInterval": "Long Break Interval",
+    "longBreakDuration": "Long Break Duration",
+    "workTime": "Work Hours",
+    "quietHours": "Quiet Hours"
+  },
+  "option": {
+    "longBreakEveryN": "Every {{count}} rounds"
+  },
+  "unit": {
+    "minutes": "min",
+    "times": "times"
+  },
+  "quietHours": {
+    "add": "Add period",
+    "empty": "No quiet hours"
+  },
+  "button": {
+    "reset": "Reset",
+    "cancel": "Cancel",
+    "save": "Save"
+  }
+}

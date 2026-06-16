@@ -1,0 +1,38 @@
+{
+  "menu": {
+    "plan": "计划"
+  },
+  "page": {
+    "title": "计划"
+  },
+  "card": {
+    "timer": "计时器",
+    "schedule": "时段"
+  },
+  "row": {
+    "workDuration": "工作时长",
+    "breakDuration": "休息时长",
+    "dailyGoal": "每日目标",
+    "longBreakEnabled": "长休息",
+    "longBreakInterval": "长休息间隔",
+    "longBreakDuration": "长休息时长",
+    "workTime": "工作时间",
+    "quietHours": "休息时段"
+  },
+  "option": {
+    "longBreakEveryN": "每 {{count}} 轮"
+  },
+  "unit": {
+    "minutes": "分钟",
+    "times": "次"
+  },
+  "quietHours": {
+    "add": "添加时段",
+    "empty": "暂无休息时段"
+  },
+  "button": {
+    "reset": "重置",
+    "cancel": "取消",
+    "save": "保存"
+  }
+}
