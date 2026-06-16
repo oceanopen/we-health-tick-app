@@ -28,7 +28,7 @@ export default function PanelApp() {
 
   useEffect(() => {
     if (rootRef.current) {
-      const height = rootRef.current.scrollHeight;
+      const height = rootRef.current.offsetHeight;
       invoke('fit_panel', { height });
     }
   }, []);
@@ -55,9 +55,12 @@ export default function PanelApp() {
         px: 1.5,
         gap: 1.5,
         userSelect: 'none',
-        bgcolor: alpha(theme.palette.background.default, 0.75),
         backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        bgcolor: alpha(theme.palette.background.default, 0.5),
         borderRadius: '12px',
+        border: 1,
+        borderColor: 'divider',
       })}
     >
       <CountdownRing displayTime={displayTime} progress={progress} isExpired={isExpired} />
