@@ -9,6 +9,8 @@ pub fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
                 WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
                     .title("We Health Tick")
                     .inner_size(800.0, 600.0)
+                    // 窗口不进任务栏与 Alt+Tab（Windows/Linux），macOS 上为 no-op（Dock 由 ActivationPolicy 控制）。
+                    .skip_taskbar(true)
                     .build()
                     .map_err(|e| e.to_string())?;
 

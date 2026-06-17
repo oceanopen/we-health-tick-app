@@ -180,6 +180,8 @@ fn create_panel(app: &tauri::AppHandle, tray: &tauri::tray::TrayIcon) {
         .transparent(true)
         .always_on_top(true)
         .shadow(false)
+        // 窗口不进任务栏与 Alt+Tab（Windows/Linux），macOS 上为 no-op（Dock 由 ActivationPolicy 控制）。
+        .skip_taskbar(true)
         .focused(true)
         .inner_size(240.0, DEFAULT_PANEL_HEIGHT);
 
