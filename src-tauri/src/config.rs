@@ -26,13 +26,12 @@ pub fn read_config_conn(conn: &Connection, key: &str) -> Result<Option<String>, 
         .map_err(|e| e.to_string())
 }
 
-pub fn read_config(state: &ConfigState, key: &str) -> Result<Option<String>, String> {
+pub fn read_config_raw(state: &ConfigState, key: &str) -> Result<Option<String>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     read_config_conn(&conn, key)
 }
 
-pub fn write_config_raw(state: &ConfigState, key: &str, value: &str) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+pub fn write_config_conn(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
     conn.execute(
         "INSERT OR REPLACE INTO config (key, value) VALUES (?1, ?2)",
         params![key, value],
@@ -41,9 +40,14 @@ pub fn write_config_raw(state: &ConfigState, key: &str, value: &str) -> Result<(
     Ok(())
 }
 
+pub fn write_config_raw(state: &ConfigState, key: &str, value: &str) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    write_config_conn(&conn, key, value)
+}
+
 #[tauri::command]
 pub fn get_config(state: State<'_, ConfigState>, key: String) -> Result<Option<String>, String> {
-    read_config(&state, &key)
+    read_config_raw(&state, &key)
 }
 
 #[tauri::command]
