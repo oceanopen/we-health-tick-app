@@ -48,19 +48,19 @@ export type LongBreakInterval = number;
 export type LongBreakDuration = number;
 
 export const WORK_DURATION_KEY = 'work_duration';
-export const DEFAULT_WORK_DURATION: WorkDuration = 60;
+export const DEFAULT_WORK_DURATION: WorkDuration = 30;
 
 export const BREAK_DURATION_KEY = 'break_duration';
-export const DEFAULT_BREAK_DURATION: BreakDuration = 2;
+export const DEFAULT_BREAK_DURATION: BreakDuration = 1;
 
 export const DAILY_GOAL_KEY = 'daily_goal';
-export const DEFAULT_DAILY_GOAL: DailyGoal = 8;
+export const DEFAULT_DAILY_GOAL: DailyGoal = 10;
 
 export const LONG_BREAK_INTERVAL_KEY = 'long_break_interval';
-export const DEFAULT_LONG_BREAK_INTERVAL: LongBreakInterval = 4;
+export const DEFAULT_LONG_BREAK_INTERVAL: LongBreakInterval = 2;
 
 export const LONG_BREAK_DURATION_KEY = 'long_break_duration';
-export const DEFAULT_LONG_BREAK_DURATION: LongBreakDuration = 15;
+export const DEFAULT_LONG_BREAK_DURATION: LongBreakDuration = 5;
 
 export type LongBreakEnabled = YesNo;
 
@@ -73,7 +73,7 @@ export const WORK_START_TIME_KEY = 'work_start_time';
 export const DEFAULT_WORK_START_TIME: WorkTime = '09:00';
 
 export const WORK_END_TIME_KEY = 'work_end_time';
-export const DEFAULT_WORK_END_TIME: WorkTime = '18:00';
+export const DEFAULT_WORK_END_TIME: WorkTime = '20:00';
 
 export interface QuietHourPeriod {
   start: string;
@@ -84,7 +84,8 @@ export type QuietHours = QuietHourPeriod[];
 
 export const QUIET_HOURS_KEY = 'quiet_hours';
 export const DEFAULT_QUIET_HOURS: QuietHours = [
-  { start: '12:00', end: '13:00' },
+  { start: '12:00', end: '14:00' },
+  { start: '18:00', end: '19:00' },
 ];
 
 export function encodeQuietHours(periods: QuietHours): string {
