@@ -1,0 +1,22 @@
+{
+  "menu": {
+    "rest": "休息"
+  },
+  "page": {
+    "title": "休息"
+  },
+  "row": {
+    "restWindow": "休息窗口",
+    "restConfirm": "休息前确认"
+  },
+  "option": {
+    "tray": "托盘提醒",
+    "topRight": "右上角弹窗",
+    "fullscreen": "全屏强制"
+  },
+  "button": {
+    "reset": "重置",
+    "cancel": "取消",
+    "save": "保存"
+  }
+}

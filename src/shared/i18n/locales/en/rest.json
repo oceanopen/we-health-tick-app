@@ -1,0 +1,22 @@
+{
+  "menu": {
+    "rest": "Break"
+  },
+  "page": {
+    "title": "Break"
+  },
+  "row": {
+    "restWindow": "Break Window",
+    "restConfirm": "Confirm Before Break"
+  },
+  "option": {
+    "tray": "Tray Notification",
+    "topRight": "Top-Right Popup",
+    "fullscreen": "Fullscreen"
+  },
+  "button": {
+    "reset": "Reset",
+    "cancel": "Cancel",
+    "save": "Save"
+  }
+}

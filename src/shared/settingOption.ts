@@ -1,4 +1,4 @@
-import type { Appearance, Language, LongBreakInterval } from './config';
+import type { Appearance, Language, LongBreakInterval, RestWindow } from './config';
 
 export interface LanguageOption {
   value: Language;
@@ -35,4 +35,15 @@ export const longBreakIntervalOptions: LongBreakIntervalOption[] = [
   { value: 6, labelKey: 'plan:option.longBreakEveryN' },
   { value: 7, labelKey: 'plan:option.longBreakEveryN' },
   { value: 8, labelKey: 'plan:option.longBreakEveryN' },
+];
+
+export interface RestWindowOption {
+  value: RestWindow;
+  labelKey: string;
+}
+
+export const restWindowOptions: RestWindowOption[] = [
+  { value: 'tray', labelKey: 'rest:option.tray' },
+  { value: 'topRight', labelKey: 'rest:option.topRight' },
+  { value: 'fullscreen', labelKey: 'rest:option.fullscreen' },
 ];

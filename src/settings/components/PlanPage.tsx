@@ -1,5 +1,5 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { QuietHourPeriod } from '../../shared/config';
+import type { LongBreakEnabled, QuietHourPeriod } from '../../shared/config';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AvTimerOutlinedIcon from '@mui/icons-material/AvTimerOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
@@ -43,11 +43,14 @@ import {
   LONG_BREAK_DURATION_KEY,
   LONG_BREAK_ENABLED_KEY,
   LONG_BREAK_INTERVAL_KEY,
+  parseYesNo,
   QUIET_HOURS_KEY,
   setConfig,
+  toYesNo,
   WORK_DURATION_KEY,
   WORK_END_TIME_KEY,
   WORK_START_TIME_KEY,
+  YES_NO,
 } from '../../shared/config';
 import { longBreakIntervalOptions } from '../../shared/settingOption';
 
@@ -59,7 +62,7 @@ interface PlanConfig {
   workDuration: number;
   breakDuration: number;
   dailyGoal: number;
-  longBreakEnabled: boolean;
+  longBreakEnabled: LongBreakEnabled;
   longBreakInterval: number;
   longBreakDuration: number;
   workStartTime: string;
@@ -106,7 +109,7 @@ function PlanPage() {
         workDuration: wd ? Number(wd) : DEFAULT_WORK_DURATION,
         breakDuration: bd ? Number(bd) : DEFAULT_BREAK_DURATION,
         dailyGoal: dg ? Number(dg) : DEFAULT_DAILY_GOAL,
-        longBreakEnabled: lbe === 'true',
+        longBreakEnabled: parseYesNo(lbe, DEFAULT_LONG_BREAK_ENABLED),
         longBreakInterval: lbi ? Number(lbi) : DEFAULT_LONG_BREAK_INTERVAL,
         longBreakDuration: lbdu ? Number(lbdu) : DEFAULT_LONG_BREAK_DURATION,
         workStartTime: wst ?? DEFAULT_WORK_START_TIME,
@@ -171,7 +174,7 @@ function PlanPage() {
       setConfig(WORK_DURATION_KEY, String(draft.workDuration)),
       setConfig(BREAK_DURATION_KEY, String(draft.breakDuration)),
       setConfig(DAILY_GOAL_KEY, String(draft.dailyGoal)),
-      setConfig(LONG_BREAK_ENABLED_KEY, String(draft.longBreakEnabled)),
+      setConfig(LONG_BREAK_ENABLED_KEY, draft.longBreakEnabled),
       setConfig(LONG_BREAK_INTERVAL_KEY, String(draft.longBreakInterval)),
       setConfig(LONG_BREAK_DURATION_KEY, String(draft.longBreakDuration)),
       setConfig(WORK_START_TIME_KEY, draft.workStartTime),
@@ -316,8 +319,8 @@ function PlanPage() {
               <Typography>{t('plan:row.longBreakEnabled')}</Typography>
             </Box>
             <Switch
-              checked={draft.longBreakEnabled}
-              onChange={e => update('longBreakEnabled', e.target.checked)}
+              checked={draft.longBreakEnabled === YES_NO.YES}
+              onChange={e => update('longBreakEnabled', toYesNo(e.target.checked))}
             />
           </Box>
 

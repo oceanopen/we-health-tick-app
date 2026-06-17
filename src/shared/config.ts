@@ -1,9 +1,38 @@
 import { invoke } from '@tauri-apps/api/core';
 
+export const YES_NO = {
+  YES: 'Y',
+  NO: 'N',
+} as const;
+
+export type YesNo = (typeof YES_NO)[keyof typeof YES_NO];
+
+export function isYes(value: string | null): boolean {
+  return value === YES_NO.YES;
+}
+
+export function toYesNo(value: boolean): YesNo {
+  return value ? YES_NO.YES : YES_NO.NO;
+}
+
+export function parseYesNo(value: string | null, fallback: YesNo): YesNo {
+  return value === YES_NO.YES || value === YES_NO.NO ? value : fallback;
+}
+
 export type Appearance = 'system' | 'light' | 'dark';
 
 export const APPEARANCE_KEY = 'appearance';
 export const DEFAULT_APPEARANCE: Appearance = 'system';
+
+export type RestWindow = 'tray' | 'topRight' | 'fullscreen';
+
+export const REST_WINDOW_KEY = 'rest_window';
+export const DEFAULT_REST_WINDOW: RestWindow = 'tray';
+
+export type RestConfirm = YesNo;
+
+export const REST_CONFIRM_KEY = 'rest_confirm';
+export const DEFAULT_REST_CONFIRM: RestConfirm = YES_NO.YES;
 
 export type Language = 'system' | 'zh-CN' | 'en';
 
@@ -33,10 +62,10 @@ export const DEFAULT_LONG_BREAK_INTERVAL: LongBreakInterval = 4;
 export const LONG_BREAK_DURATION_KEY = 'long_break_duration';
 export const DEFAULT_LONG_BREAK_DURATION: LongBreakDuration = 15;
 
-export type LongBreakEnabled = boolean;
+export type LongBreakEnabled = YesNo;
 
 export const LONG_BREAK_ENABLED_KEY = 'long_break_enabled';
-export const DEFAULT_LONG_BREAK_ENABLED: LongBreakEnabled = false;
+export const DEFAULT_LONG_BREAK_ENABLED: LongBreakEnabled = YES_NO.YES;
 
 export type WorkTime = string;
 
