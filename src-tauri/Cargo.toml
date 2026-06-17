@@ -25,3 +25,5 @@ tauri = { version = "2.11.2", features = ["tray-icon", "macos-private-api", "ima
 tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["time"] }
+chrono = "0.4"

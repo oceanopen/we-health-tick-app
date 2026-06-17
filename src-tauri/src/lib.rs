@@ -1,6 +1,7 @@
 mod config;
 mod panel;
 mod settings;
+mod timer;
 
 #[tauri::command]
 fn exit_app(app: tauri::AppHandle) {
@@ -30,6 +31,7 @@ pub fn run() {
 
             panel::setup(app)?;
             config::init(app)?;
+            timer::init(app)?;
 
             Ok(())
         })
@@ -38,7 +40,8 @@ pub fn run() {
             settings::show_settings_window,
             panel::fit_panel,
             config::get_config,
-            config::set_config
+            config::set_config,
+            timer::get_timer_state
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
