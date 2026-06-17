@@ -1,0 +1,22 @@
+{
+  "menu": {
+    "reminders": "提醒文案"
+  },
+  "page": {
+    "title": "提醒文案",
+    "hint": "休息时随机展示一条提醒"
+  },
+  "row": {
+    "placeholder": "输入提醒内容..."
+  },
+  "button": {
+    "add": "添加",
+    "reset": "重置",
+    "cancel": "取消",
+    "save": "保存"
+  },
+  "defaultMessage": {
+    "walk": "该起来走走了",
+    "water": "该喝水了"
+  }
+}

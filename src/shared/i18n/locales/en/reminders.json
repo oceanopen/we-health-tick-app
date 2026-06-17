@@ -1,0 +1,22 @@
+{
+  "menu": {
+    "reminders": "Reminders"
+  },
+  "page": {
+    "title": "Reminders",
+    "hint": "A random reminder is shown during breaks"
+  },
+  "row": {
+    "placeholder": "Enter reminder text..."
+  },
+  "button": {
+    "add": "Add",
+    "reset": "Reset",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
+  "defaultMessage": {
+    "walk": "Time to stand up and walk",
+    "water": "Time to drink water"
+  }
+}

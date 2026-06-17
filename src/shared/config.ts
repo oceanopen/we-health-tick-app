@@ -115,6 +115,32 @@ export function decodeQuietHours(value: string | null): QuietHours {
   return DEFAULT_QUIET_HOURS;
 }
 
+export type Reminders = string[];
+
+export const REMINDERS_KEY = 'reminders';
+
+export function encodeReminders(list: Reminders): string {
+  return JSON.stringify(list);
+}
+
+export function decodeReminders(value: string | null): Reminders {
+  if (!value) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      const valid = parsed.filter((s): s is string => typeof s === 'string');
+      if (valid.length > 0) {
+        return valid;
+      }
+    }
+  } catch {
+    // ignore parse errors, fall through to empty
+  }
+  return [];
+}
+
 export async function getConfig(key: string): Promise<string | null> {
   return invoke<string | null>('get_config', { key });
 }
