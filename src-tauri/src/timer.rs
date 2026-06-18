@@ -1,64 +1,11 @@
 use chrono::Local;
 use rusqlite::Connection;
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
 use crate::config::{read_config_conn, ConfigState};
-
-// ============================================================
-// Phase 枚举（5 状态 FSM）
-// ============================================================
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Phase {
-    Working,
-    Alerting,
-    Breaking,
-    Waiting,
-    Paused,
-}
-
-// ============================================================
-// Payload（timer-tick / phase-changed 共用）
-// ============================================================
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TimerStatePayload {
-    /// 当前状态机阶段。前端 PanelApp（M5）据此切换 5 种 UI 分支
-    /// （Working/Alerting/Breaking/Waiting/Paused 各一个视图）。
-    pub phase: Phase,
-    /// 切换前的阶段。仅在 phase-changed 事件中有意义（前端做过渡动画 / 判断进入 vs 离开）；
-    /// timer-tick 与 get_timer_state 中恒为 None。
-    pub prev_phase: Option<Phase>,
-    /// 本阶段剩余秒数。working / breaking 阶段倒计时核心字段：
-    /// 前端圆环进度 = remaining / total，中央显示 MM:SS。
-    pub remaining_seconds: i64,
-    /// 本轮总秒数（work_duration 或 break_duration / long_break_duration 换算成秒）。
-    /// UI 圆环进度分母，与 remaining_seconds 配合算百分比。
-    pub total_seconds: i64,
-    /// 当前随机抽取的提醒文案。alerting 阶段大字显示唤起注意，breaking 阶段小字辅助；
-    /// working / waiting / paused 阶段为空字符串。M2 的 on_work_done 中抽取。
-    pub current_reminder: String,
-    /// 本次休息是否为长休息。前端 breaking UI 据此显示「休息中」/「长休息中」标签与不同配色；
-    /// M3 的 start_break 中按 completed_cycles % interval 判定。
-    pub is_long_break: bool,
-    /// 跳过休息的累计点击次数。前端 breaking 阶段按钮显示「跳过 (n/3)」；
-    /// 达到 3 才真正跳过（M2 skip_break 实现，防止误触）。进入 breaking 时清零。
-    pub break_skip_count: u32,
-    /// 已完成的工作-休息轮数。M3 长休息判定输入：
-    /// `completed_cycles > 0 && completed_cycles % interval == 0`；
-    /// 仅正常完成 on_break_done 才递增，跳过休息不计入。
-    pub completed_cycles: u32,
-    /// 当前 Paused 是否由 quietHours 静音时段触发（vs 用户手动暂停）。
-    /// 前端 M5 PausedView 据此切换 UI：
-    ///   - true：显示「休息时段中」（无「继续」按钮或禁用，等静音结束自动恢复）
-    ///   - false：显示「已暂停」+「继续」按钮（用户主动恢复）
-    pub quiet_triggered: bool,
-}
+use crate::shared::types::{Phase, TimerStatePayload};
 
 // ============================================================
 // 内部状态
@@ -467,7 +414,7 @@ fn build_payload(inner: &TimerInner, prev_phase: Option<Phase>) -> TimerStatePay
 // emit "timer-tick"：每秒推送当前状态快照，前端 useTimerState（M5）订阅以更新圆环倒计时。
 // emit 失败仅 log warn，不中断主循环（前端暂时少一帧不影响下秒恢复）。
 fn emit_timer_tick(app: &AppHandle, payload: TimerStatePayload) {
-    if let Err(e) = app.emit("timer-tick", payload) {
+    if let Err(e) = app.emit(crate::shared::events::EVENT_TIMER_TICK, payload) {
         log::warn!("emit timer-tick failed: {e}");
     }
 }
@@ -475,7 +422,7 @@ fn emit_timer_tick(app: &AppHandle, payload: TimerStatePayload) {
 // emit "phase-changed"：phase 切换时推送（带 prev_phase），前端 PanelApp（M4/M5）用于切换 UI 分支。
 // M1 仅在跨天重置时触发；M2 的状态转移逻辑（on_work_done / start_break 等）会频繁触发。
 fn emit_phase_changed(app: &AppHandle, payload: TimerStatePayload) {
-    if let Err(e) = app.emit("phase-changed", payload) {
+    if let Err(e) = app.emit(crate::shared::events::EVENT_PHASE_CHANGED, payload) {
         log::warn!("emit phase-changed failed: {e}");
     }
 }
@@ -483,7 +430,7 @@ fn emit_phase_changed(app: &AppHandle, payload: TimerStatePayload) {
 // emit "show-panel"：进入 Alerting / Breaking 时触发，M4 的 panel.rs 监听后主动唤起 panel 窗口。
 // M2 仅 emit 事件；具体 show/create panel 由 M4 在 listener 中实现。
 fn emit_show_panel(app: &AppHandle) {
-    if let Err(e) = app.emit("show-panel", ()) {
+    if let Err(e) = app.emit(crate::shared::events::EVENT_SHOW_PANEL, ()) {
         log::warn!("emit show-panel failed: {e}");
     }
 }
@@ -736,7 +683,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle_listen = app.handle().clone();
     let inner_listen = inner.clone();
     app.handle()
-        .listen("config-changed", move |event| {
+        .listen(crate::shared::events::EVENT_CONFIG_CHANGED, move |event| {
             on_config_changed(app_handle_listen.clone(), inner_listen.clone(), event);
         });
 
@@ -747,6 +694,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 // 场景：前端 panel/settings 初始化时 invoke("get_timer_state") 主动拉取一次，
 //      避免 mount 后到下一秒 timer-tick 之间的 UI 空白；之后由 timer-tick 自动同步。
 #[tauri::command]
+#[specta::specta]
 pub fn get_timer_state(state: State<'_, TimerState>) -> Result<TimerStatePayload, String> {
     let inner = lock_inner(&state.inner);
     Ok(build_payload(&inner, None))
@@ -766,6 +714,7 @@ pub fn get_timer_state(state: State<'_, TimerState>) -> Result<TimerStatePayload
 // 强制开始新一轮工作（任意 phase 都可调用）。
 // 场景：用户在 UI 点「重置」之外主动 start，或托盘菜单 start。
 #[tauri::command]
+#[specta::specta]
 pub fn start_work(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
     let payload = {
         let mut inner = lock_inner(&state.inner);
@@ -786,6 +735,7 @@ pub fn start_work(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
 
 // Alerting → Breaking：用户在 alerting UI 点「开始休息」。
 #[tauri::command]
+#[specta::specta]
 pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
     let (phase_payload, show_panel) = {
         let mut inner = lock_inner(&state.inner);
@@ -817,6 +767,7 @@ pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(),
 
 // Waiting → Working：休息结束用户点「我回来了」，开始新一轮。
 #[tauri::command]
+#[specta::specta]
 pub fn confirm_return(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
     let payload = {
         let mut inner = lock_inner(&state.inner);
@@ -842,6 +793,7 @@ pub fn confirm_return(app: AppHandle, state: State<'_, TimerState>) -> Result<()
 // - Paused → 原 phase（working 重设 target_epoch = now + remaining；breaking 保持递减）
 // - Alerting / Waiting：不操作（这两个阶段无「暂停」语义）
 #[tauri::command]
+#[specta::specta]
 pub fn toggle_pause(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
     let payload_opt = {
         let mut inner = lock_inner(&state.inner);
@@ -865,6 +817,7 @@ pub fn toggle_pause(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
 
 // 重置：清 completed_cycles + 重新开始 Working（与参考项目 reset 一致）。
 #[tauri::command]
+#[specta::specta]
 pub fn reset(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
     let payload = {
         let mut inner = lock_inner(&state.inner);
@@ -885,6 +838,7 @@ pub fn reset(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String>
 
 // 立即休息：Working → Breaking（用户主动「立即休息」按钮；不计 completed_cycles）。
 #[tauri::command]
+#[specta::specta]
 pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
     let (phase_payload, show_panel) = {
         let mut inner = lock_inner(&state.inner);
@@ -918,6 +872,7 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
 // - < 3 次：break_skip_count += 1，emit timer-tick 让 UI 显示「跳过 (n/3)」
 // - >= 3 次：跳过本次休息（不计入 completed_cycles），直接 start_work
 #[tauri::command]
+#[specta::specta]
 pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
     let (tick_payload, phase_payload) = {
         let mut inner = lock_inner(&state.inner);

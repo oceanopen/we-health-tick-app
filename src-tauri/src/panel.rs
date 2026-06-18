@@ -4,7 +4,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
-use crate::timer::{Phase, TimerStatePayload};
+use crate::shared::types::{Phase, TimerStatePayload};
 
 const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
@@ -59,7 +59,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     // 订阅 phase-changed：phase 切换时同步切换托盘图标（G2）。
     // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
-    app.handle().listen("phase-changed", move |event| {
+    app.handle()
+        .listen(crate::shared::events::EVENT_PHASE_CHANGED, move |event| {
         let phase = serde_json::from_str::<TimerStatePayload>(event.payload())
             .ok()
             .map(|p| p.phase);
@@ -73,7 +74,10 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // 此处主动唤起 panel 窗口（H5）。payload 为 unit，无需解析。
     let show_panel_handle = app.handle().clone();
     app.handle()
-        .listen("show-panel", move |_| show_panel(&show_panel_handle));
+        .listen(
+            crate::shared::events::EVENT_SHOW_PANEL,
+            move |_| show_panel(&show_panel_handle),
+        );
 
     Ok(())
 }
@@ -228,6 +232,7 @@ fn compute_panel_position(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn fit_panel(app: tauri::AppHandle, height: f64) -> Result<(), String> {
     let panel = app.get_webview_window("panel").ok_or("panel not found")?;
     let tray = app.tray_by_id("tray").ok_or("tray not found")?;

@@ -1,6 +1,7 @@
 use tauri::{LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[tauri::command]
+#[specta::specta]
 pub fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     let settings_win = match app.get_webview_window("settings") {
         Some(w) => w,

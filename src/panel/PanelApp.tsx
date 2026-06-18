@@ -1,9 +1,11 @@
-import type { Phase, TimerStatePayload } from './types';
+import type { Phase, TimerStatePayload } from '../shared/bindings';
 import { alpha, Box } from '@mui/material';
-import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useCallback, useEffect, useRef } from 'react';
+import { commands } from '../shared/bindings';
+import { logOnError, safeAwait } from '../shared/commands';
+import { EVENT_PHASE_CHANGED } from '../shared/events';
 import { ActionButtons } from './components/ActionButtons';
 import { CountdownRing } from './components/CountdownRing';
 import { ExitButton } from './components/ExitButton';
@@ -31,7 +33,7 @@ export default function PanelApp() {
 
   // 订阅 phase-changed：把最新 phase 写入 phaseRef，避免 onFocusChanged 闭包读到旧值（I2 已消费此 ref）。
   useEffect(() => {
-    const unlistenPromise = listen<TimerStatePayload>('phase-changed', (e) => {
+    const unlistenPromise = listen<TimerStatePayload>(EVENT_PHASE_CHANGED, (e) => {
       phaseRef.current = e.payload.phase;
       console.log('[PanelApp] phase →', e.payload.phase);
     });
@@ -43,17 +45,17 @@ export default function PanelApp() {
   useEffect(() => {
     if (rootRef.current) {
       const height = rootRef.current.offsetHeight;
-      invoke('fit_panel', { height });
+      void logOnError(commands.fitPanel(height), 'fitPanel');
     }
   }, []);
 
   const handleSettings = useCallback(async () => {
     hidingRef.current = true;
-    await invoke('show_settings_window');
+    await logOnError(commands.showSettingsWindow(), 'showSettingsWindow');
   }, []);
 
   const handleExit = useCallback(async () => {
-    await invoke('exit_app');
+    await safeAwait(commands.exitApp(), 'exitApp');
   }, []);
 
   return (
