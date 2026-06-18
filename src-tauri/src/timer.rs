@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
-use crate::config::{read_config_conn, ConfigState};
+use crate::shared::config::{read_config_conn, ConfigState};
 use crate::shared::types::{Phase, TimerStatePayload};
 
 // ============================================================
@@ -655,7 +655,7 @@ fn on_config_changed(app: AppHandle, inner: Arc<Mutex<TimerInner>>, event: tauri
 // 公开 API：init + get_timer_state
 // ============================================================
 
-// 模块初始化入口，在 lib.rs setup 中调用（必须在 config::init 之后，因为依赖 ConfigState）。
+// 模块初始化入口，在 lib.rs setup 中调用（必须在 shared::config::init 之后，因为依赖 ConfigState）。
 // 执行步骤：
 //   1. fresh_working 创建初始 Working 状态（重启即重新计时，不读历史）
 //   2. app.manage(TimerState) 注册全局状态供 command 访问

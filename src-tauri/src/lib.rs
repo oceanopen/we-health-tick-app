@@ -1,4 +1,3 @@
-mod config;
 mod panel;
 mod settings;
 mod shared;
@@ -22,8 +21,8 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
             exit_app,
             settings::show_settings_window,
             panel::fit_panel,
-            config::get_config,
-            config::set_config,
+            shared::config::get_config,
+            shared::config::set_config,
             timer::get_timer_state,
             timer::start_work,
             timer::confirm_break,
@@ -63,7 +62,7 @@ pub fn run() {
             }
 
             panel::setup(app)?;
-            config::init(app)?;
+            shared::config::init(app)?;
             timer::init(app)?;
 
             specta_builder.mount_events(app);
