@@ -1,5 +1,5 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { LongBreakEnabled, QuietHourPeriod } from '../../shared/config';
+import type { LongBreakEnabled, QuietHourPeriod } from '@src/shared/config';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AvTimerOutlinedIcon from '@mui/icons-material/AvTimerOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
@@ -23,8 +23,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   BREAK_DURATION_KEY,
   DAILY_GOAL_KEY,
@@ -51,8 +49,10 @@ import {
   WORK_END_TIME_KEY,
   WORK_START_TIME_KEY,
   YES_NO,
-} from '../../shared/config';
-import { longBreakIntervalOptions } from '../../shared/settingOption';
+} from '@src/shared/config';
+import { longBreakIntervalOptions } from '@src/shared/settingOption';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface QuietHourItem extends QuietHourPeriod {
   id: number;

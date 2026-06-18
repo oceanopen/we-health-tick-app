@@ -10,15 +10,15 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   decodeReminders,
   encodeReminders,
   getConfig,
   REMINDERS_KEY,
   setConfig,
-} from '../../shared/config';
+} from '@src/shared/config';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ReminderItem {
   id: number;

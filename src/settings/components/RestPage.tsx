@@ -1,5 +1,5 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { RestConfirm, RestWindow } from '../../shared/config';
+import type { RestConfirm, RestWindow } from '@src/shared/config';
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
 import WeekendOutlinedIcon from '@mui/icons-material/WeekendOutlined';
 import {
@@ -12,8 +12,6 @@ import {
   Switch,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   DEFAULT_REST_CONFIRM,
   DEFAULT_REST_WINDOW,
@@ -24,8 +22,10 @@ import {
   setConfig,
   toYesNo,
   YES_NO,
-} from '../../shared/config';
-import { restWindowOptions } from '../../shared/settingOption';
+} from '@src/shared/config';
+import { restWindowOptions } from '@src/shared/settingOption';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface RestConfig {
   restWindow: RestWindow;

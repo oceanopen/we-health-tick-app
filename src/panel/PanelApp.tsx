@@ -1,11 +1,11 @@
-import type { Phase, TimerStatePayload } from '../shared/bindings';
+import type { Phase, TimerStatePayload } from '@src/shared/bindings';
 import { alpha, Box } from '@mui/material';
+import { commands } from '@src/shared/bindings';
+import { logOnError, safeAwait } from '@src/shared/commands';
+import { EVENT_PHASE_CHANGED } from '@src/shared/events';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useCallback, useEffect, useRef } from 'react';
-import { commands } from '../shared/bindings';
-import { logOnError, safeAwait } from '../shared/commands';
-import { EVENT_PHASE_CHANGED } from '../shared/events';
 import { ActionButtons } from './components/ActionButtons';
 import { CountdownRing } from './components/CountdownRing';
 import { ExitButton } from './components/ExitButton';
