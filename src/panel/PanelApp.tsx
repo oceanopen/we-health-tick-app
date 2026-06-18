@@ -1,5 +1,7 @@
+import type { Phase, TimerStatePayload } from './types';
 import { alpha, Box } from '@mui/material';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useCallback, useEffect, useRef } from 'react';
 import { ActionButtons } from './components/ActionButtons';
@@ -10,6 +12,7 @@ import { useTimer } from './hooks/useTimer';
 export default function PanelApp() {
   const { isPaused, isExpired, displayTime, progress, toggle, reset } = useTimer();
   const hidingRef = useRef(false);
+  const phaseRef = useRef<Phase>('working');
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,6 +26,17 @@ export default function PanelApp() {
     });
     return () => {
       unlisten.then(fn => fn());
+    };
+  }, []);
+
+  // 订阅 phase-changed：把最新 phase 写入 phaseRef，避免 onFocusChanged 闭包读到旧值（I2 将消费此 ref）。
+  useEffect(() => {
+    const unlistenPromise = listen<TimerStatePayload>('phase-changed', (e) => {
+      phaseRef.current = e.payload.phase;
+      console.log('[PanelApp] phase →', e.payload.phase);
+    });
+    return () => {
+      unlistenPromise.then(fn => fn());
     };
   }, []);
 
