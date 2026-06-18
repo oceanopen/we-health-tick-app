@@ -53,6 +53,11 @@ pub struct TimerStatePayload {
     /// `completed_cycles > 0 && completed_cycles % interval == 0`；
     /// 仅正常完成 on_break_done 才递增，跳过休息不计入。
     pub completed_cycles: u32,
+    /// 当前 Paused 是否由 quietHours 静音时段触发（vs 用户手动暂停）。
+    /// 前端 M5 PausedView 据此切换 UI：
+    ///   - true：显示「休息时段中」（无「继续」按钮或禁用，等静音结束自动恢复）
+    ///   - false：显示「已暂停」+「继续」按钮（用户主动恢复）
+    pub quiet_triggered: bool,
 }
 
 // ============================================================
@@ -78,6 +83,12 @@ struct TimerInner {
     /// 进入 Paused 前的阶段，恢复时回到这里（M2 toggle_pause 使用）。
     /// 例如 working → paused 时存 Working，恢复时回到 working。
     paused_phase: Option<Phase>,
+    /// 当前 Paused 是否由 quietHours 静音触发（true）vs 用户手动暂停（false）。
+    /// M3 quietHours 判断使用：
+    ///   - 静音命中 → apply_enter_quiet_paused 设为 true；静音结束时自动 start_work 新一轮
+    ///   - 用户手动 → apply_enter_paused 设为 false；不自动恢复，等用户点继续
+    ///   - apply_resume 检测 true 时返回 false（静音期间忽略 toggle_pause）
+    paused_by_quiet: bool,
     /// 已完成的工作-休息轮数。M3 长休息判定输入：
     /// `completed_cycles > 0 && completed_cycles % long_break_interval == 0`。
     /// 仅正常完成 on_break_done 才递增；跳过休息不计入。
@@ -145,6 +156,10 @@ const KEY_REST_CONFIRM: &str = "rest_confirm";
 const DEFAULT_REST_CONFIRM: bool = true; // Y
 
 const KEY_REMINDERS: &str = "reminders";
+
+// quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 与前端
+// src/shared/config.ts 的 QuietHourPeriod 一致；支持跨午夜（start > end）。
+const KEY_QUIET_HOURS: &str = "quiet_hours";
 
 // ============================================================
 // 时间辅助函数
@@ -230,6 +245,45 @@ fn read_rest_confirm(conn: &Connection) -> bool {
         .unwrap_or(DEFAULT_REST_CONFIRM)
 }
 
+// 读 quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 与前端一致。
+// 容错：DB 无值 / JSON 解析失败 / 字段缺失 → 空 vec，视为无静音时段。
+// 每秒被 run_timer_loop 调用一次，开销可忽略（quiet_hours 通常 < 5 项）。
+fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
+    #[derive(serde::Deserialize)]
+    struct Period {
+        start: String,
+        end: String,
+    }
+    let raw = read_config_conn(conn, KEY_QUIET_HOURS)
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    let periods: Vec<Period> = serde_json::from_str(&raw).unwrap_or_default();
+    periods.into_iter().map(|p| (p.start, p.end)).collect()
+}
+
+// 返回当前本地时区的 "HH:mm" 字符串。
+// 用于 quietHours 判断；每秒被调用一次。
+fn now_hhmm() -> String {
+    Local::now().format("%H:%M").to_string()
+}
+
+// 判断某 HH:mm 时刻是否落在任一静音时段内。
+// - 同日时段（start ≤ end，如 12:00-14:00）：start <= hhmm && hhmm < end
+// - 跨午夜时段（start > end，如 22:00-06:00）：hhmm >= start || hhmm < end
+// 注：用字符串比较合法，因为 "HH:mm" 定长格式字典序等价于时间序（"09:00" < "12:00" < "22:00"）。
+fn is_in_quiet_periods(periods: &[(String, String)], hhmm: &str) -> bool {
+    periods.iter().any(|(start, end)| {
+        if start <= end {
+            // 同日时段：[start, end)
+            hhmm >= start.as_str() && hhmm < end.as_str()
+        } else {
+            // 跨午夜时段：[start, 24:00) ∪ [00:00, end)
+            hhmm >= start.as_str() || hhmm < end.as_str()
+        }
+    })
+}
+
 // 从 reminders JSON 数组随机抽一条，空数组/解析失败 → 空串。
 // 伪随机源：本地时区纳秒精度（chrono），无需引入 rand crate。
 // 调用频率：仅在每次 on_work_done（工作结束）时一次，纳秒粒度足够避免重复。
@@ -263,6 +317,7 @@ fn fresh_working(conn: &Connection) -> TimerInner {
         remaining_seconds: total_seconds,
         total_seconds,
         paused_phase: None,
+        paused_by_quiet: false,
         completed_cycles: 0,
         break_skip_count: 0,
         current_reminder: String::new(),
@@ -296,6 +351,7 @@ fn apply_start_work(inner: &mut TimerInner, work_total_secs: i64, now: i64) {
     inner.remaining_seconds = work_total_secs;
     inner.total_seconds = work_total_secs;
     inner.paused_phase = None;
+    inner.paused_by_quiet = false;
     inner.break_skip_count = 0;
     inner.current_reminder = String::new();
     inner.is_long_break = false;
@@ -327,6 +383,7 @@ fn apply_start_break(inner: &mut TimerInner, break_total_secs: i64, is_long: boo
     inner.is_long_break = is_long;
     inner.break_skip_count = 0;
     inner.paused_phase = None;
+    inner.paused_by_quiet = false;
 }
 
 // 休息正常结束（on_break_done）：后置递增 completed_cycles + 进 Waiting。
@@ -339,18 +396,40 @@ fn apply_on_break_done(inner: &mut TimerInner) {
 }
 
 // 进入 Paused：仅 Working / Breaking 可暂停；保存原 phase 到 paused_phase。
+// 用户手动暂停（paused_by_quiet = false）：不自动恢复，等用户点继续。
 fn apply_enter_paused(inner: &mut TimerInner) -> bool {
     if inner.phase != Phase::Working && inner.phase != Phase::Breaking {
         return false;
     }
     inner.paused_phase = Some(inner.phase);
+    inner.paused_by_quiet = false;
+    inner.phase = Phase::Paused;
+    true
+}
+
+// 进入 Paused（静音触发）：任意非 Paused 阶段都强制进 Paused。
+// 与 apply_enter_paused 区别：
+//   - 适用阶段更广（Alerting / Waiting 也会被打断）
+//   - paused_by_quiet = true；静音结束时由 tick 自动 start_work 新一轮（不恢复原进度）
+fn apply_enter_quiet_paused(inner: &mut TimerInner) -> bool {
+    if inner.phase == Phase::Paused {
+        return false;
+    }
+    inner.paused_phase = Some(inner.phase);
+    inner.paused_by_quiet = true;
     inner.phase = Phase::Paused;
     true
 }
 
 // 从 Paused 恢复：根据 paused_phase 重设（working 重设 target_epoch；breaking 保持 remaining 递减）。
+// ⚠️ 静音触发的 paused（paused_by_quiet=true）不允许手动恢复：返回 false，toggle_pause 忽略；
+//    等系统在 tick 中检测静音结束后自动 start_work。
 fn apply_resume(inner: &mut TimerInner, now: i64) -> bool {
     if inner.phase != Phase::Paused {
+        return false;
+    }
+    if inner.paused_by_quiet {
+        // 静音期间，用户手动「继续」无效
         return false;
     }
     let prev = inner.paused_phase.unwrap_or(Phase::Working);
@@ -377,6 +456,7 @@ fn build_payload(inner: &TimerInner, prev_phase: Option<Phase>) -> TimerStatePay
         is_long_break: inner.is_long_break,
         break_skip_count: inner.break_skip_count,
         completed_cycles: inner.completed_cycles,
+        quiet_triggered: inner.paused_by_quiet,
     }
 }
 
@@ -415,11 +495,15 @@ fn emit_show_panel(app: &AppHandle) {
 // 1Hz 定时器主循环：在 init 中 spawn 一次，永久运行（与应用同生命周期）。
 // 每秒执行：
 //   1. 跨天判断（save_date != today → fresh_working + emit phase-changed）
-//   2. 按当前 phase 推进：
+//   2. M3 quietHours 静音判断（每秒检查）：
+//      - 命中静音 + 非 Paused → apply_enter_quiet_paused + emit phase-changed
+//      - 不命中 + paused_by_quiet=true → apply_start_work（新一轮，不恢复原进度）
+//      - 其他组合（已 Paused / 用户手动 paused / 非 Paused 不命中）→ 不操作
+//   3. 按当前 phase 推进（若未被 quiet 切换）：
 //      - Working：按 target_epoch 重算 remaining；归零 → on_work_done → Alerting 或直接 Breaking
 //      - Breaking：remaining -= 1；归零 → on_break_done → Waiting
-//      - Alerting / Waiting / Paused：不递减、不切换（等用户 / M3 quietHours）
-//   3. emit timer-tick；有 phase 切换则 emit phase-changed；进入 Alerting/Breaking 则 emit show-panel
+//      - Alerting / Waiting / Paused：不递减、不切换
+//   4. emit timer-tick；有 phase 切换则 emit phase-changed；进入 Alerting/Breaking 则 emit show-panel
 // 关键约束：所有锁内操作必须不跨 .await（std::sync::Mutex 的 MutexGuard 不是 Send），
 //          payload 构建在锁内完成，emit 在锁外执行。
 async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
@@ -447,10 +531,46 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                 }
             }
 
+            // 一次性读 quiet_hours + work_duration（M3 quiet 判断 + 自动 start_work 共用，
+            // 避免在 quiet 分支里再锁一次 ConfigState）。
+            // 锁失败时回退空 quiet_periods（视为无静音）+ 默认 work 时长。
+            let (quiet_periods, work_min) = {
+                let config_state = app.state::<ConfigState>();
+                match config_state.0.lock() {
+                    Ok(conn) => (
+                        read_quiet_hours(&conn),
+                        read_work_duration_minutes(&conn),
+                    ),
+                    Err(e) => {
+                        log::warn!("config lock failed, skip quiet check: {e}");
+                        (Vec::new(), DEFAULT_WORK_DURATION_MIN)
+                    }
+                }
+            };
+
+            // M3 quietHours 静音判断（每秒检查，开销可忽略）
+            let now = now_epoch();
+            let in_quiet = is_in_quiet_periods(&quiet_periods, &now_hhmm());
+            if in_quiet {
+                // 命中静音：任意非 Paused 阶段强制进 Paused（静音触发）
+                if state.phase != Phase::Paused {
+                    let prev = state.phase;
+                    apply_enter_quiet_paused(&mut state);
+                    phase_change_payload = Some(build_payload(&state, Some(prev)));
+                }
+                // 已 Paused 时无操作：静音触发则保持；用户手动 paused（paused_by_quiet=false）也保持
+            } else if state.phase == Phase::Paused && state.paused_by_quiet {
+                // 不命中 + 静音触发的 paused → 自动 start_work 新一轮（不恢复原进度，照搬参考项目）
+                let prev = state.phase;
+                apply_start_work(&mut state, (work_min as i64) * 60, now);
+                state.save_date = today_string();
+                phase_change_payload = Some(build_payload(&state, Some(prev)));
+            }
+
+            // phase 推进（若 quiet 切到了 Paused 或 Working，下方 match 会自然落到对应分支处理新 phase）
             match state.phase {
                 Phase::Working => {
                     // 绝对时间机制：按 target_epoch 重算 remaining_seconds
-                    let now = now_epoch();
                     state.remaining_seconds = if state.target_epoch > now {
                         state.target_epoch - now
                     } else {
