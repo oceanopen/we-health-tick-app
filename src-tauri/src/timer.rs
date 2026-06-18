@@ -1,6 +1,6 @@
 use chrono::Local;
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
@@ -11,7 +11,7 @@ use crate::config::{read_config_conn, ConfigState};
 // Phase 枚举（5 状态 FSM）
 // ============================================================
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
     Working,
@@ -25,7 +25,7 @@ pub enum Phase {
 // Payload（timer-tick / phase-changed 共用）
 // ============================================================
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimerStatePayload {
     /// 当前状态机阶段。前端 PanelApp（M5）据此切换 5 种 UI 分支

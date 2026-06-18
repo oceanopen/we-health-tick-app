@@ -1,7 +1,10 @@
 use tauri::{
-    LogicalPosition, LogicalSize, Manager, Position, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Listener, LogicalPosition, LogicalSize, Manager, Position, WebviewUrl,
+    WebviewWindowBuilder,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+
+use crate::timer::{Phase, TimerStatePayload};
 
 const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
@@ -55,7 +58,48 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         })
         .build(app)?;
 
+    // 订阅 phase-changed：phase 切换时同步切换托盘图标（G2）。
+    // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
+    let app_handle = app.handle().clone();
+    app.handle().listen("phase-changed", move |event| {
+        let phase = serde_json::from_str::<TimerStatePayload>(event.payload())
+            .ok()
+            .map(|p| p.phase);
+        match phase {
+            Some(phase) => set_tray_icon_by_phase(&app_handle, phase),
+            None => log::warn!("phase-changed payload parse failed, skip tray icon update"),
+        }
+    });
+
     Ok(())
+}
+
+// 按 phase 切换托盘图标（G2）。在 setup 末尾订阅 phase-changed 时调用；
+// G3 落地后启动时也会显式调一次（Phase::Working）。
+// 失败容错：图片解码 / tray 缺失 / set_icon 失败均 log::warn! 并返回，不 panic
+// （托盘图标切换是非关键路径，不应阻塞状态机主流程）。
+pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
+    let bytes: &[u8] = match phase {
+        Phase::Working => include_bytes!("../icons/tray/working.png"),
+        Phase::Alerting => include_bytes!("../icons/tray/alerting.png"),
+        Phase::Breaking => include_bytes!("../icons/tray/breaking.png"),
+        Phase::Waiting => include_bytes!("../icons/tray/waiting.png"),
+        Phase::Paused => include_bytes!("../icons/tray/paused.png"),
+    };
+    let icon = match tauri::image::Image::from_bytes(bytes) {
+        Ok(img) => img,
+        Err(e) => {
+            log::warn!("decode tray icon failed for {:?}: {e}", phase);
+            return;
+        }
+    };
+    let Some(tray) = app.tray_by_id("tray") else {
+        log::warn!("tray not found when set_tray_icon_by_phase({:?})", phase);
+        return;
+    };
+    if let Err(e) = tray.set_icon(Some(icon)) {
+        log::warn!("set_icon failed for {:?}: {e}", phase);
+    }
 }
 
 fn position_panel(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
