@@ -5,6 +5,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
 use crate::shared::config::{read_config_conn, ConfigState};
+use crate::shared::time::{now_epoch, now_hhmm, today_string};
 use crate::shared::types::{Phase, TimerStatePayload};
 
 // ============================================================
@@ -108,23 +109,6 @@ const KEY_REMINDERS: &str = "reminders";
 // src/shared/config.ts 的 QuietHourPeriod 一致；支持跨午夜（start > end）。
 const KEY_QUIET_HOURS: &str = "quiet_hours";
 
-// ============================================================
-// 时间辅助函数
-// ============================================================
-
-// 返回今天日期字符串（yyyy-MM-dd，本地时区）。
-// 场景：与 TimerInner.save_date 比较，检测应用运行期间是否跨天；跨天则触发 fresh_working 重置。
-fn today_string() -> String {
-    Local::now().format("%Y-%m-%d").to_string()
-}
-
-// 返回当前 epoch 秒（本地时区）。
-// 场景：working 阶段每秒重算 remaining_seconds = target_epoch - now；
-//      fresh_working 与 on_config_changed 中设 target_epoch = now + duration。
-fn now_epoch() -> i64 {
-    Local::now().timestamp()
-}
-
 // 拿 TimerInner 锁，poisoned 时自动恢复（避免线程 panic 级联导致整个状态机死锁）。
 // 场景：所有需要读写 TimerInner 的同步代码块入口。
 fn lock_inner(inner: &Mutex<TimerInner>) -> MutexGuard<'_, TimerInner> {
@@ -207,12 +191,6 @@ fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
         .unwrap_or_default();
     let periods: Vec<Period> = serde_json::from_str(&raw).unwrap_or_default();
     periods.into_iter().map(|p| (p.start, p.end)).collect()
-}
-
-// 返回当前本地时区的 "HH:mm" 字符串。
-// 用于 quietHours 判断；每秒被调用一次。
-fn now_hhmm() -> String {
-    Local::now().format("%H:%M").to_string()
 }
 
 // 判断某 HH:mm 时刻是否落在任一静音时段内。
