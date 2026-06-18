@@ -58,9 +58,12 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         })
         .build(app)?;
 
+    let app_handle = app.handle().clone();
+    // 启动即 fresh_working（L1），初始恒为 Working；显式设置一次避免启动瞬间显示默认 32x32.png（G3）。
+    set_tray_icon_by_phase(&app_handle, Phase::Working);
+
     // 订阅 phase-changed：phase 切换时同步切换托盘图标（G2）。
     // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
-    let app_handle = app.handle().clone();
     app.handle().listen("phase-changed", move |event| {
         let phase = serde_json::from_str::<TimerStatePayload>(event.payload())
             .ok()
