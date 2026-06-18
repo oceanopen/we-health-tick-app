@@ -18,7 +18,7 @@ export default function PanelApp() {
   useEffect(() => {
     const currentWin = getCurrentWindow();
     const unlisten = currentWin.onFocusChanged(({ payload: focused }) => {
-      if (!focused && !hidingRef.current) {
+      if (!focused && !hidingRef.current && phaseRef.current !== 'alerting') {
         currentWin.hide();
       } else if (focused) {
         hidingRef.current = false;
@@ -29,7 +29,7 @@ export default function PanelApp() {
     };
   }, []);
 
-  // 订阅 phase-changed：把最新 phase 写入 phaseRef，避免 onFocusChanged 闭包读到旧值（I2 将消费此 ref）。
+  // 订阅 phase-changed：把最新 phase 写入 phaseRef，避免 onFocusChanged 闭包读到旧值（I2 已消费此 ref）。
   useEffect(() => {
     const unlistenPromise = listen<TimerStatePayload>('phase-changed', (e) => {
       phaseRef.current = e.payload.phase;
