@@ -41,7 +41,14 @@ pub fn run() {
             panel::fit_panel,
             config::get_config,
             config::set_config,
-            timer::get_timer_state
+            timer::get_timer_state,
+            timer::start_work,
+            timer::confirm_break,
+            timer::confirm_return,
+            timer::toggle_pause,
+            timer::reset,
+            timer::manual_break,
+            timer::skip_break
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

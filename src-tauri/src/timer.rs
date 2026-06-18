@@ -11,7 +11,6 @@ use crate::config::{read_config_conn, ConfigState};
 // Phase 枚举（5 状态 FSM）
 // ============================================================
 
-#[allow(dead_code)] // Alerting/Breaking/Waiting/Paused 由 M2/M3 状态转移逻辑使用
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
@@ -70,6 +69,7 @@ struct TimerInner {
     /// 当前 phase 的剩余秒数（working 与 breaking 共用此字段）。
     /// - working 阶段：每秒 tick 时由 target_epoch 重算（不持久化）
     /// - breaking 阶段：递减（M2 实现）
+    ///
     /// 是 emit 给前端的核心字段之一（圆环 + MM:SS）。
     remaining_seconds: i64,
     /// 本轮总秒数。working 阶段 = work_duration × 60；breaking 阶段 = break 或 long_break 时长。
@@ -77,7 +77,6 @@ struct TimerInner {
     total_seconds: i64,
     /// 进入 Paused 前的阶段，恢复时回到这里（M2 toggle_pause 使用）。
     /// 例如 working → paused 时存 Working，恢复时回到 working。
-    #[allow(dead_code)]
     paused_phase: Option<Phase>,
     /// 已完成的工作-休息轮数。M3 长休息判定输入：
     /// `completed_cycles > 0 && completed_cycles % long_break_interval == 0`。
@@ -106,11 +105,46 @@ pub struct TimerState {
 }
 
 // ============================================================
-// 常量：业务配置 key + 默认值
+// 业务配置 key + 默认值
 // ============================================================
+//
+// ⚠️ SSOT (Single Source of Truth)：src/shared/config.ts
+//
+// 下方 key 与默认值与前端 config.ts 一一对应（前端是可信源）。
+// 修改任一项时，必须同步另一侧；否则会出现「DB 无值时前后端兜底不一致」的 bug
+// （例：后端读 work_duration 默认 30，前端 UI 显示 25，用户首次进设置页看到错值）。
+//
+// 重复存在的根因：Tauri 跨语言边界（TS webview ↔ Rust native）不能共享内存常量，
+// IPC 只传字符串；两边都需要 key 名 + 兜底默认值。这是结构性重复，非设计失误。
+//
+// 配对清单（修改时按此核对）：
+//   KEY_WORK_DURATION          ↔ WORK_DURATION_KEY         / DEFAULT_WORK_DURATION
+//   KEY_BREAK_DURATION         ↔ BREAK_DURATION_KEY        / DEFAULT_BREAK_DURATION
+//   KEY_LONG_BREAK_ENABLED     ↔ LONG_BREAK_ENABLED_KEY    / DEFAULT_LONG_BREAK_ENABLED
+//   KEY_LONG_BREAK_INTERVAL    ↔ LONG_BREAK_INTERVAL_KEY   / DEFAULT_LONG_BREAK_INTERVAL
+//   KEY_LONG_BREAK_DURATION    ↔ LONG_BREAK_DURATION_KEY   / DEFAULT_LONG_BREAK_DURATION
+//   KEY_REST_CONFIRM           ↔ REST_CONFIRM_KEY          / DEFAULT_REST_CONFIRM
+//   KEY_REMINDERS              ↔ REMINDERS_KEY             / （无默认，运行时 decode/pick）
 
 const KEY_WORK_DURATION: &str = "work_duration";
 const DEFAULT_WORK_DURATION_MIN: u32 = 30;
+
+const KEY_BREAK_DURATION: &str = "break_duration";
+const DEFAULT_BREAK_DURATION_MIN: u32 = 1;
+
+const KEY_LONG_BREAK_ENABLED: &str = "long_break_enabled";
+const DEFAULT_LONG_BREAK_ENABLED: bool = true; // Y
+
+const KEY_LONG_BREAK_INTERVAL: &str = "long_break_interval";
+const DEFAULT_LONG_BREAK_INTERVAL: u32 = 2;
+
+const KEY_LONG_BREAK_DURATION: &str = "long_break_duration";
+const DEFAULT_LONG_BREAK_DURATION_MIN: u32 = 5;
+
+const KEY_REST_CONFIRM: &str = "rest_confirm";
+const DEFAULT_REST_CONFIRM: bool = true; // Y
+
+const KEY_REMINDERS: &str = "reminders";
 
 // ============================================================
 // 时间辅助函数
@@ -150,6 +184,68 @@ fn read_work_duration_minutes(conn: &Connection) -> u32 {
         .unwrap_or(DEFAULT_WORK_DURATION_MIN)
 }
 
+// 读 break_duration（分钟），同样容错回退。
+fn read_break_duration_minutes(conn: &Connection) -> u32 {
+    read_config_conn(conn, KEY_BREAK_DURATION)
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(DEFAULT_BREAK_DURATION_MIN)
+}
+
+// 读 long_break_enabled（Y/N），容错回退默认 Y。
+fn read_long_break_enabled(conn: &Connection) -> bool {
+    read_config_conn(conn, KEY_LONG_BREAK_ENABLED)
+        .ok()
+        .flatten()
+        .map(|s| s == "Y")
+        .unwrap_or(DEFAULT_LONG_BREAK_ENABLED)
+}
+
+// 读 long_break_interval（轮），容错回退 2。
+fn read_long_break_interval(conn: &Connection) -> u32 {
+    read_config_conn(conn, KEY_LONG_BREAK_INTERVAL)
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(DEFAULT_LONG_BREAK_INTERVAL)
+}
+
+// 读 long_break_duration（分钟），容错回退 5。
+fn read_long_break_duration_minutes(conn: &Connection) -> u32 {
+    read_config_conn(conn, KEY_LONG_BREAK_DURATION)
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(DEFAULT_LONG_BREAK_DURATION_MIN)
+}
+
+// 读 rest_confirm（Y/N），容错回退默认 Y。
+// Y：工作结束时先进 Alerting 等用户确认；N：直接进 Breaking。
+fn read_rest_confirm(conn: &Connection) -> bool {
+    read_config_conn(conn, KEY_REST_CONFIRM)
+        .ok()
+        .flatten()
+        .map(|s| s == "Y")
+        .unwrap_or(DEFAULT_REST_CONFIRM)
+}
+
+// 从 reminders JSON 数组随机抽一条，空数组/解析失败 → 空串。
+// 伪随机源：本地时区纳秒精度（chrono），无需引入 rand crate。
+// 调用频率：仅在每次 on_work_done（工作结束）时一次，纳秒粒度足够避免重复。
+fn pick_random_reminder(conn: &Connection) -> String {
+    let raw = read_config_conn(conn, KEY_REMINDERS)
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    let list: Vec<String> = serde_json::from_str(&raw).unwrap_or_default();
+    if list.is_empty() {
+        return String::new();
+    }
+    let idx = (Local::now().timestamp_nanos_opt().unwrap_or(0) as usize) % list.len();
+    list.into_iter().nth(idx).unwrap_or_default()
+}
+
 // ============================================================
 // 状态构造与序列化
 // ============================================================
@@ -173,6 +269,98 @@ fn fresh_working(conn: &Connection) -> TimerInner {
         is_long_break: false,
         save_date: today_string(),
     }
+}
+
+// ============================================================
+// 内部状态转移纯函数（操作 &mut TimerInner，不读 DB、不 emit）
+// ============================================================
+//
+// 这些函数由 command（持有 State）与定时器循环（持有 Arc<Mutex>）共享调用，
+// 确保状态修改规则集中、可测试。调用方负责：
+//   1. 持有 TimerInner 锁
+//   2. 临时锁 ConfigState 读 DB（按 inner → config 顺序避免死锁）
+//   3. 锁外 emit phase-changed / timer-tick / show-panel
+
+// 长休息判定（读取递增前的 completed_cycles）：
+//   `enabled && interval > 0 && completed_cycles > 0 && completed_cycles % interval == 0`
+// 关键：completed_cycles 在 on_break_done 中后置递增，第一次休息时 = 0，永不长休息。
+fn check_is_long_break(enabled: bool, interval: u32, completed_cycles: u32) -> bool {
+    enabled && interval > 0 && completed_cycles > 0 && completed_cycles % interval == 0
+}
+
+// 进入 Working 阶段：重设 target_epoch = now + work_total_secs + 清休息相关字段。
+// 场景：start_work command / confirm_return / reset / 跳过休息。
+fn apply_start_work(inner: &mut TimerInner, work_total_secs: i64, now: i64) {
+    inner.phase = Phase::Working;
+    inner.target_epoch = now + work_total_secs;
+    inner.remaining_seconds = work_total_secs;
+    inner.total_seconds = work_total_secs;
+    inner.paused_phase = None;
+    inner.break_skip_count = 0;
+    inner.current_reminder = String::new();
+    inner.is_long_break = false;
+}
+
+// 工作倒计时归零：抽取 reminder + 按 rest_confirm 分流。
+// rest_confirm=true → 进 Alerting（等用户确认）；=false → 调用方继续 apply_start_break。
+// 返回进入的下一个 phase，调用方据此决定是否继续 breaking 流程 / emit show-panel。
+fn apply_on_work_done(inner: &mut TimerInner, reminder: String, rest_confirm: bool) -> Phase {
+    inner.current_reminder = reminder;
+    if rest_confirm {
+        inner.phase = Phase::Alerting;
+        inner.remaining_seconds = 0;
+        inner.target_epoch = 0;
+        Phase::Alerting
+    } else {
+        // 调用方继续：调 apply_start_break
+        Phase::Breaking
+    }
+}
+
+// 进入 Breaking 阶段：清 break_skip_count + 设剩余/总秒数。
+// is_long 由调用方按 check_is_long_break 判定后传入（用递增前的 completed_cycles）。
+fn apply_start_break(inner: &mut TimerInner, break_total_secs: i64, is_long: bool) {
+    inner.phase = Phase::Breaking;
+    inner.target_epoch = 0; // breaking 不用 target_epoch（递减模式）
+    inner.remaining_seconds = break_total_secs;
+    inner.total_seconds = break_total_secs;
+    inner.is_long_break = is_long;
+    inner.break_skip_count = 0;
+    inner.paused_phase = None;
+}
+
+// 休息正常结束（on_break_done）：后置递增 completed_cycles + 进 Waiting。
+// 关键：completedCycles 后置递增 → 下次 start_break 判定时读到递增后的值。
+fn apply_on_break_done(inner: &mut TimerInner) {
+    inner.completed_cycles += 1;
+    inner.phase = Phase::Waiting;
+    inner.remaining_seconds = 0;
+    inner.target_epoch = 0;
+}
+
+// 进入 Paused：仅 Working / Breaking 可暂停；保存原 phase 到 paused_phase。
+fn apply_enter_paused(inner: &mut TimerInner) -> bool {
+    if inner.phase != Phase::Working && inner.phase != Phase::Breaking {
+        return false;
+    }
+    inner.paused_phase = Some(inner.phase);
+    inner.phase = Phase::Paused;
+    true
+}
+
+// 从 Paused 恢复：根据 paused_phase 重设（working 重设 target_epoch；breaking 保持 remaining 递减）。
+fn apply_resume(inner: &mut TimerInner, now: i64) -> bool {
+    if inner.phase != Phase::Paused {
+        return false;
+    }
+    let prev = inner.paused_phase.unwrap_or(Phase::Working);
+    inner.phase = prev;
+    inner.paused_phase = None;
+    if prev == Phase::Working && inner.remaining_seconds > 0 {
+        // 重设 target_epoch = now + remaining，继续 working 倒计时
+        inner.target_epoch = now + inner.remaining_seconds;
+    }
+    true
 }
 
 // 把 TimerInner 转成可序列化的 TimerStatePayload（前端能直接消费的形态）。
@@ -212,6 +400,14 @@ fn emit_phase_changed(app: &AppHandle, payload: TimerStatePayload) {
     }
 }
 
+// emit "show-panel"：进入 Alerting / Breaking 时触发，M4 的 panel.rs 监听后主动唤起 panel 窗口。
+// M2 仅 emit 事件；具体 show/create panel 由 M4 在 listener 中实现。
+fn emit_show_panel(app: &AppHandle) {
+    if let Err(e) = app.emit("show-panel", ()) {
+        log::warn!("emit show-panel failed: {e}");
+    }
+}
+
 // ============================================================
 // 1Hz 定时器循环
 // ============================================================
@@ -219,8 +415,11 @@ fn emit_phase_changed(app: &AppHandle, payload: TimerStatePayload) {
 // 1Hz 定时器主循环：在 init 中 spawn 一次，永久运行（与应用同生命周期）。
 // 每秒执行：
 //   1. 跨天判断（save_date != today → fresh_working + emit phase-changed）
-//   2. working 阶段按 target_epoch 重算 remaining_seconds（绝对时间机制，防时钟漂移）
-//   3. emit timer-tick
+//   2. 按当前 phase 推进：
+//      - Working：按 target_epoch 重算 remaining；归零 → on_work_done → Alerting 或直接 Breaking
+//      - Breaking：remaining -= 1；归零 → on_break_done → Waiting
+//      - Alerting / Waiting / Paused：不递减、不切换（等用户 / M3 quietHours）
+//   3. emit timer-tick；有 phase 切换则 emit phase-changed；进入 Alerting/Breaking 则 emit show-panel
 // 关键约束：所有锁内操作必须不跨 .await（std::sync::Mutex 的 MutexGuard 不是 Send），
 //          payload 构建在锁内完成，emit 在锁外执行。
 async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
@@ -230,9 +429,10 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
         interval.tick().await;
 
         // 同步块：所有状态修改 + payload 构建在锁内完成，不跨 await 持锁
-        let (tick_payload, phase_change_payload) = {
+        let (tick_payload, phase_change_payload, show_panel) = {
             let mut state = lock_inner(&inner);
             let mut phase_change_payload = None;
+            let mut show_panel = false;
 
             // 运行时跨天判断：长时间运行到次日，开始新一轮工作
             let today = today_string();
@@ -247,24 +447,85 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                 }
             }
 
-            // working 阶段：根据 target_epoch 重算 remaining_seconds（绝对时间机制）
-            if state.phase == Phase::Working {
-                let now = now_epoch();
-                state.remaining_seconds = if state.target_epoch > now {
-                    state.target_epoch - now
-                } else {
-                    0
-                };
-                // M1 不实现 on_work_done 转移，留给 M2 接管
+            match state.phase {
+                Phase::Working => {
+                    // 绝对时间机制：按 target_epoch 重算 remaining_seconds
+                    let now = now_epoch();
+                    state.remaining_seconds = if state.target_epoch > now {
+                        state.target_epoch - now
+                    } else {
+                        0
+                    };
+
+                    // 工作倒计时归零 → on_work_done
+                    if state.remaining_seconds == 0 {
+                        let prev = state.phase;
+                        let config_state = app.state::<ConfigState>();
+                        match config_state.0.lock() {
+                            Ok(conn) => {
+                                let reminder = pick_random_reminder(&conn);
+                                let rest_confirm = read_rest_confirm(&conn);
+                                let next =
+                                    apply_on_work_done(&mut state, reminder, rest_confirm);
+
+                                if next == Phase::Breaking {
+                                    // rest_confirm=N：直接进 Breaking
+                                    let break_min = read_break_duration_minutes(&conn);
+                                    let lb_enabled = read_long_break_enabled(&conn);
+                                    let lb_interval = read_long_break_interval(&conn);
+                                    let lb_duration_min =
+                                        read_long_break_duration_minutes(&conn);
+                                    let is_long = check_is_long_break(
+                                        lb_enabled,
+                                        lb_interval,
+                                        state.completed_cycles,
+                                    );
+                                    let total_min = if is_long { lb_duration_min } else { break_min };
+                                    apply_start_break(
+                                        &mut state,
+                                        (total_min as i64) * 60,
+                                        is_long,
+                                    );
+                                }
+                                // Alerting 与 Breaking 都需要唤起 panel（M4 监听）
+                                show_panel = true;
+                                phase_change_payload = Some(build_payload(&state, Some(prev)));
+                            }
+                            Err(e) => log::warn!("config lock poisoned, skip on_work_done: {e}"),
+                        }
+                    }
+                }
+                Phase::Breaking => {
+                    // breaking 用递减模式（与参考项目一致；M3 活动检测可在此基础上扩展暂停）
+                    if state.remaining_seconds > 0 {
+                        state.remaining_seconds -= 1;
+                    }
+                    if state.remaining_seconds == 0 {
+                        let prev = state.phase;
+                        apply_on_break_done(&mut state);
+                        phase_change_payload = Some(build_payload(&state, Some(prev)));
+                    }
+                }
+                Phase::Alerting | Phase::Waiting | Phase::Paused => {
+                    // 这些阶段 tick 中不推进：Alerting 等用户确认；Waiting 等用户回来；
+                    // Paused 等用户恢复或 M3 quietHours 结束。remaining 保持当前值。
+                }
             }
 
-            (build_payload(&state, None), phase_change_payload)
+            (
+                build_payload(&state, None),
+                phase_change_payload,
+                show_panel,
+            )
         };
 
         emit_timer_tick(&app, tick_payload);
 
         if let Some(payload) = phase_change_payload {
             emit_phase_changed(&app, payload);
+        }
+        if show_panel {
+            emit_show_panel(&app);
         }
     }
 }
@@ -369,4 +630,199 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 pub fn get_timer_state(state: State<'_, TimerState>) -> Result<TimerStatePayload, String> {
     let inner = lock_inner(&state.inner);
     Ok(build_payload(&inner, None))
+}
+
+// ============================================================
+// 状态转移 commands（前端按钮 invoke 入口）
+// ============================================================
+//
+// 共同模式：
+//   1. 锁 inner（同步块）
+//   2. 必要时锁 ConfigState 读配置（保持 inner → config 顺序避免死锁）
+//   3. 调 apply_* 纯函数修改状态
+//   4. 锁外 emit phase-changed / timer-tick / show-panel
+// 错误策略：锁 poisoned → 返回 Err；读配置失败 → 回退默认值（不返回 Err）。
+
+// 强制开始新一轮工作（任意 phase 都可调用）。
+// 场景：用户在 UI 点「重置」之外主动 start，或托盘菜单 start。
+#[tauri::command]
+pub fn start_work(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
+    let payload = {
+        let mut inner = lock_inner(&state.inner);
+        let prev = inner.phase;
+        let now = now_epoch();
+        let work_min = {
+            let config_state = app.state::<ConfigState>();
+            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            read_work_duration_minutes(&conn)
+        };
+        apply_start_work(&mut inner, (work_min as i64) * 60, now);
+        inner.save_date = today_string();
+        build_payload(&inner, Some(prev))
+    };
+    emit_phase_changed(&app, payload);
+    Ok(())
+}
+
+// Alerting → Breaking：用户在 alerting UI 点「开始休息」。
+#[tauri::command]
+pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
+    let (phase_payload, show_panel) = {
+        let mut inner = lock_inner(&state.inner);
+        if inner.phase != Phase::Alerting {
+            return Err("confirm_break only valid in Alerting phase".into());
+        }
+        let prev = inner.phase;
+        let (total_secs, is_long) = {
+            let config_state = app.state::<ConfigState>();
+            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            let break_min = read_break_duration_minutes(&conn);
+            let lb_enabled = read_long_break_enabled(&conn);
+            let lb_interval = read_long_break_interval(&conn);
+            let lb_duration_min = read_long_break_duration_minutes(&conn);
+            let is_long =
+                check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
+            let total_min = if is_long { lb_duration_min } else { break_min };
+            ((total_min as i64) * 60, is_long)
+        };
+        apply_start_break(&mut inner, total_secs, is_long);
+        (build_payload(&inner, Some(prev)), true)
+    };
+    emit_phase_changed(&app, phase_payload);
+    if show_panel {
+        emit_show_panel(&app);
+    }
+    Ok(())
+}
+
+// Waiting → Working：休息结束用户点「我回来了」，开始新一轮。
+#[tauri::command]
+pub fn confirm_return(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
+    let payload = {
+        let mut inner = lock_inner(&state.inner);
+        if inner.phase != Phase::Waiting {
+            return Err("confirm_return only valid in Waiting phase".into());
+        }
+        let prev = inner.phase;
+        let now = now_epoch();
+        let work_min = {
+            let config_state = app.state::<ConfigState>();
+            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            read_work_duration_minutes(&conn)
+        };
+        apply_start_work(&mut inner, (work_min as i64) * 60, now);
+        build_payload(&inner, Some(prev))
+    };
+    emit_phase_changed(&app, payload);
+    Ok(())
+}
+
+// Working/Breaking ↔ Paused 切换。
+// - Working 或 Breaking → Paused（保存 paused_phase）
+// - Paused → 原 phase（working 重设 target_epoch = now + remaining；breaking 保持递减）
+// - Alerting / Waiting：不操作（这两个阶段无「暂停」语义）
+#[tauri::command]
+pub fn toggle_pause(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
+    let payload_opt = {
+        let mut inner = lock_inner(&state.inner);
+        let prev = inner.phase;
+        let changed = match inner.phase {
+            Phase::Working | Phase::Breaking => apply_enter_paused(&mut inner),
+            Phase::Paused => apply_resume(&mut inner, now_epoch()),
+            _ => false,
+        };
+        if changed {
+            Some(build_payload(&inner, Some(prev)))
+        } else {
+            None
+        }
+    };
+    if let Some(payload) = payload_opt {
+        emit_phase_changed(&app, payload);
+    }
+    Ok(())
+}
+
+// 重置：清 completed_cycles + 重新开始 Working（与参考项目 reset 一致）。
+#[tauri::command]
+pub fn reset(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
+    let payload = {
+        let mut inner = lock_inner(&state.inner);
+        let prev = inner.phase;
+        let work_min = {
+            let config_state = app.state::<ConfigState>();
+            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            read_work_duration_minutes(&conn)
+        };
+        apply_start_work(&mut inner, (work_min as i64) * 60, now_epoch());
+        inner.completed_cycles = 0;
+        inner.save_date = today_string();
+        build_payload(&inner, Some(prev))
+    };
+    emit_phase_changed(&app, payload);
+    Ok(())
+}
+
+// 立即休息：Working → Breaking（用户主动「立即休息」按钮；不计 completed_cycles）。
+#[tauri::command]
+pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
+    let (phase_payload, show_panel) = {
+        let mut inner = lock_inner(&state.inner);
+        if inner.phase != Phase::Working {
+            return Err("manual_break only valid in Working phase".into());
+        }
+        let prev = inner.phase;
+        let (total_secs, is_long) = {
+            let config_state = app.state::<ConfigState>();
+            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            let break_min = read_break_duration_minutes(&conn);
+            let lb_enabled = read_long_break_enabled(&conn);
+            let lb_interval = read_long_break_interval(&conn);
+            let lb_duration_min = read_long_break_duration_minutes(&conn);
+            let is_long =
+                check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
+            let total_min = if is_long { lb_duration_min } else { break_min };
+            ((total_min as i64) * 60, is_long)
+        };
+        apply_start_break(&mut inner, total_secs, is_long);
+        (build_payload(&inner, Some(prev)), true)
+    };
+    emit_phase_changed(&app, phase_payload);
+    if show_panel {
+        emit_show_panel(&app);
+    }
+    Ok(())
+}
+
+// 跳过休息（Breaking 阶段）：需连点 3 次才生效，防止误触。
+// - < 3 次：break_skip_count += 1，emit timer-tick 让 UI 显示「跳过 (n/3)」
+// - >= 3 次：跳过本次休息（不计入 completed_cycles），直接 start_work
+#[tauri::command]
+pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
+    let (tick_payload, phase_payload) = {
+        let mut inner = lock_inner(&state.inner);
+        if inner.phase != Phase::Breaking {
+            return Err("skip_break only valid in Breaking phase".into());
+        }
+        inner.break_skip_count = inner.break_skip_count.saturating_add(1);
+        if inner.break_skip_count < 3 {
+            (Some(build_payload(&inner, None)), None)
+        } else {
+            let prev = inner.phase;
+            let work_min = {
+                let config_state = app.state::<ConfigState>();
+                let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+                read_work_duration_minutes(&conn)
+            };
+            apply_start_work(&mut inner, (work_min as i64) * 60, now_epoch());
+            (None, Some(build_payload(&inner, Some(prev))))
+        }
+    };
+    if let Some(p) = tick_payload {
+        emit_timer_tick(&app, p);
+    }
+    if let Some(p) = phase_payload {
+        emit_phase_changed(&app, p);
+    }
+    Ok(())
 }

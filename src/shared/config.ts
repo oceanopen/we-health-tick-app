@@ -1,5 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 
+// 本文件是所有配置项 key + 默认值的唯一可信源 (SSOT)。
+// 后端 src-tauri/src/timer.rs 中有对应常量副本（用于 DB 无值时兜底），
+// 修改任一 *KEY / DEFAULT_* 时必须同步后端，否则首次启动会出现前后端兜底不一致。
+
 export const YES_NO = {
   YES: 'Y',
   NO: 'N',
