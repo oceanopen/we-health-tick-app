@@ -69,6 +69,12 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
+    // 订阅 show-panel：进入 Alerting / Breaking 时 timer.rs emit 此事件（B4），
+    // 此处主动唤起 panel 窗口（H5）。payload 为 unit，无需解析。
+    let show_panel_handle = app.handle().clone();
+    app.handle()
+        .listen("show-panel", move |_| show_panel(&show_panel_handle));
+
     Ok(())
 }
 
