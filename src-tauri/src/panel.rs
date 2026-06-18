@@ -4,29 +4,13 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
+use crate::shared::screen::{
+    detect_taskbar_edge, find_monitor_for_rect, MonitorInfo, TaskbarEdge,
+};
 use crate::shared::types::{Phase, TimerStatePayload};
 
 const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
-
-struct MonitorInfo {
-    scale_factor: f64,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-    wa_x: f64,
-    wa_y: f64,
-    wa_width: f64,
-    wa_height: f64,
-}
-
-enum TaskbarEdge {
-    Top,
-    Bottom,
-    Left,
-    Right,
-}
 
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
@@ -148,65 +132,6 @@ fn position_panel(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
         };
 
         let _ = panel.set_position(Position::Logical(LogicalPosition::new(x, y)));
-    }
-}
-
-fn find_monitor_for_rect(app: &tauri::AppHandle, rect: &tauri::Rect) -> Option<MonitorInfo> {
-    let (x, y) = match &rect.position {
-        Position::Physical(p) => (p.x, p.y),
-        Position::Logical(_) => return None,
-    };
-
-    for m in app.available_monitors().ok()? {
-        let mp = m.position();
-        let ms = m.size();
-        if x >= mp.x
-            && x < mp.x + ms.width as i32
-            && y >= mp.y
-            && y < mp.y + ms.height as i32
-        {
-            let sf = m.scale_factor();
-            let wa = m.work_area();
-            return Some(MonitorInfo {
-                scale_factor: sf,
-                x: mp.x as f64 / sf,
-                y: mp.y as f64 / sf,
-                width: ms.width as f64 / sf,
-                height: ms.height as f64 / sf,
-                wa_x: wa.position.x as f64 / sf,
-                wa_y: wa.position.y as f64 / sf,
-                wa_width: wa.size.width as f64 / sf,
-                wa_height: wa.size.height as f64 / sf,
-            });
-        }
-    }
-    None
-}
-
-fn detect_taskbar_edge(
-    monitor: &MonitorInfo,
-    icon_x: f64,
-    icon_y: f64,
-    icon_w: f64,
-    icon_h: f64,
-) -> TaskbarEdge {
-    let cx = icon_x + icon_w / 2.0;
-    let cy = icon_y + icon_h / 2.0;
-
-    let d_top = (cy - monitor.y).abs();
-    let d_bottom = (monitor.y + monitor.height - cy).abs();
-    let d_left = (cx - monitor.x).abs();
-    let d_right = (monitor.x + monitor.width - cx).abs();
-
-    let min = d_top.min(d_bottom).min(d_left).min(d_right);
-    if (d_top - min).abs() < f64::EPSILON {
-        TaskbarEdge::Top
-    } else if (d_bottom - min).abs() < f64::EPSILON {
-        TaskbarEdge::Bottom
-    } else if (d_left - min).abs() < f64::EPSILON {
-        TaskbarEdge::Left
-    } else {
-        TaskbarEdge::Right
     }
 }
 

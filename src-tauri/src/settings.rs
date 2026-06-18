@@ -1,5 +1,7 @@
 use tauri::{LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
 
+use crate::shared::screen::{work_area_center, MonitorInfo};
+
 #[tauri::command]
 #[specta::specta]
 pub fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
@@ -29,22 +31,14 @@ pub fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
 
     if let Some(panel) = app.get_webview_window("panel") {
         if let Ok(Some(monitor)) = panel.current_monitor() {
-            let sf = monitor.scale_factor();
-            let wa = monitor.work_area();
-            let wa_w = wa.size.width as f64 / sf;
-            let wa_h = wa.size.height as f64 / sf;
-            let wa_x = wa.position.x as f64 / sf;
-            let wa_y = wa.position.y as f64 / sf;
-
-            let settings_sf = settings_win.scale_factor().unwrap_or(sf);
+            let monitor = MonitorInfo::from_monitor(&monitor);
+            let settings_sf = settings_win.scale_factor().unwrap_or(monitor.scale_factor);
             let settings_size = settings_win
                 .inner_size()
                 .map(|s| s.to_logical::<f64>(settings_sf))
                 .unwrap_or_else(|_| tauri::LogicalSize::new(800.0, 600.0));
 
-            let x = wa_x + (wa_w - settings_size.width) / 2.0;
-            let y = wa_y + (wa_h - settings_size.height) / 2.0;
-
+            let (x, y) = work_area_center(&monitor, settings_size.width, settings_size.height);
             let _ = settings_win.set_position(LogicalPosition::new(x, y));
         }
         let _ = panel.hide();
