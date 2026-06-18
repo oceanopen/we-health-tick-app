@@ -43,16 +43,11 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             } = event
             {
                 let app = tray.app_handle();
-                if let Some(panel) = app.get_webview_window("panel") {
-                    if panel.is_visible().unwrap_or(false) {
+                match app.get_webview_window("panel") {
+                    Some(panel) if panel.is_visible().unwrap_or(false) => {
                         let _ = panel.hide();
-                    } else {
-                        position_panel(tray, &panel);
-                        let _ = panel.show();
-                        let _ = panel.set_focus();
                     }
-                } else {
-                    create_panel(app, tray);
+                    _ => show_panel(app),
                 }
             }
         })
@@ -102,6 +97,22 @@ pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
     };
     if let Err(e) = tray.set_icon(Some(icon)) {
         log::warn!("set_icon failed for {:?}: {e}", phase);
+    }
+}
+
+// 强制显示 panel（H4）：panel 不存在 → create；存在 → position + show + set_focus。
+// pub 是为 H5（show-panel 事件订阅）预留统一入口，避免调用方重复实现两分支逻辑。
+pub fn show_panel(app: &AppHandle) {
+    let Some(tray) = app.tray_by_id("tray") else {
+        log::warn!("tray not found when show_panel");
+        return;
+    };
+    if let Some(panel) = app.get_webview_window("panel") {
+        position_panel(&tray, &panel);
+        let _ = panel.show();
+        let _ = panel.set_focus();
+    } else {
+        create_panel(app, &tray);
     }
 }
 
