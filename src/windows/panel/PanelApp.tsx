@@ -9,6 +9,7 @@ import { AlertingView } from './components/AlertingView';
 import { BreakingView } from './components/BreakingView';
 import { CountdownRing } from './components/CountdownRing';
 import { ExitButton } from './components/ExitButton';
+import { WaitingView } from './components/WaitingView';
 import { WorkingView } from './components/WorkingView';
 import { useTimerState } from './hooks/useTimerState';
 
@@ -25,6 +26,7 @@ export default function PanelApp() {
     reset,
     manualBreak,
     confirmBreak,
+    confirmReturn,
     skipBreak,
   } = useTimerState();
   const hidingRef = useRef(false);
@@ -115,17 +117,21 @@ export default function PanelApp() {
                   onSkip={skipBreak}
                 />
               )
-            : (
-                <>
-                  <CountdownRing phase={phase} displayTime={displayTime} progress={progress} />
-                  <ActionButtons
-                    isPaused={isPaused}
-                    onToggle={togglePause}
-                    onReset={reset}
-                    onSettings={handleSettings}
-                  />
-                </>
-              )}
+            : phase === 'waiting'
+              ? (
+                  <WaitingView onReturn={confirmReturn} />
+                )
+              : (
+                  <>
+                    <CountdownRing phase={phase} displayTime={displayTime} progress={progress} />
+                    <ActionButtons
+                      isPaused={isPaused}
+                      onToggle={togglePause}
+                      onReset={reset}
+                      onSettings={handleSettings}
+                    />
+                  </>
+                )}
       <ExitButton onExit={handleExit} />
     </Box>
   );

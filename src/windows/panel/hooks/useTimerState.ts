@@ -65,6 +65,7 @@ export function useTimerState() {
   const reset = useCallback(() => logOnError(commands.reset(), 'reset'), []);
   const manualBreak = useCallback(() => logOnError(commands.manualBreak(), 'manualBreak'), []);
   const confirmBreak = useCallback(() => logOnError(commands.confirmBreak(), 'confirmBreak'), []);
+  const confirmReturn = useCallback(() => logOnError(commands.confirmReturn(), 'confirmReturn'), []);
   const skipBreak = useCallback(() => logOnError(commands.skipBreak(), 'skipBreak'), []);
 
   const { remainingSeconds, totalSeconds, phase } = state;
@@ -88,6 +89,7 @@ export function useTimerState() {
     reset,
     manualBreak,
     confirmBreak,
+    confirmReturn,
     skipBreak,
   };
 }

@@ -7,11 +7,14 @@
     "settings": "Settings",
     "manualBreak": "Break Now",
     "startBreak": "Start Break",
-    "skipBreak": "Skip"
+    "skipBreak": "Skip",
+    "imBack": "I'm Back"
   },
   "phaseWorking": "Working",
   "phaseBreaking": "Breaking",
   "longBreakLabel": "Long Break",
   "alertTitle": "Time for a Break",
+  "waitingTitle": "Break Over!",
+  "waitingSubtitle": "Ready to get back to work?",
   "exit": "Exit"
 }

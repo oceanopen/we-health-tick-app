@@ -92,11 +92,11 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | G | 托盘图标状态切换 | 3 | 3 | 0 |
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
-| J | panel UI 多状态重构 | 8 | 5 | 3 |
+| J | panel UI 多状态重构 | 8 | 6 | 2 |
 | K | i18n 与配置收尾 | 5 | 0 | 5 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **49** | **18** |
+| **合计** | | **67** | **50** | **17** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -503,12 +503,17 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：breaking 阶段显示橙色圆环 + 「跳过 (0/3)」按钮；长休息时标签为「长休息中」。
 
-#### J6 · Waiting 视图 ❌
-**开发任务**：
-- [ ] 新增 `src/windows/panel/components/WaitingView.tsx`：绿色对勾图标 + 「休息结束啦！准备好继续工作了吗？」
-- [ ] 主按钮「我回来了」→ `invoke("confirm_return")`
+#### J6 · Waiting 视图 ✅
+> **实施说明**：
+> - 文档「绿色对勾」**与 PHASE_RING_COLORS.waiting（红色）不一致**——绿色取自 MUI `success.main`（成功/完成语义），不沿用 phase 色，正向反馈优先于色表统一
+> - 文案「休息结束啦！准备好继续工作了吗？」**拆为 title + subtitle 两个 i18n key**（`waitingTitle` + `waitingSubtitle`），替代 K1 提议的单 `breakOverPrompt`，与 `alertTitle` 命名风格对称；K1 实施时仅补 phaseWaiting 等剩余 key
+> - 按钮集仅「我回来了」（waiting 是确认阶段，推动用户尽快进入新一轮 working）
 
-**验证**：waiting 阶段显示对勾 + 「我回来了」按钮，点击后进新一轮 working。
+**开发任务**：
+- [x] 新增 `src/windows/panel/components/WaitingView.tsx`：CheckCircle 图标（success 绿）+ 「休息结束啦！」标题 + 「准备好继续工作了吗？」副标题 + 「我回来了」主按钮
+- [x] 主按钮「我回来了」→ `confirm_return`（useTimerState 新增 `confirmReturn` 回调暴露）
+
+**验证**：waiting 阶段显示绿色对勾 + 「我回来了」按钮，点击后进新一轮 working。
 
 #### J7 · Paused 视图 ❌
 **开发任务**：
