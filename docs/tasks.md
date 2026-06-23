@@ -92,11 +92,11 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | G | 托盘图标状态切换 | 3 | 3 | 0 |
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
-| J | panel UI 多状态重构 | 8 | 6 | 2 |
+| J | panel UI 多状态重构 | 8 | 7 | 1 |
 | K | i18n 与配置收尾 | 5 | 0 | 5 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **50** | **17** |
+| **合计** | | **67** | **51** | **16** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -515,13 +515,20 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：waiting 阶段显示绿色对勾 + 「我回来了」按钮，点击后进新一轮 working。
 
-#### J7 · Paused 视图 ❌
-**开发任务**：
-- [ ] 新增 `src/windows/panel/components/PausedView.tsx`：暂停图标（灰）+ 「已暂停」标签 + 剩余时间
-- [ ] 主按钮「继续」→ `invoke("toggle_pause")`
-- [ ] 若 quietTriggered，显示「休息时段中，点击继续工作」
+#### J7 · Paused 视图 ✅
+> **实施说明**：
+> - 与 E4 后端逻辑一致：`quietTriggered=true` 时「继续」按钮**禁用**（后端 toggle_pause 本就返回 false），副标题提示「休息时段结束后自动恢复」；手动暂停（quietTriggered=false）按钮可用，显示「已暂停」+ 剩余时间
+> - **术语调整**：中文文案 quietHours 一律用「休息」（与 settings 现有「休息时段」对齐），**禁用「静音」**（用户反馈有歧义，详见 [memory: terminology-quiet-hours-zh]）；英文保留 "Quiet Hours"
+> - K1 提议的 `tapToContinue`「点击继续」**不采用**——J7 设计是禁用按钮（与 E4 一致），用 `pausedAutoResumeHint`「休息时段结束后自动恢复」替代
+> - **始终展示剩余时间**（手动暂停显示原进度，休息时段触发显示进入前的剩余，仅供参考）
+> - PanelApp 改为显式六分支（working/alerting/breaking/waiting/paused 全判断 + 兜底「未识别 phase: {phase}」防御未来新增 phase），原 ActionButtons + CountdownRing 在 panel 中不再被引用（CountdownRing 仍被 WorkingView/BreakingView 复用；ActionButtons 文件保留待 J8 重构决定）
 
-**验证**：paused 阶段显示灰色暂停图标 + 「继续」按钮；静音 paused 显示静音提示。
+**开发任务**：
+- [x] 新增 `src/windows/panel/components/PausedView.tsx`：PauseCircleFilled 图标（灰）+ 标题（已暂停/休息时段中）+ 剩余时间 + 副标题（仅 quietTriggered）+ 「继续」主按钮（quietTriggered 时禁用）
+- [x] 主按钮「继续」→ `toggle_pause`，`disabled={quietTriggered}` 与 E4 后端一致
+- [x] quietTriggered 分支：标题切换为「休息时段中」+ 副标题「休息时段结束后自动恢复」
+
+**验证**：paused 阶段显示灰色暂停图标 + 「继续」按钮；休息时段 paused（quietTriggered）显示「休息时段中」+ 禁用按钮 + 自动恢复提示。
 
 #### J8 · ActionButtons 按 phase 切换按钮集 ❌
 **开发任务**：

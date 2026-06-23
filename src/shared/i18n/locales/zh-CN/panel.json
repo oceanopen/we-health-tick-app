@@ -16,5 +16,8 @@
   "alertTitle": "该休息啦",
   "waitingTitle": "休息结束啦！",
   "waitingSubtitle": "准备好继续工作了吗？",
+  "phasePaused": "已暂停",
+  "quietHoursActive": "休息时段中",
+  "pausedAutoResumeHint": "休息时段结束后自动恢复",
   "exit": "退出"
 }

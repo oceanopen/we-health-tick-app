@@ -16,5 +16,8 @@
   "alertTitle": "Time for a Break",
   "waitingTitle": "Break Over!",
   "waitingSubtitle": "Ready to get back to work?",
+  "phasePaused": "Paused",
+  "quietHoursActive": "Quiet Hours Active",
+  "pausedAutoResumeHint": "Auto resumes after quiet hours",
   "exit": "Exit"
 }

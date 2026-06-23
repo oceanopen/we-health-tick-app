@@ -4,11 +4,10 @@ import { commands } from '@src/shared/bindings';
 import { logOnError, safeAwait } from '@src/shared/commands';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useCallback, useEffect, useRef } from 'react';
-import { ActionButtons } from './components/ActionButtons';
 import { AlertingView } from './components/AlertingView';
 import { BreakingView } from './components/BreakingView';
-import { CountdownRing } from './components/CountdownRing';
 import { ExitButton } from './components/ExitButton';
+import { PausedView } from './components/PausedView';
 import { WaitingView } from './components/WaitingView';
 import { WorkingView } from './components/WorkingView';
 import { useTimerState } from './hooks/useTimerState';
@@ -23,11 +22,11 @@ export default function PanelApp() {
     isLongBreak,
     breakSkipCount,
     togglePause,
-    reset,
     manualBreak,
     confirmBreak,
     confirmReturn,
     skipBreak,
+    quietTriggered,
   } = useTimerState();
   const hidingRef = useRef(false);
   const phaseRef = useRef<Phase>('working');
@@ -121,17 +120,19 @@ export default function PanelApp() {
               ? (
                   <WaitingView onReturn={confirmReturn} />
                 )
-              : (
-                  <>
-                    <CountdownRing phase={phase} displayTime={displayTime} progress={progress} />
-                    <ActionButtons
-                      isPaused={isPaused}
-                      onToggle={togglePause}
-                      onReset={reset}
-                      onSettings={handleSettings}
+              : phase === 'paused'
+                ? (
+                    <PausedView
+                      displayTime={displayTime}
+                      quietTriggered={quietTriggered}
+                      onResume={togglePause}
                     />
-                  </>
-                )}
+                  )
+                : (
+                    <Box sx={{ py: 4, color: 'error.main', fontSize: 14 }}>
+                      未识别状态: {phase}
+                    </Box>
+                  )}
       <ExitButton onExit={handleExit} />
     </Box>
   );
