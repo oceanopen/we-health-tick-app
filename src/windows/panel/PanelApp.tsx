@@ -1,18 +1,16 @@
-import type { Phase, TimerStatePayload } from '@src/shared/bindings';
+import type { Phase } from '@src/shared/bindings';
 import { alpha, Box } from '@mui/material';
 import { commands } from '@src/shared/bindings';
 import { logOnError, safeAwait } from '@src/shared/commands';
-import { EVENT_PHASE_CHANGED } from '@src/shared/events';
-import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useCallback, useEffect, useRef } from 'react';
 import { ActionButtons } from './components/ActionButtons';
 import { CountdownRing } from './components/CountdownRing';
 import { ExitButton } from './components/ExitButton';
-import { useTimer } from './hooks/useTimer';
+import { useTimerState } from './hooks/useTimerState';
 
 export default function PanelApp() {
-  const { isPaused, isExpired, displayTime, progress, toggle, reset } = useTimer();
+  const { isPaused, isExpired, displayTime, progress, phase, togglePause, reset } = useTimerState();
   const hidingRef = useRef(false);
   const phaseRef = useRef<Phase>('working');
   const rootRef = useRef<HTMLDivElement>(null);
@@ -27,20 +25,16 @@ export default function PanelApp() {
       }
     });
     return () => {
-      unlisten.then(fn => fn());
+      unlisten
+        .then(fn => fn())
+        .catch(err => console.warn('[onFocusChanged] unlisten failed:', err));
     };
   }, []);
 
-  // 订阅 phase-changed：把最新 phase 写入 phaseRef，避免 onFocusChanged 闭包读到旧值（I2 已消费此 ref）。
+  // phase 由 useTimerState 独占订阅，此处同步到 ref 供 onFocusChanged 闭包读取（避免 stale closure）。
   useEffect(() => {
-    const unlistenPromise = listen<TimerStatePayload>(EVENT_PHASE_CHANGED, (e) => {
-      phaseRef.current = e.payload.phase;
-      console.log('[PanelApp] phase →', e.payload.phase);
-    });
-    return () => {
-      unlistenPromise.then(fn => fn());
-    };
-  }, []);
+    phaseRef.current = phase;
+  }, [phase]);
 
   useEffect(() => {
     if (rootRef.current) {
@@ -82,7 +76,7 @@ export default function PanelApp() {
       <CountdownRing displayTime={displayTime} progress={progress} isExpired={isExpired} />
       <ActionButtons
         isPaused={isPaused}
-        onToggle={toggle}
+        onToggle={togglePause}
         onReset={reset}
         onSettings={handleSettings}
       />

@@ -92,11 +92,11 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | G | 托盘图标状态切换 | 3 | 3 | 0 |
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
-| J | panel UI 多状态重构 | 8 | 0 | 8 |
+| J | panel UI 多状态重构 | 8 | 1 | 7 |
 | K | i18n 与配置收尾 | 5 | 0 | 5 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **44** | **23** |
+| **合计** | | **67** | **45** | **22** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -457,15 +457,15 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 ---
 
-### 域 J · panel UI 多状态重构（8 点，全 ❌）
+### 域 J · panel UI 多状态重构（8 点，1 ✅ + 7 ❌）
 
-#### J1 · useTimerState hook（替换硬编码倒计时）❌
+#### J1 · useTimerState hook（替换硬编码倒计时）✅
 **开发任务**：
-- [ ] 新增/重写 `src/panel/hooks/useTimerState.ts`（或重命名 `useTimer.ts`）
-- [ ] 挂载时 `invoke<TimerStatePayload>("get_timer_state")` 拉取初始状态
-- [ ] `listen("timer-tick")` 每秒更新 remainingSeconds / phase 等字段
-- [ ] `listen("phase-changed")` 切换 UI 分支
-- [ ] **移除**原 `setInterval` 本地倒计时与 `INITIAL_SECONDS = 30 * 60` 硬编码
+- [x] 新增 `src/windows/panel/hooks/useTimerState.ts`（旧 `useTimer.ts` 已删除）
+- [x] 挂载时 `commands.getTimerState()` 拉取初始状态
+- [x] `listen("timer-tick")` 每秒更新 remainingSeconds / phase 等字段
+- [x] `listen("phase-changed")` 切换 UI 分支（与 timer-tick 共用 setState handler）
+- [x] **移除**原 `setInterval` 本地倒计时与 `INITIAL_SECONDS = 30 * 60` 硬编码
 
 **验证**：panel 显示的剩余时间与后端 work_duration 配置一致（30 分钟），每秒递减。
 
