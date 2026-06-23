@@ -70,7 +70,6 @@ export function useTimerState() {
   const displayTime = formatDisplayTime(remainingSeconds);
   const progress = totalSeconds > 0 ? (remainingSeconds / totalSeconds) * 100 : 0;
   const isPaused = phase === 'paused';
-  const isExpired = remainingSeconds === 0;
 
   return {
     phase,
@@ -84,7 +83,6 @@ export function useTimerState() {
     displayTime,
     progress,
     isPaused,
-    isExpired,
     togglePause,
     reset,
     manualBreak,

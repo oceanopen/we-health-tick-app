@@ -92,11 +92,11 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | G | 托盘图标状态切换 | 3 | 3 | 0 |
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
-| J | panel UI 多状态重构 | 8 | 1 | 7 |
+| J | panel UI 多状态重构 | 8 | 2 | 6 |
 | K | i18n 与配置收尾 | 5 | 0 | 5 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **45** | **22** |
+| **合计** | | **67** | **46** | **21** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -457,7 +457,7 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 ---
 
-### 域 J · panel UI 多状态重构（8 点，1 ✅ + 7 ❌）
+### 域 J · panel UI 多状态重构（8 点，2 ✅ + 6 ❌）
 
 #### J1 · useTimerState hook（替换硬编码倒计时）✅
 **开发任务**：
@@ -469,10 +469,10 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：panel 显示的剩余时间与后端 work_duration 配置一致（30 分钟），每秒递减。
 
-#### J2 · CountdownRing 按 phase 着色 ❌
+#### J2 · CountdownRing 按 phase 着色 ✅
 **开发任务**：
-- [ ] `src/panel/components/CountdownRing.tsx` 新增 `phase` prop
-- [ ] 颜色映射：Working 绿 / Breaking 橙 / Alerting 红 / Waiting 绿 / Paused 灰（light/dark 双主题色值）
+- [x] `src/windows/panel/components/CountdownRing.tsx` 新增 `phase` prop（同时删除语义模糊的 `isExpired` prop）
+- [x] 颜色映射：Working 绿 / Alerting 橙 / Breaking 深茶 / Waiting 红 / Paused 灰（与 G1 托盘统一，light/dark 双主题色值）；色表抽到 `src/windows/panel/phaseColors.ts` 供 J3-J7 复用
 
 **验证**：不同 phase 下圆环颜色肉眼可区分。
 

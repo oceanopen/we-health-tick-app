@@ -1,9 +1,11 @@
+import type { Phase } from '@src/shared/bindings';
 import { Box, Typography, useTheme } from '@mui/material';
+import { PHASE_RING_COLORS } from '../phaseColors';
 
 interface CountdownRingProps {
+  phase: Phase;
   displayTime: string;
   progress: number;
-  isExpired: boolean;
 }
 
 const SIZE = 120;
@@ -11,12 +13,11 @@ const STROKE_WIDTH = 3;
 const RADIUS = (SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export function CountdownRing({ displayTime, progress, isExpired }: CountdownRingProps) {
+export function CountdownRing({ phase, displayTime, progress }: CountdownRingProps) {
   const theme = useTheme();
-  const progressColor = isExpired
-    ? theme.palette.error.main
-    : theme.palette.mode === 'light' ? '#16a34a' : '#4ade80';
-  const clamped = isExpired ? 0 : Math.min(100, Math.max(0, progress));
+  const phaseColor = PHASE_RING_COLORS[phase];
+  const progressColor = theme.palette.mode === 'light' ? phaseColor.light : phaseColor.dark;
+  const clamped = Math.min(100, Math.max(0, progress));
   const dashOffset = CIRCUMFERENCE * (1 - clamped / 100);
 
   return (

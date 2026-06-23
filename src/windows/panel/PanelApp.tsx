@@ -10,7 +10,7 @@ import { ExitButton } from './components/ExitButton';
 import { useTimerState } from './hooks/useTimerState';
 
 export default function PanelApp() {
-  const { isPaused, isExpired, displayTime, progress, phase, togglePause, reset } = useTimerState();
+  const { isPaused, displayTime, progress, phase, togglePause, reset } = useTimerState();
   const hidingRef = useRef(false);
   const phaseRef = useRef<Phase>('working');
   const rootRef = useRef<HTMLDivElement>(null);
@@ -73,7 +73,7 @@ export default function PanelApp() {
         borderColor: 'divider',
       })}
     >
-      <CountdownRing displayTime={displayTime} progress={progress} isExpired={isExpired} />
+      <CountdownRing phase={phase} displayTime={displayTime} progress={progress} />
       <ActionButtons
         isPaused={isPaused}
         onToggle={togglePause}
