@@ -13,8 +13,13 @@ const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
 
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../../icons/32x32.png"))
-        .expect("failed to load tray icon");
+    // CARGO_MANIFEST_DIR 在编译期由 cargo 注入，指向 src-tauri/ 根目录的绝对路径。
+    // 用 concat!() 拼成 include_bytes! 的路径，让 icon 资源路径与 panel.rs 当前所在目录解耦。
+    let icon = tauri::image::Image::from_bytes(include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/icons/32x32.png"
+    )))
+    .expect("failed to load tray icon");
 
     TrayIconBuilder::with_id("tray")
         .icon(icon)
@@ -72,11 +77,11 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 // （托盘图标切换是非关键路径，不应阻塞状态机主流程）。
 pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
     let bytes: &[u8] = match phase {
-        Phase::Working => include_bytes!("../../icons/tray/working.png"),
-        Phase::Alerting => include_bytes!("../../icons/tray/alerting.png"),
-        Phase::Breaking => include_bytes!("../../icons/tray/breaking.png"),
-        Phase::Waiting => include_bytes!("../../icons/tray/waiting.png"),
-        Phase::Paused => include_bytes!("../../icons/tray/paused.png"),
+        Phase::Working => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/working.png")),
+        Phase::Alerting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/alerting.png")),
+        Phase::Breaking => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/breaking.png")),
+        Phase::Waiting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/waiting.png")),
+        Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/paused.png")),
     };
     let icon = match tauri::image::Image::from_bytes(bytes) {
         Ok(img) => img,
