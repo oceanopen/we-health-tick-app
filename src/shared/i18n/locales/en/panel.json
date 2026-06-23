@@ -4,7 +4,9 @@
     "pause": "Pause",
     "reset": "Reset",
     "resetTimerAria": "Reset timer",
-    "settings": "Settings"
+    "settings": "Settings",
+    "manualBreak": "Break Now"
   },
+  "phaseWorking": "Working",
   "exit": "Exit"
 }

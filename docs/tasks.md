@@ -92,11 +92,11 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | G | 托盘图标状态切换 | 3 | 3 | 0 |
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
-| J | panel UI 多状态重构 | 8 | 2 | 6 |
+| J | panel UI 多状态重构 | 8 | 3 | 5 |
 | K | i18n 与配置收尾 | 5 | 0 | 5 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **46** | **21** |
+| **合计** | | **67** | **47** | **20** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -476,12 +476,14 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：不同 phase 下圆环颜色肉眼可区分。
 
-#### J3 · Working 视图 ❌
-**开发任务**：
-- [ ] 新增 `src/windows/panel/components/WorkingView.tsx`：圆环倒计时（绿）+ 中央 MM:SS + 「工作中」标签 + 当前提醒（小字）
-- [ ] 按钮：暂停 → `invoke("toggle_pause")` / 立即休息 → `invoke("manual_break")` / 设置
+#### J3 · Working 视图 ✅
+> **实施说明**：working 阶段 `currentReminder` 通常为空字符串（后端仅在 `on_work_done` 时设置），按用户决策**隐藏提醒行**，UI 仅保留圆环 + 「工作中」标签 + 3 按钮；如后续需要展示提醒再单独迭代。
 
-**验证**：working 阶段 panel 显示绿色圆环倒计时 + 3 个按钮。
+**开发任务**：
+- [x] 新增 `src/windows/panel/components/WorkingView.tsx`：圆环倒计时（绿）+ 中央 MM:SS + 「工作中」标签（圆环下方）+ 3 按钮
+- [x] 按钮：暂停 → `toggle_pause` / 立即休息 → `manual_break` / 设置 → `show_settings_window`
+
+**验证**：working 阶段 panel 显示绿色圆环倒计时 + 「工作中」标签 + 3 个按钮（暂停/立即休息/设置）。
 
 #### J4 · Alerting 视图 ❌
 **开发任务**：

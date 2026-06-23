@@ -7,10 +7,11 @@ import { useCallback, useEffect, useRef } from 'react';
 import { ActionButtons } from './components/ActionButtons';
 import { CountdownRing } from './components/CountdownRing';
 import { ExitButton } from './components/ExitButton';
+import { WorkingView } from './components/WorkingView';
 import { useTimerState } from './hooks/useTimerState';
 
 export default function PanelApp() {
-  const { isPaused, displayTime, progress, phase, togglePause, reset } = useTimerState();
+  const { isPaused, displayTime, progress, phase, togglePause, reset, manualBreak } = useTimerState();
   const hidingRef = useRef(false);
   const phaseRef = useRef<Phase>('working');
   const rootRef = useRef<HTMLDivElement>(null);
@@ -73,13 +74,28 @@ export default function PanelApp() {
         borderColor: 'divider',
       })}
     >
-      <CountdownRing phase={phase} displayTime={displayTime} progress={progress} />
-      <ActionButtons
-        isPaused={isPaused}
-        onToggle={togglePause}
-        onReset={reset}
-        onSettings={handleSettings}
-      />
+      {phase === 'working'
+        ? (
+            <WorkingView
+              displayTime={displayTime}
+              progress={progress}
+              isPaused={isPaused}
+              onToggle={togglePause}
+              onManualBreak={manualBreak}
+              onSettings={handleSettings}
+            />
+          )
+        : (
+            <>
+              <CountdownRing phase={phase} displayTime={displayTime} progress={progress} />
+              <ActionButtons
+                isPaused={isPaused}
+                onToggle={togglePause}
+                onReset={reset}
+                onSettings={handleSettings}
+              />
+            </>
+          )}
       <ExitButton onExit={handleExit} />
     </Box>
   );

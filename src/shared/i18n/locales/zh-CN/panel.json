@@ -4,7 +4,9 @@
     "pause": "暂停",
     "reset": "重置",
     "resetTimerAria": "重置计时器",
-    "settings": "设置"
+    "settings": "设置",
+    "manualBreak": "立即休息"
   },
+  "phaseWorking": "工作中",
   "exit": "退出"
 }
