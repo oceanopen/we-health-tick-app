@@ -92,11 +92,11 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | G | 托盘图标状态切换 | 3 | 3 | 0 |
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
-| J | panel UI 多状态重构 | 8 | 4 | 4 |
+| J | panel UI 多状态重构 | 8 | 5 | 3 |
 | K | i18n 与配置收尾 | 5 | 0 | 5 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **48** | **19** |
+| **合计** | | **67** | **49** | **18** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -494,10 +494,12 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：alerting 阶段 panel 显示提醒文案 + 「开始休息」按钮，点击后进 breaking。
 
-#### J5 · Breaking 视图 ❌
+#### J5 · Breaking 视图 ✅
+> **实施说明**：按钮集仅「跳过 (n/3)」（breaking 是休息进行中，主操作是提前结束）；跳过按钮用 IconButton + caption 风格（与 WorkingView 一致，非 contained 主按钮）；长休息（`isLongBreak=true`）**仅切换标签文案**（`phaseBreaking`「休息中」→ `longBreakLabel`「长休息中」），其他视觉无差异；currentReminder 用条件渲染（`{reminder && (...)}`）防御空值留白。
+
 **开发任务**：
-- [ ] 新增 `src/windows/panel/components/BreakingView.tsx`：圆环倒计时（橙）+ 「休息中」/「长休息中」标签 + 提醒文案
-- [ ] 「跳过 (n/3)」按钮 → `invoke("skip_break")`，n = breakSkipCount
+- [x] 新增 `src/windows/panel/components/BreakingView.tsx`：橙色圆环 + 「休息中」/「长休息中」标签 + currentReminder 提醒文案（斜体弱化）+「跳过 (n/3)」IconButton
+- [x] 「跳过 (n/3)」按钮 → `skip_break`，n 由 hook 已暴露的 `breakSkipCount` 提供；caption 文案 `${t('action.skipBreak')} (${breakSkipCount}/3)` 前端拼装
 
 **验证**：breaking 阶段显示橙色圆环 + 「跳过 (0/3)」按钮；长休息时标签为「长休息中」。
 

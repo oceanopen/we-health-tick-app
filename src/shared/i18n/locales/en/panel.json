@@ -6,9 +6,12 @@
     "resetTimerAria": "Reset timer",
     "settings": "Settings",
     "manualBreak": "Break Now",
-    "startBreak": "Start Break"
+    "startBreak": "Start Break",
+    "skipBreak": "Skip"
   },
   "phaseWorking": "Working",
+  "phaseBreaking": "Breaking",
+  "longBreakLabel": "Long Break",
   "alertTitle": "Time for a Break",
   "exit": "Exit"
 }
