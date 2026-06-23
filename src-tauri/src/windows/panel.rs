@@ -13,7 +13,7 @@ const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
 
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../../icons/32x32.png"))
         .expect("failed to load tray icon");
 
     TrayIconBuilder::with_id("tray")
@@ -72,11 +72,11 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 // （托盘图标切换是非关键路径，不应阻塞状态机主流程）。
 pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
     let bytes: &[u8] = match phase {
-        Phase::Working => include_bytes!("../icons/tray/working.png"),
-        Phase::Alerting => include_bytes!("../icons/tray/alerting.png"),
-        Phase::Breaking => include_bytes!("../icons/tray/breaking.png"),
-        Phase::Waiting => include_bytes!("../icons/tray/waiting.png"),
-        Phase::Paused => include_bytes!("../icons/tray/paused.png"),
+        Phase::Working => include_bytes!("../../icons/tray/working.png"),
+        Phase::Alerting => include_bytes!("../../icons/tray/alerting.png"),
+        Phase::Breaking => include_bytes!("../../icons/tray/breaking.png"),
+        Phase::Waiting => include_bytes!("../../icons/tray/waiting.png"),
+        Phase::Paused => include_bytes!("../../icons/tray/paused.png"),
     };
     let icon = match tauri::image::Image::from_bytes(bytes) {
         Ok(img) => img,

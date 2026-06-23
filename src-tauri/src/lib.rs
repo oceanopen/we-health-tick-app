@@ -1,7 +1,6 @@
-mod panel;
-mod settings;
 mod shared;
 mod timer;
+mod windows;
 
 use tauri_specta::{collect_commands, Builder};
 
@@ -19,8 +18,8 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             exit_app,
-            settings::show_settings_window,
-            panel::fit_panel,
+            windows::settings::show_settings_window,
+            windows::panel::fit_panel,
             shared::config::get_config,
             shared::config::set_config,
             timer::get_timer_state,
@@ -61,7 +60,7 @@ pub fn run() {
                 )?;
             }
 
-            panel::setup(app)?;
+            windows::panel::setup(app)?;
             shared::config::init(app)?;
             timer::init(app)?;
 
