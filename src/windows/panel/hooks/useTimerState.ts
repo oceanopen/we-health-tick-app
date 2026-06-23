@@ -64,6 +64,7 @@ export function useTimerState() {
   const togglePause = useCallback(() => logOnError(commands.togglePause(), 'togglePause'), []);
   const reset = useCallback(() => logOnError(commands.reset(), 'reset'), []);
   const manualBreak = useCallback(() => logOnError(commands.manualBreak(), 'manualBreak'), []);
+  const confirmBreak = useCallback(() => logOnError(commands.confirmBreak(), 'confirmBreak'), []);
   const skipBreak = useCallback(() => logOnError(commands.skipBreak(), 'skipBreak'), []);
 
   const { remainingSeconds, totalSeconds, phase } = state;
@@ -86,6 +87,7 @@ export function useTimerState() {
     togglePause,
     reset,
     manualBreak,
+    confirmBreak,
     skipBreak,
   };
 }

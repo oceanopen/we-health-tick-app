@@ -5,8 +5,10 @@
     "reset": "重置",
     "resetTimerAria": "重置计时器",
     "settings": "设置",
-    "manualBreak": "立即休息"
+    "manualBreak": "立即休息",
+    "startBreak": "开始休息"
   },
   "phaseWorking": "工作中",
+  "alertTitle": "该休息啦",
   "exit": "退出"
 }

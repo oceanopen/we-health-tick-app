@@ -5,8 +5,10 @@
     "reset": "Reset",
     "resetTimerAria": "Reset timer",
     "settings": "Settings",
-    "manualBreak": "Break Now"
+    "manualBreak": "Break Now",
+    "startBreak": "Start Break"
   },
   "phaseWorking": "Working",
+  "alertTitle": "Time for a Break",
   "exit": "Exit"
 }

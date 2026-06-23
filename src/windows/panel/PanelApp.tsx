@@ -5,13 +5,15 @@ import { logOnError, safeAwait } from '@src/shared/commands';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useCallback, useEffect, useRef } from 'react';
 import { ActionButtons } from './components/ActionButtons';
+import { AlertingView } from './components/AlertingView';
 import { CountdownRing } from './components/CountdownRing';
 import { ExitButton } from './components/ExitButton';
 import { WorkingView } from './components/WorkingView';
 import { useTimerState } from './hooks/useTimerState';
 
 export default function PanelApp() {
-  const { isPaused, displayTime, progress, phase, togglePause, reset, manualBreak } = useTimerState();
+  const { isPaused, displayTime, progress, phase, currentReminder, togglePause, reset, manualBreak, confirmBreak }
+    = useTimerState();
   const hidingRef = useRef(false);
   const phaseRef = useRef<Phase>('working');
   const rootRef = useRef<HTMLDivElement>(null);
@@ -85,17 +87,21 @@ export default function PanelApp() {
               onSettings={handleSettings}
             />
           )
-        : (
-            <>
-              <CountdownRing phase={phase} displayTime={displayTime} progress={progress} />
-              <ActionButtons
-                isPaused={isPaused}
-                onToggle={togglePause}
-                onReset={reset}
-                onSettings={handleSettings}
-              />
-            </>
-          )}
+        : phase === 'alerting'
+          ? (
+              <AlertingView reminder={currentReminder} onStartBreak={confirmBreak} />
+            )
+          : (
+              <>
+                <CountdownRing phase={phase} displayTime={displayTime} progress={progress} />
+                <ActionButtons
+                  isPaused={isPaused}
+                  onToggle={togglePause}
+                  onReset={reset}
+                  onSettings={handleSettings}
+                />
+              </>
+            )}
       <ExitButton onExit={handleExit} />
     </Box>
   );

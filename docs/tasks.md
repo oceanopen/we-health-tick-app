@@ -92,11 +92,11 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | G | 托盘图标状态切换 | 3 | 3 | 0 |
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
-| J | panel UI 多状态重构 | 8 | 3 | 5 |
+| J | panel UI 多状态重构 | 8 | 4 | 4 |
 | K | i18n 与配置收尾 | 5 | 0 | 5 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **47** | **20** |
+| **合计** | | **67** | **48** | **19** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -485,10 +485,12 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：working 阶段 panel 显示绿色圆环倒计时 + 「工作中」标签 + 3 个按钮（暂停/立即休息/设置）。
 
-#### J4 · Alerting 视图 ❌
+#### J4 · Alerting 视图 ✅
+> **实施说明**：布局为「铃铛图标 + alertTitle 标题 + currentReminder 大字 + 单个主按钮」，按钮集仅「开始休息」（alerting 是强制确认阶段，panel 不可关闭、不提供设置入口，推动用户尽快进入 breaking）；currentReminder 信任后端 `pick_random_reminder` 兜底，前端不再加额外空值兼容。
+
 **开发任务**：
-- [ ] 新增 `src/windows/panel/components/AlertingView.tsx`：铃铛图标（橙）+ 大字体 currentReminder
-- [ ] 主按钮「开始休息」→ `invoke("confirm_break")`
+- [x] 新增 `src/windows/panel/components/AlertingView.tsx`：NotificationsActive 图标（橙）+ 「该休息啦」标题 + 大字体 currentReminder + 「开始休息」主按钮
+- [x] 主按钮「开始休息」→ `confirm_break`（useTimerState 新增 `confirmBreak` 回调暴露）
 
 **验证**：alerting 阶段 panel 显示提醒文案 + 「开始休息」按钮，点击后进 breaking。
 
