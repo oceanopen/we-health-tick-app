@@ -434,7 +434,7 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 #### I1 · 前端记录当前 phase 到 ref ✅
 **开发任务**：
-- [x] `src/panel/PanelApp.tsx` 新增 `phaseRef`（避免闭包陷阱，回调里读最新值）
+- [x] `src/windows/panel/PanelApp.tsx` 新增 `phaseRef`（避免闭包陷阱，回调里读最新值）
 - [x] `useEffect` 中 `listen<TimerStatePayload>("phase-changed", e => { phaseRef.current = e.payload.phase })`
 - [x] cleanup 用 `unlistenPromise.then(fn => fn())`（沿用现有 config-changed 模式）
 
@@ -478,35 +478,35 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 #### J3 · Working 视图 ❌
 **开发任务**：
-- [ ] 新增 `src/panel/components/WorkingView.tsx`：圆环倒计时（绿）+ 中央 MM:SS + 「工作中」标签 + 当前提醒（小字）
+- [ ] 新增 `src/windows/panel/components/WorkingView.tsx`：圆环倒计时（绿）+ 中央 MM:SS + 「工作中」标签 + 当前提醒（小字）
 - [ ] 按钮：暂停 → `invoke("toggle_pause")` / 立即休息 → `invoke("manual_break")` / 设置
 
 **验证**：working 阶段 panel 显示绿色圆环倒计时 + 3 个按钮。
 
 #### J4 · Alerting 视图 ❌
 **开发任务**：
-- [ ] 新增 `src/panel/components/AlertingView.tsx`：铃铛图标（橙）+ 大字体 currentReminder
+- [ ] 新增 `src/windows/panel/components/AlertingView.tsx`：铃铛图标（橙）+ 大字体 currentReminder
 - [ ] 主按钮「开始休息」→ `invoke("confirm_break")`
 
 **验证**：alerting 阶段 panel 显示提醒文案 + 「开始休息」按钮，点击后进 breaking。
 
 #### J5 · Breaking 视图 ❌
 **开发任务**：
-- [ ] 新增 `src/panel/components/BreakingView.tsx`：圆环倒计时（橙）+ 「休息中」/「长休息中」标签 + 提醒文案
+- [ ] 新增 `src/windows/panel/components/BreakingView.tsx`：圆环倒计时（橙）+ 「休息中」/「长休息中」标签 + 提醒文案
 - [ ] 「跳过 (n/3)」按钮 → `invoke("skip_break")`，n = breakSkipCount
 
 **验证**：breaking 阶段显示橙色圆环 + 「跳过 (0/3)」按钮；长休息时标签为「长休息中」。
 
 #### J6 · Waiting 视图 ❌
 **开发任务**：
-- [ ] 新增 `src/panel/components/WaitingView.tsx`：绿色对勾图标 + 「休息结束啦！准备好继续工作了吗？」
+- [ ] 新增 `src/windows/panel/components/WaitingView.tsx`：绿色对勾图标 + 「休息结束啦！准备好继续工作了吗？」
 - [ ] 主按钮「我回来了」→ `invoke("confirm_return")`
 
 **验证**：waiting 阶段显示对勾 + 「我回来了」按钮，点击后进新一轮 working。
 
 #### J7 · Paused 视图 ❌
 **开发任务**：
-- [ ] 新增 `src/panel/components/PausedView.tsx`：暂停图标（灰）+ 「已暂停」标签 + 剩余时间
+- [ ] 新增 `src/windows/panel/components/PausedView.tsx`：暂停图标（灰）+ 「已暂停」标签 + 剩余时间
 - [ ] 主按钮「继续」→ `invoke("toggle_pause")`
 - [ ] 若 quietTriggered，显示「休息时段中，点击继续工作」
 
@@ -514,7 +514,7 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 #### J8 · ActionButtons 按 phase 切换按钮集 ❌
 **开发任务**：
-- [ ] 重写 `src/panel/components/ActionButtons.tsx`：按 phase 切换按钮集（working：暂停/立即休息/设置；breaking：跳过/设置；等等）
+- [ ] 重写 `src/windows/panel/components/ActionButtons.tsx`：按 phase 切换按钮集（working：暂停/立即休息/设置；breaking：跳过/设置；等等）
 - [ ] 或拆分为各 View 内联按钮（J3-J7 已含按钮，此任务可整合）
 
 **验证**：不同 phase 下 panel 底部按钮集正确切换。
@@ -633,8 +633,8 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 | `src-tauri/src/panel.rs` | 托盘 + panel 窗口管理（域 G/H 主战场） |
 | `src-tauri/src/timer.rs` | 状态机核心（域 A-F 已完成主体） |
 | `src-tauri/src/config.rs` | 配置存储 + config-changed 事件 |
-| `src/panel/PanelApp.tsx` | panel 根组件（域 I/J 主战场） |
-| `src/panel/hooks/useTimer.ts` | 当前定时器（域 J1 将重写为 useTimerState） |
+| `src/windows/panel/PanelApp.tsx` | panel 根组件（域 I/J 主战场） |
+| `src/windows/panel/hooks/useTimerState.ts` | 当前定时器（域 J1 已落地，订阅 timer-tick / phase-changed） |
 | `src/settings/components/PlanPage.tsx` | 设置页表单模式范本（域 K3） |
 
 ### 5.3 Tauri 2 关键 API
