@@ -7,21 +7,12 @@ license = ""
 repository = ""
 edition = "2024"
 rust-version = "1.85.0"
-# 多 binary 项目（we-health-tick 主 app + export_bindings 绑定生成器）必须指定默认运行目标，
-# 否则 `cargo run`（tauri dev 底层调用，不带 --bin）会因目标歧义报错：
-#   error: `cargo run` could not determine which binary to run
-# gen:bindings 脚本显式 --bin export_bindings 不受此设置影响。
-default-run = "we-health-tick"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 name = "we_health_tick_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
-
-[[bin]]
-name = "export_bindings"
-path = "src/bin/export_bindings.rs"
 
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }

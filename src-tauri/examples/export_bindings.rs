@@ -3,6 +3,10 @@
 //! 触发方式：`pnpm gen:bindings`（见 package.json）。
 //! 修改 src-tauri/src/shared/types.rs 或任何 #[tauri::command] 签名后必须重新运行，
 //! 否则前后端类型会漂移。
+//!
+//! 放在 examples/ 而非 src/bin/：Tauri 2.x macOS bundler 会枚举 package 内所有 `[[bin]]`
+//! 目标并尝试打包进 .app，但 `tauri build` 只编译主 binary，导致 bin/export_bindings 缺失，
+//! 打包报 "does not exist"。examples 不是 binary 目标，不会被 bundler 收录。
 
 use specta_typescript::Typescript;
 use we_health_tick_lib::build_specta_builder;
