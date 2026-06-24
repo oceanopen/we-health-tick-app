@@ -3,9 +3,8 @@
     "resume": "Resume",
     "pause": "Pause",
     "reset": "Reset",
-    "resetTimerAria": "Reset timer",
     "settings": "Settings",
-    "manualBreak": "Break Now",
+    "manualBreak": "Break",
     "startBreak": "Start Break",
     "skipBreak": "Skip",
     "imBack": "I'm Back"

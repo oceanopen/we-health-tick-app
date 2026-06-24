@@ -22,6 +22,7 @@ export default function PanelApp() {
     isLongBreak,
     breakSkipCount,
     togglePause,
+    reset,
     manualBreak,
     confirmBreak,
     confirmReturn,
@@ -97,6 +98,7 @@ export default function PanelApp() {
               progress={progress}
               isPaused={isPaused}
               onToggle={togglePause}
+              onReset={reset}
               onManualBreak={manualBreak}
               onSettings={handleSettings}
             />

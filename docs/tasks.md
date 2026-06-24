@@ -93,10 +93,10 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
 | J | panel UI 多状态重构 | 8 | 8 | 0 |
-| K | i18n 与配置收尾 | 5 | 0 | 5 |
+| K | i18n 与配置收尾 | 5 | 1 | 4 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **52** | **15** |
+| **合计** | | **67** | **53** | **14** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -477,13 +477,15 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 **验证**：不同 phase 下圆环颜色肉眼可区分。
 
 #### J3 · Working 视图 ✅
-> **实施说明**：working 阶段 `currentReminder` 通常为空字符串（后端仅在 `on_work_done` 时设置），按用户决策**隐藏提醒行**，UI 仅保留圆环 + 「工作中」标签 + 3 按钮；如后续需要展示提醒再单独迭代。
+> **实施说明**：working 阶段 `currentReminder` 通常为空字符串（后端仅在 `on_work_done` 时设置），按用户决策**隐藏提醒行**，UI 仅保留圆环 + 「工作中」标签 + 4 按钮；如后续需要展示提醒再单独迭代。
+>
+> **补丁（K1 收尾后追加）**：初版仅放 3 按钮（暂停/立即休息/设置），漏接 reset——后端 D2 reset command 与 useTimerState.reset 回调本就就绪。补丁在「暂停」与「立即休息」之间插入 ReplayIcon IconButton（caption「重置」），点击调用 `reset` 重新开始当前工作倒计时（清 cycles/skip_count → apply_start_work，remainingSeconds 恢复满值）。
 
 **开发任务**：
-- [x] 新增 `src/windows/panel/components/WorkingView.tsx`：圆环倒计时（绿）+ 中央 MM:SS + 「工作中」标签（圆环下方）+ 3 按钮
-- [x] 按钮：暂停 → `toggle_pause` / 立即休息 → `manual_break` / 设置 → `show_settings_window`
+- [x] 新增 `src/windows/panel/components/WorkingView.tsx`：圆环倒计时（绿）+ 中央 MM:SS + 「工作中」标签（圆环下方）+ 4 按钮
+- [x] 按钮：暂停 → `toggle_pause` / 重置 → `reset`（补丁）/ 立即休息 → `manual_break` / 设置 → `show_settings_window`
 
-**验证**：working 阶段 panel 显示绿色圆环倒计时 + 「工作中」标签 + 3 个按钮（暂停/立即休息/设置）。
+**验证**：working 阶段 panel 显示绿色圆环倒计时 + 「工作中」标签 + 4 个按钮（暂停/重置/立即休息/设置）；点击「重置」后 remainingSeconds 恢复满值。
 
 #### J4 · Alerting 视图 ✅
 > **实施说明**：布局为「铃铛图标 + alertTitle 标题 + currentReminder 大字 + 单个主按钮」，按钮集仅「开始休息」（alerting 是强制确认阶段，panel 不可关闭、不提供设置入口，推动用户尽快进入 breaking）；currentReminder 信任后端 `pick_random_reminder` 兜底，前端不再加额外空值兼容。
@@ -540,11 +542,18 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 ---
 
-### 域 K · i18n 与配置收尾（5 点，全 ❌）
+### 域 K · i18n 与配置收尾（5 点，1 ✅ + 4 ❌）
 
-#### K1 · panel i18n 文案补充（中/英）❌
+#### K1 · panel i18n 文案补充（中/英）✅
+> **实施说明**：K1 原始清单的 17 个 key 中，绝大多数已在 J3-J7 迭代中随各 View 组件落地（phaseWorking/Breaking/Paused、longBreakLabel、alertTitle、waitingTitle/Subtitle、quietHoursActive、pausedAutoResumeHint、action.{resume,pause,reset,settings,manualBreak,startBreak,skipBreak,imBack}、exit）。本次收敛工作包含以下偏差处理：
+> - **`breakOverPrompt` 不添加**：J6 已拆为 `waitingTitle` + `waitingSubtitle`（均已存在）
+> - **`tapToContinue` 不添加**：J7 明确不采用，已由 `pausedAutoResumeHint` 替代（已存在）
+> - **`phaseAlerting` / `phaseWaiting` 不添加**：AlertingView/WaitingView 在 J4/J6 采用语义化标题（alertTitle/waitingTitle），无单独 phase 标签需求；添加会形成死代码，遵循 CLAUDE.md「不添加任务无关内容」
+> - **`resetTimerAria` 删除**：J3 统一了 IconButton 的 aria-label 与 caption（共用同一 key），原 ActionButtons 的独立 aria key 不再需要
+> - **`action.reset` 勘误保留**：初版误判为孤儿删除，实际是 J3 WorkingView 漏接 reset 按钮——后端 D2 reset command 与 useTimerState.reset 回调均已就绪，K1 后补充恢复（详见 J3 补丁）
+
 **开发任务**：
-- [ ] `src/shared/i18n/locales/zh-CN/panel.json` 与 `en/panel.json` 补充：
+- [x] `src/shared/i18n/locales/zh-CN/panel.json` 与 `en/panel.json` 补充：
   - phase 标签：`phaseWorking` / `phaseAlerting` / `phaseBreaking` / `phaseWaiting` / `phasePaused`
   - 长休息：`longBreakLabel`
   - 按钮：`startBreak` / `imBack` / `skipBreak` / `resume` / `pause` / `manualBreak` / `reset`

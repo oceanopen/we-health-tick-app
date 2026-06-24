@@ -1,6 +1,7 @@
 import LocalCafeOutlinedIcon from '@mui/icons-material/LocalCafeOutlined';
 import PauseIcon from '@mui/icons-material/Pause';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, Divider, IconButton, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +12,7 @@ interface WorkingViewProps {
   progress: number;
   isPaused: boolean;
   onToggle: () => void;
+  onReset: () => void;
   onManualBreak: () => void;
   onSettings: () => void;
 }
@@ -20,6 +22,7 @@ export function WorkingView({
   progress,
   isPaused,
   onToggle,
+  onReset,
   onManualBreak,
   onSettings,
 }: WorkingViewProps) {
@@ -49,6 +52,17 @@ export function WorkingView({
           </IconButton>
           <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
             {toggleLabel}
+          </Typography>
+        </Box>
+
+        <Divider orientation="vertical" flexItem />
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <IconButton aria-label={t('panel:action.reset')} onClick={onReset} size="small" color="secondary">
+            <ReplayIcon />
+          </IconButton>
+          <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
+            {t('panel:action.reset')}
           </Typography>
         </Box>
 
