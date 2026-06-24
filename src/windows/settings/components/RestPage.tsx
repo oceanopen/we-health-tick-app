@@ -113,7 +113,7 @@ function RestPage() {
                   update('restWindow', e.target.value as RestWindow)}
               >
                 {restWindowOptions.map(opt => (
-                  <MenuItem key={opt.value} value={opt.value}>
+                  <MenuItem key={opt.value} value={opt.value} disabled={opt.disabled}>
                     {t(opt.labelKey)}
                   </MenuItem>
                 ))}

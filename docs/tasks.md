@@ -93,10 +93,10 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
 | J | panel UI 多状态重构 | 8 | 8 | 0 |
-| K | i18n 与配置收尾 | 5 | 1 | 4 |
+| K | i18n 与配置收尾 | 5 | 2 | 3 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **53** | **14** |
+| **合计** | | **67** | **54** | **13** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -562,12 +562,14 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：中英文切换，panel 所有文案正确显示（无 key 裸露）。
 
-#### K2 · RestPage 隐藏不支持的模式选项 ❌
-**开发任务**：
-- [ ] `src/settings/components/RestPage.tsx` 的 `rest_window` Select：仅保留 `tray` 选项
-- [ ] 移除 topRight/fullscreen，或保留但禁用并标注「暂不支持」
+#### K2 · RestPage 隐藏不支持的模式选项 ✅
+> **实施说明**：采用「禁用而非移除」策略——topRight/fullscreen 渲染为 `<MenuItem disabled>`（置灰不可选），保留完整选项列表为未来扩展铺路（用户明确表示「后面会支持」）。`RestWindowOption` 接口新增可选 `disabled` 字段，i18n 不改动（用户决策不追加「暂不支持」文案）。DB 历史值边界**有意不处理**：若 DB 残留 topRight/fullscreen 值，MenuItem disabled 仍能渲染选中态，用户可重新选 tray 修正；强制回退反而破坏未来扩展时的兼容性。
 
-**验证**：RestPage 休息窗口模式选项只剩 tray。
+**开发任务**：
+- [x] `src/shared/settingOption.ts` 的 `RestWindowOption` 接口新增 `disabled?: boolean`；`topRight`/`fullscreen` 两项设 `disabled: true`
+- [x] `src/windows/settings/components/RestPage.tsx` 的 `<MenuItem>` 追加 `disabled={opt.disabled}`
+
+**验证**：RestPage「休息窗口」下拉中 topRight/fullscreen 置灰不可选，tray 可正常选中并保存。
 
 #### K3 · PlanPage 隐藏 daily_goal ❌
 **开发任务**：

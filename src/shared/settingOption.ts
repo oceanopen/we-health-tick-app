@@ -40,10 +40,11 @@ export const longBreakIntervalOptions: LongBreakIntervalOption[] = [
 export interface RestWindowOption {
   value: RestWindow;
   labelKey: string;
+  disabled?: boolean;
 }
 
 export const restWindowOptions: RestWindowOption[] = [
   { value: 'tray', labelKey: 'rest:option.tray' },
-  { value: 'topRight', labelKey: 'rest:option.topRight' },
-  { value: 'fullscreen', labelKey: 'rest:option.fullscreen' },
+  { value: 'topRight', labelKey: 'rest:option.topRight', disabled: true },
+  { value: 'fullscreen', labelKey: 'rest:option.fullscreen', disabled: true },
 ];
