@@ -1,7 +1,7 @@
 {
   "name": "we-health-tick",
   "type": "module",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": false,
   "packageManager": "pnpm@10.18.3",
   "scripts": {
@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "genAppIcons": "tauri icon src/assets/app-icon.svg && rm -rf src-tauri/icons/android && rm -rf src-tauri/icons/ios && cp src-tauri/icons/icon.png src/assets/app-icon.png && cp src/assets/app-icon.svg public/favicon.svg",
-    "gen:bindings": "cargo run --manifest-path src-tauri/Cargo.toml --example export_bindings",
+    "gen:bindings": "cargo test --manifest-path src-tauri/Cargo.toml export_bindings",
     "verify:bindings": "pnpm gen:bindings && git ls-files --error-unmatch src/shared/bindings.ts && git diff --exit-code src/shared/bindings.ts",
     "release": "bumpp"
   },
