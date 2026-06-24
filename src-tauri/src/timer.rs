@@ -83,6 +83,7 @@ pub struct TimerState {
 //   KEY_LONG_BREAK_INTERVAL    ↔ LONG_BREAK_INTERVAL_KEY   / DEFAULT_LONG_BREAK_INTERVAL
 //   KEY_LONG_BREAK_DURATION    ↔ LONG_BREAK_DURATION_KEY   / DEFAULT_LONG_BREAK_DURATION
 //   KEY_REST_CONFIRM           ↔ REST_CONFIRM_KEY          / DEFAULT_REST_CONFIRM
+//   KEY_QUIET_HOURS            ↔ QUIET_HOURS_KEY           / DEFAULT_QUIET_HOURS (DEFAULT_QUIET_HOURS_JSON)
 //   KEY_REMINDERS              ↔ REMINDERS_KEY             / （无默认，运行时 decode/pick）
 
 const KEY_WORK_DURATION: &str = "work_duration";
@@ -108,6 +109,10 @@ const KEY_REMINDERS: &str = "reminders";
 // quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 与前端
 // src/shared/config.ts 的 QuietHourPeriod 一致；支持跨午夜（start > end）。
 const KEY_QUIET_HOURS: &str = "quiet_hours";
+// 默认静音时段（与前端 DEFAULT_QUIET_HOURS 一一对应）。
+// DB 无值 / 解析失败时回退此项，避免「前端显示 2 项但后端不静音」的兜底不一致。
+const DEFAULT_QUIET_HOURS_JSON: &str =
+    "[{\"start\":\"12:00\",\"end\":\"14:00\"},{\"start\":\"18:00\",\"end\":\"19:00\"}]";
 
 // 拿 TimerInner 锁，poisoned 时自动恢复（避免线程 panic 级联导致整个状态机死锁）。
 // 场景：所有需要读写 TimerInner 的同步代码块入口。
@@ -177,7 +182,10 @@ fn read_rest_confirm(conn: &Connection) -> bool {
 }
 
 // 读 quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 与前端一致。
-// 容错：DB 无值 / JSON 解析失败 / 字段缺失 → 空 vec，视为无静音时段。
+// 容错策略（与前端 decodeQuietHours 对齐，避免兜底不一致）：
+//   - DB 无值 / 锁失败 → 回退 DEFAULT_QUIET_HOURS_JSON（2 项默认时段）
+//   - JSON 解析失败 → 同样回退默认 JSON
+//   - 用户主动保存 "[]"（清空所有时段）→ 尊重用户选择，返回空 vec
 // 每秒被 run_timer_loop 调用一次，开销可忽略（quiet_hours 通常 < 5 项）。
 fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
     #[derive(serde::Deserialize)]
@@ -185,11 +193,11 @@ fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
         start: String,
         end: String,
     }
-    let raw = read_config_conn(conn, KEY_QUIET_HOURS)
-        .ok()
-        .flatten()
-        .unwrap_or_default();
-    let periods: Vec<Period> = serde_json::from_str(&raw).unwrap_or_default();
+    let raw = read_config_conn(conn, KEY_QUIET_HOURS).ok().flatten();
+    let json = raw.as_deref().unwrap_or(DEFAULT_QUIET_HOURS_JSON);
+    let fallback: Vec<Period> =
+        serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
+    let periods: Vec<Period> = serde_json::from_str(json).unwrap_or(fallback);
     periods.into_iter().map(|p| (p.start, p.end)).collect()
 }
 

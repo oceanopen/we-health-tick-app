@@ -93,10 +93,10 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
 | J | panel UI 多状态重构 | 8 | 8 | 0 |
-| K | i18n 与配置收尾 | 5 | 4 | 1 |
+| K | i18n 与配置收尾 | 5 | 5 | 0 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **56** | **11** |
+| **合计** | | **67** | **57** | **10** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -542,7 +542,7 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 ---
 
-### 域 K · i18n 与配置收尾（5 点，4 ✅ + 1 ❌）
+### 域 K · i18n 与配置收尾（5 点，全 ✅）
 
 #### K1 · panel i18n 文案补充（中/英）✅
 > **实施说明**：K1 原始清单的 17 个 key 中，绝大多数已在 J3-J7 迭代中随各 View 组件落地（phaseWorking/Breaking/Paused、longBreakLabel、alertTitle、waitingTitle/Subtitle、quietHoursActive、pausedAutoResumeHint、action.{resume,pause,reset,settings,manualBreak,startBreak,skipBreak,imBack}、exit）。本次收敛工作包含以下偏差处理：
@@ -607,12 +607,36 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：全量 `grep -rn "unwrap()\|expect(\|panic!" src-tauri/src/` 仅剩 3 处非配置路径（Tauri 启动 / 编译期资源 / 开发工具）；删除 DB 中任一 key 或首次启动空库时，后端读取回退默认值不 panic（timer.rs 8 个读取点的 `unwrap_or` 已覆盖）。
 
-#### K5 · 确认 config.ts 默认值与后端一致 ❌
-**开发任务**：
-- [ ] 检查 `src/shared/config.ts` 各 key 的 DEFAULT 与后端读取逻辑一致
-- [ ] 后端 timer.rs 常量副本（行 3-5）与 config.ts 同步
+#### K5 · 确认 config.ts 默认值与后端一致 ✅
+> **实施说明**：逐项对照 timer.rs 配对清单（L79-86）的 7 项 + quiet_hours，发现 **7 项一致、1 项差异已修复**。
+>
+> **前后端默认值对照表**（timer.rs 常量 ↔ config.ts DEFAULT_*）：
+>
+> | key | 前端 (config.ts) | 后端 (timer.rs) | 状态 |
+> |-----|------------------|-----------------|------|
+> | work_duration | 30 | 30 | ✅ 一致 |
+> | break_duration | 1 | 1 | ✅ 一致 |
+> | long_break_enabled | YES (Y) | true (Y) | ✅ 一致 |
+> | long_break_interval | 2 | 2 | ✅ 一致 |
+> | long_break_duration | 5 | 5 | ✅ 一致 |
+> | rest_confirm | YES (Y) | true (Y) | ✅ 一致 |
+> | reminders | `[]` | 空 vec | ✅ 一致（双方均无 DEFAULT，空兜底） |
+> | **quiet_hours** | `[{12:00-14:00},{18:00-19:00}]` | ~~空 vec~~ → **默认 JSON** | ❌ → ✅ 已修复 |
+>
+> **差异详情**：`read_quiet_hours`（timer.rs L182-194）原本 `.unwrap_or_default()` 返回空 String → 空 vec；而前端 `decodeQuietHours(null)`（config.ts L96-118）返回 `DEFAULT_QUIET_HOURS`（2 项）。**bug 场景**：首次启动空库时，用户打开 settings 看到「12-14 / 18-19 静音时段」（前端 decode），但后端每秒 tick 读 DB 得 null → 空 vec → 完全不静音。用户看到的与系统实际行为不一致，直到用户手动点「保存」才对齐。
+>
+> **修复**：timer.rs 新增 `DEFAULT_QUIET_HOURS_JSON` 常量（内容与前端 `DEFAULT_QUIET_HOURS` 完全一致）；`read_quiet_hours` 改为三层兜底：①DB 无值 → 默认 JSON；②JSON 解析失败 → 默认 JSON；③**用户主动保存 `"[]"`（清空操作）→ 仍返回空 vec**（尊重用户选择，不强制塞回默认）。配对清单注释（L79-87）追加 `KEY_QUIET_HOURS ↔ QUIET_HOURS_KEY / DEFAULT_QUIET_HOURS`。
+>
+> **不在 K5 范围**（前端-only，后端不消费，不在 timer.rs 配对清单）：appearance / rest_window / language / work_start_time / work_end_time。其中 work_start_time / work_end_time 在第四节已明确排除（工作时间窗口范围外）。
+>
+> **路径更正**：tasks.md 5.2 节写的 `src-tauri/src/config.rs` 实际为 `src-tauri/src/shared/config.rs`（K4 已记录）；K5 关注的默认值副本在 `src-tauri/src/timer.rs` L88-113（非 config.rs）。
 
-**验证**：前后端默认值逐项对照表无差异。
+**开发任务**：
+- [x] 逐项对照 `src/shared/config.ts` DEFAULT_* 与 `src-tauri/src/timer.rs` DEFAULT_* 常量（7 项一致）
+- [x] 修复 quiet_hours 兜底不一致：新增 `DEFAULT_QUIET_HOURS_JSON` 常量 + 修正 `read_quiet_hours` 三层兜底
+- [x] 更新 timer.rs L79-87 配对清单注释（追加 quiet_hours 行）
+
+**验证**：`cargo check` 通过；前后端默认值逐项对照表仅 quiet_hours 历史不一致，已修复对齐；用户主动清空 `"[]"` 边界保留（返回空 vec）。
 
 ---
 
