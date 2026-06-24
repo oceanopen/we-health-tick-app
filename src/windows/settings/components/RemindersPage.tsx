@@ -39,6 +39,20 @@ function buildDefaultReminders(t: TFunction): ReminderItem[] {
   return [
     { id: 1, text: t('reminders:defaultMessage.walk') },
     { id: 2, text: t('reminders:defaultMessage.water') },
+    { id: 3, text: '成功只有一个 ———— 按照自己的方式，去度过人生。' },
+    { id: 4, text: '世界上只有一种真正的英雄主义，那就是在认清生活的真相后依然热爱生活。' },
+    { id: 5, text: '这个世界上有很多人，很多种选择，最低的是温饱，然后是利益，就是钱，超越钱的，是名望、权利，但是在超越这些所有东西之上还有一样东西，叫智慧。... 因为我知道我懂的越来越多，只有智慧和知识，内在强大，让你自己懂得很多，对这个世界你有充分的了解，你就不会有畏惧。' },
+    { id: 6, text: '在我们的身边，经常会出现一些人，让我们一见如故，感觉温暖，如沐春风，这种气质往往是天生的，我们都愿意和这样的人交往。' },
+    { id: 7, text: '因为我要告诉你，所谓千秋霸业，万古流芳，以及一切的一切，只是粪土。先变成粪，再变成土。现在你不明白，将来你会明白，将来不明白，就再等将来，如果一辈子都不明白，也行。' },
+    { id: 8, text: '纯粹的人，是这个世界上最可怕的人，他们的一生，往往只有一个目标，为了达到这个目标，他们可以不择手段，不顾一切，他们无法被收买，无法被威逼，他们不要钱 ———— 纯粹和执着，也是有区别的，所谓执着，就是不见棺材不掉泪，而纯粹，是见了棺材，也不掉泪。' },
+    { id: 9, text: '长期的困难生活，最能磨炼一个人的意志。有很多人在遇到困难后，只能怨天尤人，得过且过，而另外一些人虽然也不得不在困难面前低头，但他们的心从未屈服，他们不断地努力，相信一定能够取得最后的胜利。' },
+    { id: 10, text: '当你感到畏惧和痛苦，支撑不下去的时候，你应该同时意识到，决定你命运的时候到了。 因为畏惧并不是消极的，事实上，它是一个人真正强大的开始，也是成为英雄的起点。 不懂得畏惧的人不知道什么是困难，也无法战胜困难。 只有懂得畏惧的人，才能唤起自己的力量。 只有懂得畏惧的人，才有勇气去战胜畏惧。 懂得畏惧的可怕，还能超越它、征服它的人，就是英雄。' },
+    { id: 11, text: '所谓道，是天下所有规律的总和，是最根本的法则，只要能够了解道，就可以明了世间所有的一切。' },
+    { id: 12, text: '无论何时、何地，有何种理由，人性都是不能，也不会被泯灭的，它将永远屹立于天地之间。' },
+    { id: 13, text: '滚滚长江东逝水，浪花淘尽英雄。是非成败转头空，青山依旧在，几度夕阳红。 白发渔樵江渚上，惯看秋月春风。一壶浊酒喜相逢，古今多少事，都付笑谈中。' },
+    { id: 14, text: '无论有多么伟大正直的理想，要实现它，还必须懂得两个字——变通。只有变通，只有切合实际的行动，才能适应这个变化万千的世界。' },
+    { id: 15, text: '常人，有正常的欲望，有自己的小算盘，有过犹豫和挣扎，有过贪婪和污点，你才能明白，那个不顾一切、顶住压力坚持改革的张居正，到底有多么的伟大。' },
+    { id: 16, text: '你还很年轻，将来你会遇到很多人，经历很多事，得到很多，也会失去很多，但无论如何，有两样东西，你绝不能丢弃，一个叫良心，另一个叫理想。' },
   ];
 }
 
@@ -51,7 +65,7 @@ function RemindersPage() {
     reminders: buildDefaultReminders(t),
   }));
   const [hasValidationAttempted, setHasValidationAttempted] = useState(false);
-  const reminderIdRef = useRef(2);
+  const reminderIdRef = useRef(0);
 
   const allocateReminderId = () => {
     reminderIdRef.current += 1;
@@ -65,6 +79,7 @@ function RemindersPage() {
         = decoded.length > 0
           ? decoded.map(text => ({ id: allocateReminderId(), text }))
           : buildDefaultReminders(t);
+      reminderIdRef.current = items.reduce((max, r) => Math.max(max, r.id), 0);
       const next: RemindersConfig = { reminders: items };
       setSaved(next);
       setDraft(next);
