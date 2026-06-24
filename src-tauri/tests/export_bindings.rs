@@ -1,19 +1,23 @@
-//! tauri-specta 绑定生成器：导出 TypeScript 绑定到 src/shared/bindings.ts。
+//! tauri-specta 绑定生成测试：导出 TypeScript 绑定到 src/shared/bindings.ts。
 //!
-//! 触发方式：`pnpm gen:bindings`（见 package.json）。
+//! 触发方式：`pnpm gen:bindings`（见 package.json）—— 实际跑
+//! `cargo test --manifest-path src-tauri/Cargo.toml export_bindings`。
 //! 修改 src-tauri/src/shared/types.rs 或任何 #[tauri::command] 签名后必须重新运行，
 //! 否则前后端类型会漂移。
 //!
-//! 放在 examples/ 而非 src/bin/：Tauri 2.x macOS bundler 会枚举 package 内所有 `[[bin]]`
-//! 目标并尝试打包进 .app，但 `tauri build` 只编译主 binary，导致 bin/export_bindings 缺失，
-//! 打包报 "does not exist"。examples 不是 binary 目标，不会被 bundler 收录。
+//! 为什么用 #[test] 而不是独立 [[bin]]？
+//! Tauri 2.x bundler 的 Stage 2 会无脑扫描 src-tauri/src/bin/ 目录（tauri#15325），
+//! 把扫到的 .rs 当作 bundle binary 找产物，导致 `tauri build` 失败。
+//! test 目标不在 src/bin/，绕开此 bug；类型生成失败也会被 test 直接捕获，
+//! 比独立 bin 的 panic 更早暴露。
 
 use specta_typescript::Typescript;
 use we_health_tick_lib::build_specta_builder;
 
-fn main() {
+#[test]
+fn export_bindings() {
     // CARGO_MANIFEST_DIR 在编译时由 cargo 注入，指向 src-tauri/ 的绝对路径。
-    // 用 env!() 在编译时嵌入，保证无论 cargo run 的 CWD 在哪里，绑定都能写到正确位置。
+    // 用 env!() 在编译时嵌入，保证无论 cargo test 的 CWD 在哪里，绑定都能写到正确位置。
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let out_path = format!("{manifest_dir}/../src/shared/bindings.ts");
 
