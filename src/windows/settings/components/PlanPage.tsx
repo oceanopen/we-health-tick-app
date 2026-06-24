@@ -3,7 +3,6 @@ import type { LongBreakEnabled, QuietHourPeriod } from '@src/shared/config';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AvTimerOutlinedIcon from '@mui/icons-material/AvTimerOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
-import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import FreeBreakfastOutlinedIcon from '@mui/icons-material/FreeBreakfastOutlined';
 import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
 import NightsStayOutlinedIcon from '@mui/icons-material/NightsStayOutlined';
@@ -25,10 +24,8 @@ import {
 } from '@mui/material';
 import {
   BREAK_DURATION_KEY,
-  DAILY_GOAL_KEY,
   decodeQuietHours,
   DEFAULT_BREAK_DURATION,
-  DEFAULT_DAILY_GOAL,
   DEFAULT_LONG_BREAK_DURATION,
   DEFAULT_LONG_BREAK_ENABLED,
   DEFAULT_LONG_BREAK_INTERVAL,
@@ -61,7 +58,6 @@ interface QuietHourItem extends QuietHourPeriod {
 interface PlanConfig {
   workDuration: number;
   breakDuration: number;
-  dailyGoal: number;
   longBreakEnabled: LongBreakEnabled;
   longBreakInterval: number;
   longBreakDuration: number;
@@ -73,7 +69,6 @@ interface PlanConfig {
 const DEFAULT_PLAN_CONFIG: PlanConfig = {
   workDuration: DEFAULT_WORK_DURATION,
   breakDuration: DEFAULT_BREAK_DURATION,
-  dailyGoal: DEFAULT_DAILY_GOAL,
   longBreakEnabled: DEFAULT_LONG_BREAK_ENABLED,
   longBreakInterval: DEFAULT_LONG_BREAK_INTERVAL,
   longBreakDuration: DEFAULT_LONG_BREAK_DURATION,
@@ -97,18 +92,16 @@ function PlanPage() {
     Promise.all([
       getConfig(WORK_DURATION_KEY),
       getConfig(BREAK_DURATION_KEY),
-      getConfig(DAILY_GOAL_KEY),
       getConfig(LONG_BREAK_ENABLED_KEY),
       getConfig(LONG_BREAK_INTERVAL_KEY),
       getConfig(LONG_BREAK_DURATION_KEY),
       getConfig(WORK_START_TIME_KEY),
       getConfig(WORK_END_TIME_KEY),
       getConfig(QUIET_HOURS_KEY),
-    ]).then(([wd, bd, dg, lbe, lbi, lbdu, wst, wet, qh]) => {
+    ]).then(([wd, bd, lbe, lbi, lbdu, wst, wet, qh]) => {
       const next: PlanConfig = {
         workDuration: wd ? Number(wd) : DEFAULT_WORK_DURATION,
         breakDuration: bd ? Number(bd) : DEFAULT_BREAK_DURATION,
-        dailyGoal: dg ? Number(dg) : DEFAULT_DAILY_GOAL,
         longBreakEnabled: parseYesNo(lbe, DEFAULT_LONG_BREAK_ENABLED),
         longBreakInterval: lbi ? Number(lbi) : DEFAULT_LONG_BREAK_INTERVAL,
         longBreakDuration: lbdu ? Number(lbdu) : DEFAULT_LONG_BREAK_DURATION,
@@ -158,7 +151,6 @@ function PlanPage() {
   const dirty
     = saved.workDuration !== draft.workDuration
       || saved.breakDuration !== draft.breakDuration
-      || saved.dailyGoal !== draft.dailyGoal
       || saved.longBreakEnabled !== draft.longBreakEnabled
       || saved.longBreakInterval !== draft.longBreakInterval
       || saved.longBreakDuration !== draft.longBreakDuration
@@ -173,7 +165,6 @@ function PlanPage() {
     await Promise.all([
       setConfig(WORK_DURATION_KEY, String(draft.workDuration)),
       setConfig(BREAK_DURATION_KEY, String(draft.breakDuration)),
-      setConfig(DAILY_GOAL_KEY, String(draft.dailyGoal)),
       setConfig(LONG_BREAK_ENABLED_KEY, draft.longBreakEnabled),
       setConfig(LONG_BREAK_INTERVAL_KEY, String(draft.longBreakInterval)),
       setConfig(LONG_BREAK_DURATION_KEY, String(draft.longBreakDuration)),
@@ -266,37 +257,6 @@ function PlanPage() {
               onChange={(_, v) => update('breakDuration', v as number)}
               min={1}
               max={15}
-              step={1}
-              size="small"
-            />
-          </Box>
-
-          <Divider />
-
-          <Box sx={{ px: 2, py: 1.5 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                mb: 1,
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <FlagOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                <Typography>{t('plan:row.dailyGoal')}</Typography>
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                {draft.dailyGoal}
-                {' '}
-                {t('plan:unit.times')}
-              </Typography>
-            </Box>
-            <Slider
-              value={draft.dailyGoal}
-              onChange={(_, v) => update('dailyGoal', v as number)}
-              min={1}
-              max={20}
               step={1}
               size="small"
             />

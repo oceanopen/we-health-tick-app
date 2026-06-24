@@ -12,7 +12,6 @@
   "row": {
     "workDuration": "Work Duration",
     "breakDuration": "Break Duration",
-    "dailyGoal": "Daily Goal",
     "longBreakEnabled": "Long Break",
     "longBreakInterval": "Long Break Interval",
     "longBreakDuration": "Long Break Duration",
@@ -23,8 +22,7 @@
     "longBreakEveryN": "Every {{count}} rounds"
   },
   "unit": {
-    "minutes": "min",
-    "times": "times"
+    "minutes": "min"
   },
   "quietHours": {
     "add": "Add period",

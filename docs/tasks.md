@@ -93,10 +93,10 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
 | J | panel UI 多状态重构 | 8 | 8 | 0 |
-| K | i18n 与配置收尾 | 5 | 2 | 3 |
+| K | i18n 与配置收尾 | 5 | 3 | 2 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **54** | **13** |
+| **合计** | | **67** | **55** | **12** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -542,7 +542,7 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 ---
 
-### 域 K · i18n 与配置收尾（5 点，1 ✅ + 4 ❌）
+### 域 K · i18n 与配置收尾（5 点，3 ✅ + 2 ❌）
 
 #### K1 · panel i18n 文案补充（中/英）✅
 > **实施说明**：K1 原始清单的 17 个 key 中，绝大多数已在 J3-J7 迭代中随各 View 组件落地（phaseWorking/Breaking/Paused、longBreakLabel、alertTitle、waitingTitle/Subtitle、quietHoursActive、pausedAutoResumeHint、action.{resume,pause,reset,settings,manualBreak,startBreak,skipBreak,imBack}、exit）。本次收敛工作包含以下偏差处理：
@@ -571,11 +571,15 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：RestPage「休息窗口」下拉中 topRight/fullscreen 置灰不可选，tray 可正常选中并保存。
 
-#### K3 · PlanPage 隐藏 daily_goal ❌
-**开发任务**：
-- [ ] `src/settings/components/PlanPage.tsx` 移除或隐藏「每日目标」（dailyGoal）相关 UI（本项目不实现打卡统计）
+#### K3 · PlanPage 隐藏 daily_goal ✅
+> **实施说明**：采用「彻底清理」策略（与 K2 的「禁用而非移除」相反）——tasks.md 第四节已明确排除「每日目标 + autoPauseOnGoal」（依赖打卡统计），非"后面会支持"范畴，按 CLAUDE.md「unused → delete completely」精神彻底移除。涉及 3 文件：①PlanPage.tsx 删除 dailyGoal UI 块（含 FlagOutlinedIcon 导入、`<Divider />` 后置分隔、字段/load/dirty/save 全部引用）；②config.ts 删除 `DailyGoal` / `DAILY_GOAL_KEY` / `DEFAULT_DAILY_GOAL`；③plan.json（中/英）删除孤儿 key `row.dailyGoal` + `unit.times`（后者仅 dailyGoal UI 使用）。DB 中残留的 `daily_goal` 值不读不写，留给 K4/K5 处理边界。路径更正：tasks.md 5.2 节写的 `src/settings/components/PlanPage.tsx` 实际为 `src/windows/settings/components/PlanPage.tsx`。
 
-**验证**：PlanPage 不再显示每日目标输入框。
+**开发任务**：
+- [x] `src/windows/settings/components/PlanPage.tsx` 移除「每日目标」（dailyGoal）相关 UI 与逻辑引用
+- [x] `src/shared/config.ts` 删除 `DailyGoal` / `DAILY_GOAL_KEY` / `DEFAULT_DAILY_GOAL`
+- [x] `src/shared/i18n/locales/{zh-CN,en}/plan.json` 删除 `row.dailyGoal` 与孤儿 `unit.times`
+
+**验证**：PlanPage 不再显示每日目标输入框（UI 残留 0、grep 0 命中、tsc -b + eslint 全绿）。
 
 #### K4 · 后端读配置缺值回退默认 ❌
 **开发任务**：

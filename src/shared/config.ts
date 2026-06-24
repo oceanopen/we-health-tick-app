@@ -48,7 +48,6 @@ export const DEFAULT_LANGUAGE: Language = 'system';
 
 export type WorkDuration = number;
 export type BreakDuration = number;
-export type DailyGoal = number;
 export type LongBreakInterval = number;
 export type LongBreakDuration = number;
 
@@ -57,9 +56,6 @@ export const DEFAULT_WORK_DURATION: WorkDuration = 30;
 
 export const BREAK_DURATION_KEY = 'break_duration';
 export const DEFAULT_BREAK_DURATION: BreakDuration = 1;
-
-export const DAILY_GOAL_KEY = 'daily_goal';
-export const DEFAULT_DAILY_GOAL: DailyGoal = 10;
 
 export const LONG_BREAK_INTERVAL_KEY = 'long_break_interval';
 export const DEFAULT_LONG_BREAK_INTERVAL: LongBreakInterval = 2;
