@@ -92,11 +92,11 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | G | 托盘图标状态切换 | 3 | 3 | 0 |
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
-| J | panel UI 多状态重构 | 8 | 7 | 1 |
+| J | panel UI 多状态重构 | 8 | 8 | 0 |
 | K | i18n 与配置收尾 | 5 | 0 | 5 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **51** | **16** |
+| **合计** | | **67** | **52** | **15** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -457,7 +457,7 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 ---
 
-### 域 J · panel UI 多状态重构（8 点，2 ✅ + 6 ❌）
+### 域 J · panel UI 多状态重构（8 点，全 ✅）
 
 #### J1 · useTimerState hook（替换硬编码倒计时）✅
 **开发任务**：
@@ -530,12 +530,13 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：paused 阶段显示灰色暂停图标 + 「继续」按钮；休息时段 paused（quietTriggered）显示「休息时段中」+ 禁用按钮 + 自动恢复提示。
 
-#### J8 · ActionButtons 按 phase 切换按钮集 ❌
-**开发任务**：
-- [ ] 重写 `src/windows/panel/components/ActionButtons.tsx`：按 phase 切换按钮集（working：暂停/立即休息/设置；breaking：跳过/设置；等等）
-- [ ] 或拆分为各 View 内联按钮（J3-J7 已含按钮，此任务可整合）
+#### J8 · ActionButtons 按 phase 切换按钮集 ✅
+> **实施说明**：J3-J7 已将按钮**内联到各 View 组件**（WorkingView 3 按钮 / BreakingView 1 按钮 / AlertingView·WaitingView·PausedView 各 1 主按钮），`PanelApp.tsx` 改为显式六分支后**不再引用** `ActionButtons`。J8 实际工作收敛为**删除孤儿文件**——不重写为 phase 切换器（与 J3-J7 设计方向相反），也不抽公共 `ActionButton` 原子组件（WorkingView 与 BreakingView 按钮集语义不同，4 处重复的「IconButton+caption」模式不值得引入抽象，符合 CLAUDE.md「3 行相似胜过过早抽象」）。i18n key `panel:action.reset` / `resetTimerAria` 已随之成为孤儿，归属 K1 一并清理。
 
-**验证**：不同 phase 下 panel 底部按钮集正确切换。
+**开发任务**：
+- [x] 删除 `src/windows/panel/components/ActionButtons.tsx`（J3-J7 已内联按钮，无功能损失）
+
+**验证**：`grep -rn "ActionButtons" src/` 仅剩 0 命中；panel 各 phase 下按钮集与 J3-J7 一致（working: 暂停/立即休息/设置；breaking: 跳过(n/3)；alerting: 开始休息；waiting: 我回来了；paused: 继续）。
 
 ---
 
