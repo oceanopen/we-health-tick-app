@@ -93,10 +93,10 @@ paused   ─→ working/breaking（用户恢复 / 静音结束）
 | H | panel 窗口管理 | 5 | 5 | 0 |
 | I | panel 失焦行为 | 3 | 3 | 0 |
 | J | panel UI 多状态重构 | 8 | 8 | 0 |
-| K | i18n 与配置收尾 | 5 | 3 | 2 |
+| K | i18n 与配置收尾 | 5 | 4 | 1 |
 | L | 状态持久化 | 1 | 1 | 0 |
 | M | 端到端验证清单 | 10 | 0 | 10 |
-| **合计** | | **67** | **55** | **12** |
+| **合计** | | **67** | **56** | **11** |
 
 > ⚠️ 可优化标注共 3 处（见 F、I、L 域），非阻塞，留作后续可选任务。
 
@@ -542,7 +542,7 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 ---
 
-### 域 K · i18n 与配置收尾（5 点，3 ✅ + 2 ❌）
+### 域 K · i18n 与配置收尾（5 点，4 ✅ + 1 ❌）
 
 #### K1 · panel i18n 文案补充（中/英）✅
 > **实施说明**：K1 原始清单的 17 个 key 中，绝大多数已在 J3-J7 迭代中随各 View 组件落地（phaseWorking/Breaking/Paused、longBreakLabel、alertTitle、waitingTitle/Subtitle、quietHoursActive、pausedAutoResumeHint、action.{resume,pause,reset,settings,manualBreak,startBreak,skipBreak,imBack}、exit）。本次收敛工作包含以下偏差处理：
@@ -581,12 +581,31 @@ A（状态机基础）─┬─→ B（核心转移）─┬─→ G（托盘图
 
 **验证**：PlanPage 不再显示每日目标输入框（UI 残留 0、grep 0 命中、tsc -b + eslint 全绿）。
 
-#### K4 · 后端读配置缺值回退默认 ❌
-**开发任务**：
-- [ ] `src-tauri/src/config.rs` 的 `get_config` 在 DB 无值时回退到默认值（防 panic）
-- [ ] 或各读取点（timer.rs）显式处理 None → 默认值
+#### K4 · 后端读配置缺值回退默认 ✅
+> **实施说明**：K4 目标「后端读配置缺值不 panic」**已在 timer.rs 主体实现中落地**，无需新增代码。tasks.md 给出两个互斥方案（A: `get_config` 统一回退 / B: 各读取点显式 None 处理），当前实现采用 **方案 B**。
+>
+> **现状证据**（timer.rs 8 个读取点全部容错）：
+> - `read_work_duration_minutes` / `read_break_duration_minutes` / `read_long_break_interval` / `read_long_break_duration_minutes`：`.ok().flatten().and_then(parse).unwrap_or(DEFAULT_*)`（DB 错误 / 无值 / 非数字均回退）
+> - `read_long_break_enabled` / `read_rest_confirm`：`.ok().flatten().map(s == "Y").unwrap_or(DEFAULT_*)`
+> - `read_quiet_hours`：`.unwrap_or_default()` + `serde_json::unwrap_or_default()` → 空 vec
+> - `pick_random_reminder`：同上 → 空串
+>
+> `read_config_conn`（shared/config.rs L22-29）在 DB 错误时返回 `Err(String)`，被各读取点的 `.ok()` 统一吞成 `None`，再走 `unwrap_or` 兜底。**无任何配置读取路径会 panic**。
+>
+> **路径更正**：tasks.md 写的 `src-tauri/src/config.rs` 实际为 `src-tauri/src/shared/config.rs`；K4 关注的 `get_config` 是 Tauri command（L52，返回 `Result<Option<String>>`，本就允许 None，无 panic 风险），真正的容错点在 timer.rs 的 `read_*` 封装层。
+>
+> **非配置路径的 3 处 panic 点（有意保留，非 K4 范围）**：
+> - `lib.rs:72` `.expect("error while running tauri application")` — Tauri 启动入口，失败即崩合理
+> - `panel.rs:22` `.expect("failed to load tray icon")` — `include_bytes!` 编译期嵌入资源，运行时不可能缺失
+> - `export_bindings.rs:26` — 开发工具（`cargo run --bin`），非生产路径
+>
+> **方案 A（集中式 get_config_or_default）未采用的理由**：会把默认值表从 timer.rs 迁到 shared/config.rs 或两边重复，破坏 timer.rs L70-86 已建立的 SSOT 注释（DEFAULT_* 常量与前端 config.ts 配对清单）；方案 B 让默认值与读取逻辑就近，符合「默认值与使用场景同模块」的局部性原则。
 
-**验证**：删除 DB 中某 key（或首次启动空库），后端读取不 panic，行为用默认值。
+**开发任务**：
+- [x] `src-tauri/src/shared/config.rs` 的 `read_config_conn` 在 DB 错误时返回 `Err(String)`（非 panic）
+- [x] `src-tauri/src/timer.rs` 8 个 `read_*` 读取点全部 `.unwrap_or(DEFAULT_*)` / `unwrap_or_default()` 兜底
+
+**验证**：全量 `grep -rn "unwrap()\|expect(\|panic!" src-tauri/src/` 仅剩 3 处非配置路径（Tauri 启动 / 编译期资源 / 开发工具）；删除 DB 中任一 key 或首次启动空库时，后端读取回退默认值不 panic（timer.rs 8 个读取点的 `unwrap_or` 已覆盖）。
 
 #### K5 · 确认 config.ts 默认值与后端一致 ❌
 **开发任务**：
