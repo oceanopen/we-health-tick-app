@@ -54,11 +54,28 @@ export default function PanelApp() {
     phaseRef.current = phase;
   }, [phase]);
 
+  // 任意 phase 切换 / reminder 变化导致 root 高度变化时，重新 fitPanel 让窗口高度跟随。
+  // ResizeObserver 在 observe 后会异步触发一次首回调，等价于原 mount 即 fit 的语义。
   useEffect(() => {
-    if (rootRef.current) {
-      const height = rootRef.current.offsetHeight;
-      void logOnError(commands.fitPanel(height), 'fitPanel');
+    const root = rootRef.current;
+    if (!root) {
+      return;
     }
+
+    let raf = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const height = root.offsetHeight;
+        void logOnError(commands.fitPanel(height), 'fitPanel');
+      });
+    });
+    observer.observe(root);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
   }, []);
 
   const handleSettings = useCallback(async () => {
