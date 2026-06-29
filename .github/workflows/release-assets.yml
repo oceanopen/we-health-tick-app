@@ -51,10 +51,14 @@ jobs:
 
       # tag 推送：构建 + 发布一体化。
       # tauri-action 在检测到 updater 配置后会自动：
-      #   1. 用 TAURI_SIGNING_PRIVATE_KEY 给 .app.tar.gz / nsis .tar.gz 签名，生成 .sig 文件
+      #   1. 用 TAURI_SIGNING_PRIVATE_KEY 给 .app.tar.gz / nsis .exe.sig 签名，生成 .sig 文件
       #   2. 生成 latest.json manifest（含版本、下载 URL、签名）
       #   3. 上传所有产物（dmg / exe / *.tar.gz / *.sig / latest.json）到 GitHub Release
-      # updaterJsonPreferNsis: 与 bundle.targets=["nsis"] 对齐，Windows 产物用 nsis 包而非 zip
+      # bundle.targets=["app","dmg","nsis"]:
+      #   - macOS: app 产 .app.tar.gz + .sig（updater 用），dmg 供首次安装
+      #     注意 updater 只认 app target，dmg 不会产 updater 产物
+      #   - Windows: nsis 产 .exe + .exe.sig（updater 用）
+      # updaterJsonPreferNsis: 与 Windows nsis-only 对齐，latest.json 里 Windows 走 nsis 路径而非 msi
       # 注：用 tauri-action 内置 release 替代了原先的 softprops/action-gh-release，
       #     因为 latest.json 必须由 tauri-action 在 release 阶段生成（手动上传会漏）。
       - name: Build and release
