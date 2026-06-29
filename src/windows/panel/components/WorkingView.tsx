@@ -2,7 +2,6 @@ import LocalCafeOutlinedIcon from '@mui/icons-material/LocalCafeOutlined';
 import PauseIcon from '@mui/icons-material/Pause';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ReplayIcon from '@mui/icons-material/Replay';
-import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, Divider, IconButton, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { CountdownRing } from './CountdownRing';
@@ -14,7 +13,6 @@ interface WorkingViewProps {
   onToggle: () => void;
   onReset: () => void;
   onManualBreak: () => void;
-  onSettings: () => void;
 }
 
 export function WorkingView({
@@ -24,7 +22,6 @@ export function WorkingView({
   onToggle,
   onReset,
   onManualBreak,
-  onSettings,
 }: WorkingViewProps) {
   const { t } = useTranslation();
   const toggleLabel = isPaused ? t('panel:action.resume') : t('panel:action.pause');
@@ -74,17 +71,6 @@ export function WorkingView({
           </IconButton>
           <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
             {t('panel:action.manualBreak')}
-          </Typography>
-        </Box>
-
-        <Divider orientation="vertical" flexItem />
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <IconButton aria-label={t('panel:action.settings')} onClick={onSettings} size="small" color="secondary">
-            <SettingsIcon />
-          </IconButton>
-          <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
-            {t('panel:action.settings')}
           </Typography>
         </Box>
       </Box>

@@ -3,10 +3,11 @@ import { alpha, Box } from '@mui/material';
 import { commands } from '@src/shared/bindings';
 import { logOnError, safeAwait } from '@src/shared/commands';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { relaunch } from '@tauri-apps/plugin-process';
 import { useCallback, useEffect, useRef } from 'react';
 import { AlertingView } from './components/AlertingView';
 import { BreakingView } from './components/BreakingView';
-import { ExitButton } from './components/ExitButton';
+import { FooterActions } from './components/FooterActions';
 import { PausedView } from './components/PausedView';
 import { WaitingView } from './components/WaitingView';
 import { WorkingView } from './components/WorkingView';
@@ -87,6 +88,11 @@ export default function PanelApp() {
     await safeAwait(commands.exitApp(), 'exitApp');
   }, []);
 
+  const handleRelaunch = useCallback(() => {
+    relaunch()
+      .catch(err => console.warn('[relaunch] failed:', err));
+  }, []);
+
   return (
     <Box
       ref={rootRef}
@@ -117,7 +123,6 @@ export default function PanelApp() {
               onToggle={togglePause}
               onReset={reset}
               onManualBreak={manualBreak}
-              onSettings={handleSettings}
             />
           )
         : phase === 'alerting'
@@ -152,7 +157,7 @@ export default function PanelApp() {
                       未识别状态: {phase}
                     </Box>
                   )}
-      <ExitButton onExit={handleExit} />
+      <FooterActions onSettings={handleSettings} onRelaunch={handleRelaunch} onExit={handleExit} />
     </Box>
   );
 }
