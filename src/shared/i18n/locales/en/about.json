@@ -8,6 +8,7 @@
   "downloadAndInstall": "Download and install v{{version}}",
   "downloading": "Downloading {{percent}}%",
   "relaunch": "Restart and install",
+  "updateReady": "Update ready. Click to restart.",
   "checkFailed": "Check failed: {{error}}",
   "retry": "Retry",
   "madeWith": "Made with",

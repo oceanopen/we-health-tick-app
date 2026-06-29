@@ -6,7 +6,7 @@ import { Box, Button, Chip, CircularProgress, Typography } from '@mui/material';
 import appIcon from '@src/assets/app-icon.png';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 declare const __APP_VERSION__: string;
@@ -27,17 +27,29 @@ type CheckState
 function AboutPage() {
   const { t } = useTranslation();
   const [state, setState] = useState<CheckState>({ kind: 'idle' });
+  // 跟踪当前持有的 Update 句柄，供 handleCheck 重试、下载 finally、unmount cleanup 统一 close。
+  const updateRef = useRef<Update | null>(null);
+
+  // unmount 时释放可能残留的 Update，覆盖下载中途关闭页面等场景。
+  useEffect(() => {
+    return () => {
+      updateRef.current?.close().catch(() => {});
+      updateRef.current = null;
+    };
+  }, []);
 
   const handleCheck = async () => {
     // Update extends Resource，需显式 close 释放 Rust 端句柄。
-    // 重新点「检查更新」时释放上一次的 Update，避免反复点击累积泄漏。
-    if (state.kind === 'available') {
-      await state.update.close().catch(() => {});
+    // 无论之前是 available / error(持有上一次 update) / downloaded，重新检查前都先释放，避免累积泄漏。
+    if (updateRef.current) {
+      await updateRef.current.close().catch(() => {});
+      updateRef.current = null;
     }
     setState({ kind: 'checking' });
     try {
       const update = await check();
       if (update) {
+        updateRef.current = update;
         setState({ kind: 'available', update });
       } else {
         setState({ kind: 'up-to-date' });
@@ -73,6 +85,10 @@ function AboutPage() {
       setState({ kind: 'downloaded' });
     } catch (e) {
       setState({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      // 无论下载成功还是失败，Rust 端句柄都不再需要，统一释放。
+      await updateRef.current?.close().catch(() => {});
+      updateRef.current = null;
     }
   };
 
@@ -132,7 +148,7 @@ function AboutPage() {
       case 'available':
         return t('about:updateAvailable', { version: state.update.version });
       case 'downloaded':
-        return t('about:relaunch');
+        return t('about:updateReady');
       case 'error':
         return t('about:checkFailed', { error: state.message });
       default:

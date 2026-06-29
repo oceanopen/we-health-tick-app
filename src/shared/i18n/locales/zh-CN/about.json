@@ -8,6 +8,7 @@
   "downloadAndInstall": "下载并安装 v{{version}}",
   "downloading": "下载中 {{percent}}%",
   "relaunch": "重启并安装",
+  "updateReady": "更新已就绪，点击重启",
   "checkFailed": "检查失败：{{error}}",
   "retry": "重试",
   "madeWith": "Made with",
