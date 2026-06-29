@@ -112,7 +112,7 @@ const KEY_QUIET_HOURS: &str = "quiet_hours";
 // 默认静音时段（与前端 DEFAULT_QUIET_HOURS 一一对应）。
 // DB 无值 / 解析失败时回退此项，避免「前端显示 2 项但后端不静音」的兜底不一致。
 const DEFAULT_QUIET_HOURS_JSON: &str =
-    "[{\"start\":\"12:00\",\"end\":\"14:00\"},{\"start\":\"18:00\",\"end\":\"19:00\"}]";
+    "[{\"start\":\"12:00\",\"end\":\"14:00\"},{\"start\":\"18:00\",\"end\":\"18:30\"}]";
 
 // 拿 TimerInner 锁，poisoned 时自动恢复（避免线程 panic 级联导致整个状态机死锁）。
 // 场景：所有需要读写 TimerInner 的同步代码块入口。

@@ -86,7 +86,7 @@ export type QuietHours = QuietHourPeriod[];
 export const QUIET_HOURS_KEY = 'quiet_hours';
 export const DEFAULT_QUIET_HOURS: QuietHours = [
   { start: '12:00', end: '14:00' },
-  { start: '18:00', end: '19:00' },
+  { start: '18:00', end: '18:30' },
 ];
 
 export function encodeQuietHours(periods: QuietHours): string {
