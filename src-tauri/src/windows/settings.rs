@@ -1,6 +1,7 @@
 use tauri::{LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::shared::screen::{work_area_center, MonitorInfo};
+use crate::shared::types::Phase;
 
 #[tauri::command]
 #[specta::specta]
@@ -22,6 +23,11 @@ pub fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = w.hide();
+                    // show_settings_window 打开时主动 hide 了 panel；非 Working 阶段需恢复常驻。
+                    let app = w.app_handle();
+                    if crate::timer::current_phase(app) != Phase::Working {
+                        crate::windows::panel::show_panel(app);
+                    }
                 }
             });
 

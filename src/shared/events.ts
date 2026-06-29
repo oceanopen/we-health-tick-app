@@ -6,5 +6,3 @@ export const EVENT_TIMER_TICK = 'timer-tick';
 export const EVENT_PHASE_CHANGED = 'phase-changed';
 
 export const EVENT_CONFIG_CHANGED = 'config-changed';
-
-export const EVENT_SHOW_PANEL = 'show-panel';

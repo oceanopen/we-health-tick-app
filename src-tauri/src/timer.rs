@@ -267,7 +267,7 @@ fn fresh_working(conn: &Connection) -> TimerInner {
 // 确保状态修改规则集中、可测试。调用方负责：
 //   1. 持有 TimerInner 锁
 //   2. 临时锁 ConfigState 读 DB（按 inner → config 顺序避免死锁）
-//   3. 锁外 emit phase-changed / timer-tick / show-panel
+//   3. 锁外 emit phase-changed / timer-tick
 
 // 长休息判定（读取递增前的 completed_cycles）：
 //   `enabled && interval > 0 && completed_cycles > 0 && completed_cycles % interval == 0`
@@ -292,7 +292,7 @@ fn apply_start_work(inner: &mut TimerInner, work_total_secs: i64, now: i64) {
 
 // 工作倒计时归零：抽取 reminder + 按 rest_confirm 分流。
 // rest_confirm=true → 进 Alerting（等用户确认）；=false → 调用方继续 apply_start_break。
-// 返回进入的下一个 phase，调用方据此决定是否继续 breaking 流程 / emit show-panel。
+// 返回进入的下一个 phase，调用方据此决定是否继续 breaking 流程。
 fn apply_on_work_done(inner: &mut TimerInner, reminder: String, rest_confirm: bool) -> Phase {
     inner.current_reminder = reminder;
     if rest_confirm {
@@ -406,18 +406,10 @@ fn emit_timer_tick(app: &AppHandle, payload: TimerStatePayload) {
 }
 
 // emit "phase-changed"：phase 切换时推送（带 prev_phase），前端 PanelApp（M4/M5）用于切换 UI 分支。
-// M1 仅在跨天重置时触发；M2 的状态转移逻辑（on_work_done / start_break 等）会频繁触发。
+// panel.rs 同步监听此事件：进入非 Working 阶段时主动唤起 panel 窗口（常驻提醒）。
 fn emit_phase_changed(app: &AppHandle, payload: TimerStatePayload) {
     if let Err(e) = app.emit(crate::shared::events::EVENT_PHASE_CHANGED, payload) {
         log::warn!("emit phase-changed failed: {e}");
-    }
-}
-
-// emit "show-panel"：进入 Alerting / Breaking 时触发，M4 的 panel.rs 监听后主动唤起 panel 窗口。
-// M2 仅 emit 事件；具体 show/create panel 由 M4 在 listener 中实现。
-fn emit_show_panel(app: &AppHandle) {
-    if let Err(e) = app.emit(crate::shared::events::EVENT_SHOW_PANEL, ()) {
-        log::warn!("emit show-panel failed: {e}");
     }
 }
 
@@ -436,7 +428,7 @@ fn emit_show_panel(app: &AppHandle) {
 //      - Working：按 target_epoch 重算 remaining；归零 → on_work_done → Alerting 或直接 Breaking
 //      - Breaking：remaining -= 1；归零 → on_break_done → Waiting
 //      - Alerting / Waiting / Paused：不递减、不切换
-//   4. emit timer-tick；有 phase 切换则 emit phase-changed；进入 Alerting/Breaking 则 emit show-panel
+//   4. emit timer-tick；有 phase 切换则 emit phase-changed（panel.rs 据此唤起非 Working 窗口）
 // 关键约束：所有锁内操作必须不跨 .await（std::sync::Mutex 的 MutexGuard 不是 Send），
 //          payload 构建在锁内完成，emit 在锁外执行。
 async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
@@ -446,10 +438,9 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
         interval.tick().await;
 
         // 同步块：所有状态修改 + payload 构建在锁内完成，不跨 await 持锁
-        let (tick_payload, phase_change_payload, show_panel) = {
+        let (tick_payload, phase_change_payload) = {
             let mut state = lock_inner(&inner);
             let mut phase_change_payload = None;
-            let mut show_panel = false;
 
             // 运行时跨天判断：长时间运行到次日，开始新一轮工作
             let today = today_string();
@@ -540,8 +531,7 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                                         is_long,
                                     );
                                 }
-                                // Alerting 与 Breaking 都需要唤起 panel（M4 监听）
-                                show_panel = true;
+                                // Alerting 与 Breaking 都属于非 Working，panel.rs 监听 phase-changed 时唤起窗口
                                 phase_change_payload = Some(build_payload(&state, Some(prev)));
                             }
                             Err(e) => log::warn!("config lock poisoned, skip on_work_done: {e}"),
@@ -565,20 +555,13 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                 }
             }
 
-            (
-                build_payload(&state, None),
-                phase_change_payload,
-                show_panel,
-            )
+            (build_payload(&state, None), phase_change_payload)
         };
 
         emit_timer_tick(&app, tick_payload);
 
         if let Some(payload) = phase_change_payload {
             emit_phase_changed(&app, payload);
-        }
-        if show_panel {
-            emit_show_panel(&app);
         }
     }
 }
@@ -686,6 +669,16 @@ pub fn get_timer_state(state: State<'_, TimerState>) -> Result<TimerStatePayload
     Ok(build_payload(&inner, None))
 }
 
+// 读取当前 phase：供其他模块判断状态机阶段
+// （如 settings 关闭时决定是否恢复 panel 常驻）。锁 poisoned 时回退 Working（保守不唤起）。
+pub fn current_phase(app: &AppHandle) -> Phase {
+    let state = app.state::<TimerState>();
+    match state.inner.lock() {
+        Ok(inner) => inner.phase,
+        Err(_) => Phase::Working,
+    }
+}
+
 // ============================================================
 // 状态转移 commands（前端按钮 invoke 入口）
 // ============================================================
@@ -694,7 +687,7 @@ pub fn get_timer_state(state: State<'_, TimerState>) -> Result<TimerStatePayload
 //   1. 锁 inner（同步块）
 //   2. 必要时锁 ConfigState 读配置（保持 inner → config 顺序避免死锁）
 //   3. 调 apply_* 纯函数修改状态
-//   4. 锁外 emit phase-changed / timer-tick / show-panel
+//   4. 锁外 emit phase-changed / timer-tick
 // 错误策略：锁 poisoned → 返回 Err；读配置失败 → 回退默认值（不返回 Err）。
 
 // 强制开始新一轮工作（任意 phase 都可调用）。
@@ -723,7 +716,7 @@ pub fn start_work(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
 #[tauri::command]
 #[specta::specta]
 pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
-    let (phase_payload, show_panel) = {
+    let phase_payload = {
         let mut inner = lock_inner(&state.inner);
         if inner.phase != Phase::Alerting {
             return Err("confirm_break only valid in Alerting phase".into());
@@ -742,12 +735,9 @@ pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(),
             ((total_min as i64) * 60, is_long)
         };
         apply_start_break(&mut inner, total_secs, is_long);
-        (build_payload(&inner, Some(prev)), true)
+        build_payload(&inner, Some(prev))
     };
     emit_phase_changed(&app, phase_payload);
-    if show_panel {
-        emit_show_panel(&app);
-    }
     Ok(())
 }
 
@@ -826,7 +816,7 @@ pub fn reset(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String>
 #[tauri::command]
 #[specta::specta]
 pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
-    let (phase_payload, show_panel) = {
+    let phase_payload = {
         let mut inner = lock_inner(&state.inner);
         if inner.phase != Phase::Working {
             return Err("manual_break only valid in Working phase".into());
@@ -845,12 +835,9 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
             ((total_min as i64) * 60, is_long)
         };
         apply_start_break(&mut inner, total_secs, is_long);
-        (build_payload(&inner, Some(prev)), true)
+        build_payload(&inner, Some(prev))
     };
     emit_phase_changed(&app, phase_payload);
-    if show_panel {
-        emit_show_panel(&app);
-    }
     Ok(())
 }
 

@@ -9,6 +9,3 @@ pub const EVENT_PHASE_CHANGED: &str = "phase-changed";
 
 /// 配置项变更时广播（ConfigChangedPayload）。订阅方据此响应配置变化。
 pub const EVENT_CONFIG_CHANGED: &str = "config-changed";
-
-/// 进入 Alerting / Breaking 时触发（无载荷）。panel.rs 监听后主动唤起 panel 窗口。
-pub const EVENT_SHOW_PANEL: &str = "show-panel";

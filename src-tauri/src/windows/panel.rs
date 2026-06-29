@@ -46,7 +46,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // 启动即 fresh_working（L1），初始恒为 Working；显式设置一次避免启动瞬间显示默认 32x32.png（G3）。
     set_tray_icon_by_phase(&app_handle, Phase::Working);
 
-    // 订阅 phase-changed：phase 切换时同步切换托盘图标（G2）。
+    // 订阅 phase-changed：phase 切换时同步切换托盘图标（G2），
+    // 并在进入非 Working 阶段时主动唤起 panel 窗口（常驻提醒）。
     // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
     app.handle()
         .listen(crate::shared::events::EVENT_PHASE_CHANGED, move |event| {
@@ -54,19 +55,15 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             .ok()
             .map(|p| p.phase);
         match phase {
-            Some(phase) => set_tray_icon_by_phase(&app_handle, phase),
+            Some(phase) => {
+                set_tray_icon_by_phase(&app_handle, phase);
+                if phase != Phase::Working {
+                    show_panel(&app_handle);
+                }
+            }
             None => log::warn!("phase-changed payload parse failed, skip tray icon update"),
         }
     });
-
-    // 订阅 show-panel：进入 Alerting / Breaking 时 timer.rs emit 此事件（B4），
-    // 此处主动唤起 panel 窗口（H5）。payload 为 unit，无需解析。
-    let show_panel_handle = app.handle().clone();
-    app.handle()
-        .listen(
-            crate::shared::events::EVENT_SHOW_PANEL,
-            move |_| show_panel(&show_panel_handle),
-        );
 
     Ok(())
 }
@@ -100,7 +97,7 @@ pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
 }
 
 // 强制显示 panel（H4）：panel 不存在 → create；存在 → position + show + set_focus。
-// pub 是为 H5（show-panel 事件订阅）预留统一入口，避免调用方重复实现两分支逻辑。
+// phase-changed 监听器在进入非 Working 阶段时调用此函数唤起窗口。
 pub fn show_panel(app: &AppHandle) {
     let Some(tray) = app.tray_by_id("tray") else {
         log::warn!("tray not found when show_panel");

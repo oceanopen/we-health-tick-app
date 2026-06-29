@@ -37,7 +37,8 @@ export default function PanelApp() {
   useEffect(() => {
     const currentWin = getCurrentWindow();
     const unlisten = currentWin.onFocusChanged(({ payload: focused }) => {
-      if (!focused && !hidingRef.current && phaseRef.current !== 'alerting') {
+      // 仅 Working 阶段失焦隐藏；Alerting/Breaking/Waiting/Paused 常驻桌面，由后端 phase-changed 事件唤起。
+      if (!focused && !hidingRef.current && phaseRef.current === 'working') {
         currentWin.hide();
       } else if (focused) {
         hidingRef.current = false;
