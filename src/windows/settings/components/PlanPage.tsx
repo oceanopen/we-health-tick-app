@@ -224,9 +224,9 @@ function PlanPage() {
             <Slider
               value={draft.workDuration}
               onChange={(_, v) => update('workDuration', v as number)}
-              min={15}
+              min={1}
               max={120}
-              step={5}
+              step={1}
               size="small"
             />
           </Box>
@@ -339,9 +339,9 @@ function PlanPage() {
             <Slider
               value={draft.longBreakDuration}
               onChange={(_, v) => update('longBreakDuration', v as number)}
-              min={5}
+              min={1}
               max={30}
-              step={5}
+              step={1}
               size="small"
             />
           </Box>
