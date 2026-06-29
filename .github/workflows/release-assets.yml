@@ -5,7 +5,6 @@ on:
   push:
     tags:
       - 'v*' # 匹配 v 开头的 tag（如 v0.1.0），推送 tag 时自动触发
-  workflow_dispatch: # 支持在 GitHub Actions 页面手动触发
 
 jobs:
   build:
