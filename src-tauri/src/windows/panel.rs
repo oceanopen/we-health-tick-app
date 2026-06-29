@@ -12,6 +12,13 @@ use crate::shared::types::{Phase, TimerStatePayload};
 const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
 
+// dev build（pnpm tauri dev）tooltip 带 [DEV] 后缀，肉眼即可区分 dev/prod 产物。
+const TOOLTIP: &str = if cfg!(debug_assertions) {
+    "We Health Tick [DEV]"
+} else {
+    "We Health Tick"
+};
+
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // CARGO_MANIFEST_DIR 在编译期由 cargo 注入，指向 src-tauri/ 根目录的绝对路径。
     // 用 concat!() 拼成 include_bytes! 的路径，让 icon 资源路径与 panel.rs 当前所在目录解耦。
@@ -23,7 +30,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     TrayIconBuilder::with_id("tray")
         .icon(icon)
-        .tooltip("We Health Tick")
+        .tooltip(TOOLTIP)
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
@@ -68,19 +75,37 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// 按 phase 切换托盘图标（G2）。在 setup 末尾订阅 phase-changed 时调用；
-// G3 落地后启动时也会显式调一次（Phase::Working）。
-// 失败容错：图片解码 / tray 缺失 / set_icon 失败均 log::warn! 并返回，不 panic
-// （托盘图标切换是非关键路径，不应阻塞状态机主流程）。
-pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
-    let bytes: &[u8] = match phase {
+// 按 phase 选托盘图标字节。dev build（pnpm tauri dev）用带红色 DEV 圆点的 -dev 变体，
+// release build 用原图标。用 #[cfg] 而非 cfg!() 运行时分支：include_bytes! 是编译期展开，
+// cfg!() 会把两套 PNG 都编进二进制；#[cfg] 在编译期二选一，release 产物完全不含 dev 资源。
+#[cfg(debug_assertions)]
+fn phase_icon_bytes(phase: Phase) -> &'static [u8] {
+    match phase {
+        Phase::Working => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/working-dev.png")),
+        Phase::Alerting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/alerting-dev.png")),
+        Phase::Breaking => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/breaking-dev.png")),
+        Phase::Waiting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/waiting-dev.png")),
+        Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/paused-dev.png")),
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn phase_icon_bytes(phase: Phase) -> &'static [u8] {
+    match phase {
         Phase::Working => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/working.png")),
         Phase::Alerting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/alerting.png")),
         Phase::Breaking => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/breaking.png")),
         Phase::Waiting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/waiting.png")),
         Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/paused.png")),
-    };
-    let icon = match tauri::image::Image::from_bytes(bytes) {
+    }
+}
+
+// 按 phase 切换托盘图标（G2）。在 setup 末尾订阅 phase-changed 时调用；
+// G3 落地后启动时也会显式调一次（Phase::Working）。
+// 失败容错：图片解码 / tray 缺失 / set_icon 失败均 log::warn! 并返回，不 panic
+// （托盘图标切换是非关键路径，不应阻塞状态机主流程）。
+pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
+    let icon = match tauri::image::Image::from_bytes(phase_icon_bytes(phase)) {
         Ok(img) => img,
         Err(e) => {
             log::warn!("decode tray icon failed for {:?}: {e}", phase);
