@@ -52,7 +52,7 @@ jobs:
 
       # tag 推送：构建 + 发布一体化。
       # tauri-action 在检测到 updater 配置后会自动：
-      #   1. 用 TAURI_PRIVATE_KEY 给 .app.tar.gz / nsis .tar.gz 签名，生成 .sig 文件
+      #   1. 用 TAURI_SIGNING_PRIVATE_KEY 给 .app.tar.gz / nsis .tar.gz 签名，生成 .sig 文件
       #   2. 生成 latest.json manifest（含版本、下载 URL、签名）
       #   3. 上传所有产物（dmg / exe / *.tar.gz / *.sig / latest.json）到 GitHub Release
       # updaterJsonPreferNsis: 与 bundle.targets=["nsis"] 对齐，Windows 产物用 nsis 包而非 zip
@@ -63,7 +63,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tauriScript: pnpm tauri
           args: ${{ matrix.args }}
@@ -72,15 +72,3 @@ jobs:
           releaseName: 'We Health Tick ${{ github.ref_name }}'
           releaseDraft: false
           prerelease: false
-
-      # 手动触发：仅构建验证产物（不上传 Release，不生成 manifest）
-      # 不注入 TAURI_PRIVATE_KEY/TAURI_KEY_PASSWORD：手动验证场景不需要签名链路，
-      # tauri-action 在缺少私钥时会跳过签名步骤，不影响构建本身。
-      - name: Build only
-        if: github.ref_type != 'tag'
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tauriScript: pnpm tauri
-          args: ${{ matrix.args }}
