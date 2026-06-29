@@ -21,4 +21,10 @@ export default defineConfig({
       },
     },
   },
+  server: {
+    // strictPort 必须为 true —— tauri.conf.json 的 devUrl 固定指向此端口，端口被占时必须报错而非递增，
+    // 否则 vite 跳到 7102 会导致 tauri webview 连不上 dev server。
+    port: 7101,
+    strictPort: true,
+  },
 });
