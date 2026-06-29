@@ -2,6 +2,14 @@
   "subtitle": "健康打卡",
   "slogan": "久坐提醒 · 强制休息 · 习惯养成",
   "checkUpdate": "检查更新",
+  "checking": "检查中...",
+  "upToDate": "已是最新版本 v{{version}}",
+  "updateAvailable": "发现新版本 v{{version}}",
+  "downloadAndInstall": "下载并安装 v{{version}}",
+  "downloading": "下载中 {{percent}}%",
+  "relaunch": "重启并安装",
+  "checkFailed": "检查失败：{{error}}",
+  "retry": "重试",
   "madeWith": "Made with",
   "forHealth": "for your health"
 }

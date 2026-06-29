@@ -19,6 +19,7 @@
     "core:window:allow-inner-size",
     "core:window:allow-outer-size",
     "core:window:allow-is-visible",
-    "shell:allow-open"
+    "shell:allow-open",
+    "updater:default"
   ]
 }

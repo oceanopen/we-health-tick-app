@@ -42,6 +42,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(specta_builder.invoke_handler())
         .setup(move |app| {
             // macOS 隐藏 Dock 图标：将应用激活策略设为 Accessory（代理应用），

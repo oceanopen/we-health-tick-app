@@ -2,6 +2,14 @@
   "subtitle": "Health Tick",
   "slogan": "Sit less · Rest more · Build habits",
   "checkUpdate": "Check for updates",
+  "checking": "Checking...",
+  "upToDate": "You're on the latest version v{{version}}",
+  "updateAvailable": "New version v{{version}} available",
+  "downloadAndInstall": "Download and install v{{version}}",
+  "downloading": "Downloading {{percent}}%",
+  "relaunch": "Restart and install",
+  "checkFailed": "Check failed: {{error}}",
+  "retry": "Retry",
   "madeWith": "Made with",
   "forHealth": "for your health"
 }
