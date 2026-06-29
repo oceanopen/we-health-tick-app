@@ -25,11 +25,11 @@ export function AlertingView({ reminder, onStartBreak }: AlertingViewProps) {
         py: 1,
       }}
     >
-      <NotificationsActiveIcon sx={{ fontSize: 56, color: alertingColor }} />
-      <Typography variant="h6" component="div">
+      <NotificationsActiveIcon sx={{ fontSize: 120, color: alertingColor }} />
+      <Typography variant="body2" color="text.secondary">
         {t('panel:alertTitle')}
       </Typography>
-      <Typography variant="h5" component="div" align="center" sx={{ fontWeight: 'bold', px: 1 }}>
+      <Typography variant="body2" align="center" sx={{ fontStyle: 'italic', color: 'text.secondary', px: 1 }}>
         {reminder}
       </Typography>
       <Button variant="contained" fullWidth onClick={onStartBreak} sx={{ mt: 1, textTransform: 'none' }}>
