@@ -4,6 +4,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import { Box, Button, Chip, CircularProgress, Typography } from '@mui/material';
 import appIcon from '@src/assets/app-icon.png';
+import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +14,7 @@ declare const __APP_VERSION__: string;
 // updater 检查与下载安装的状态机。
 // idle/checking/up-to-date/error 为「检查」分支；
 // available/downloading/downloaded 为「下载安装」分支。
-// downloadAndInstall 完成后 plugin-updater 会自动重启应用，downloaded 仅作兜底显示。
+// downloadAndInstall 完成后 plugin-updater 不会自动重启，downloaded 状态由用户点按钮触发 relaunch。
 type CheckState
   = | { kind: 'idle' }
     | { kind: 'checking' }
@@ -67,8 +68,8 @@ function AboutPage() {
             break;
         }
       });
-      // downloadAndInstall 完成后 plugin-updater 内部会触发重启；
-      // 若未自动重启（如 macOS 极端情况），保留 downloaded 兜底状态。
+      // downloadAndInstall 完成后 plugin-updater 不会自动重启，
+      // 落到 downloaded 状态等用户点「重启」按钮触发 relaunch。
       setState({ kind: 'downloaded' });
     } catch (e) {
       setState({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
@@ -102,8 +103,8 @@ function AboutPage() {
         return {
           label: t('about:relaunch'),
           icon: <AutorenewIcon />,
-          disabled: true,
-          onClick: undefined,
+          disabled: false,
+          onClick: () => relaunch(),
         };
       case 'error':
         return {

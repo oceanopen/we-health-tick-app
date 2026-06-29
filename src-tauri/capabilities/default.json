@@ -20,6 +20,7 @@
     "core:window:allow-outer-size",
     "core:window:allow-is-visible",
     "shell:allow-open",
-    "updater:default"
+    "updater:default",
+    "process:default"
   ]
 }
