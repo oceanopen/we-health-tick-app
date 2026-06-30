@@ -108,7 +108,7 @@ const DEFAULT_REST_CONFIRM: bool = true; // Y
 const KEY_BREAK_SKIP_MAX: &str = "break_skip_max";
 // 休息跳过防误触门槛（连点 N 次才真正跳过）。与前端 DEFAULT_BREAK_SKIP_MAX 对齐。
 // read_break_skip_max 会 clamp 到 [MIN, MAX]，防止 DB 被外部写入异常值。
-const DEFAULT_BREAK_SKIP_MAX: u32 = 2;
+const DEFAULT_BREAK_SKIP_MAX: u32 = 1;
 // 跳过次数的合法范围（闭区间）。前后端均引用，改范围时同步 src/shared/config.ts。
 const MIN_BREAK_SKIP_MAX: u32 = 1;
 const MAX_BREAK_SKIP_MAX: u32 = 3;
