@@ -57,6 +57,11 @@ export const DEFAULT_WORK_DURATION: WorkDuration = 30;
 export const BREAK_DURATION_KEY = 'break_duration';
 export const DEFAULT_BREAK_DURATION: BreakDuration = 1;
 
+export const BREAK_SKIP_MAX_KEY = 'break_skip_max';
+export const DEFAULT_BREAK_SKIP_MAX = 2;
+export const MIN_BREAK_SKIP_MAX = 1;
+export const MAX_BREAK_SKIP_MAX = 3;
+
 export const LONG_BREAK_INTERVAL_KEY = 'long_break_interval';
 export const DEFAULT_LONG_BREAK_INTERVAL: LongBreakInterval = 2;
 

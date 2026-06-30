@@ -15,6 +15,7 @@
     "longBreakEnabled": "长休息",
     "longBreakInterval": "长休息间隔",
     "longBreakDuration": "长休息时长",
+    "breakSkipMax": "跳过次数",
     "workTime": "工作时间",
     "quietHours": "休息时段"
   },

@@ -41,8 +41,8 @@ struct TimerInner {
     /// `completed_cycles > 0 && completed_cycles % long_break_interval == 0`。
     /// 仅正常完成 on_break_done 才递增；跳过休息不计入。
     completed_cycles: u32,
-    /// 跳过休息的累计点击次数。M2 skip_break 中递增，达到 3 才真正跳过；
-    /// 每次 start_break 进入 breaking 时清零。前端按钮显示「跳过 (n/3)」。
+    /// 跳过休息的累计点击次数。M2 skip_break 中递增，达到 break_skip_max 次才真正跳过；
+    /// 每次 start_break 进入 breaking 时清零。前端按钮显示「跳过 (n/max)」。
     break_skip_count: u32,
     /// 当前随机抽取的提醒文案（来自 reminders 配置）。M2 的 on_work_done 中抽取；
     /// working / waiting / paused 阶段为空字符串。
@@ -85,6 +85,7 @@ pub struct TimerState {
 //   KEY_REST_CONFIRM           ↔ REST_CONFIRM_KEY          / DEFAULT_REST_CONFIRM
 //   KEY_QUIET_HOURS            ↔ QUIET_HOURS_KEY           / DEFAULT_QUIET_HOURS (DEFAULT_QUIET_HOURS_JSON)
 //   KEY_REMINDERS              ↔ REMINDERS_KEY             / （无默认，运行时 decode/pick）
+//   KEY_BREAK_SKIP_MAX         ↔ BREAK_SKIP_MAX_KEY        / DEFAULT_BREAK_SKIP_MAX
 
 const KEY_WORK_DURATION: &str = "work_duration";
 const DEFAULT_WORK_DURATION_MIN: u32 = 30;
@@ -103,6 +104,14 @@ const DEFAULT_LONG_BREAK_DURATION_MIN: u32 = 5;
 
 const KEY_REST_CONFIRM: &str = "rest_confirm";
 const DEFAULT_REST_CONFIRM: bool = true; // Y
+
+const KEY_BREAK_SKIP_MAX: &str = "break_skip_max";
+// 休息跳过防误触门槛（连点 N 次才真正跳过）。与前端 DEFAULT_BREAK_SKIP_MAX 对齐。
+// read_break_skip_max 会 clamp 到 [MIN, MAX]，防止 DB 被外部写入异常值。
+const DEFAULT_BREAK_SKIP_MAX: u32 = 2;
+// 跳过次数的合法范围（闭区间）。前后端均引用，改范围时同步 src/shared/config.ts。
+const MIN_BREAK_SKIP_MAX: u32 = 1;
+const MAX_BREAK_SKIP_MAX: u32 = 3;
 
 const KEY_REMINDERS: &str = "reminders";
 
@@ -169,6 +178,17 @@ fn read_long_break_duration_minutes(conn: &Connection) -> u32 {
         .flatten()
         .and_then(|s| s.parse::<u32>().ok())
         .unwrap_or(DEFAULT_LONG_BREAK_DURATION_MIN)
+}
+
+// 读 break_skip_max（休息跳过防误触门槛）。容错：非数字/超范围 → clamp 到 [MIN,MAX]；无值 → 回退默认。
+// 场景：skip_break 判定门槛时实时读取（不缓存，保证用户改配置后立即生效）。
+fn read_break_skip_max(conn: &Connection) -> u32 {
+    read_config_conn(conn, KEY_BREAK_SKIP_MAX)
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<u32>().ok())
+        .map(|n| n.clamp(MIN_BREAK_SKIP_MAX, MAX_BREAK_SKIP_MAX))
+        .unwrap_or(DEFAULT_BREAK_SKIP_MAX)
 }
 
 // 读 rest_confirm（Y/N），容错回退默认 Y。
@@ -841,9 +861,9 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
     Ok(())
 }
 
-// 跳过休息（Breaking 阶段）：需连点 3 次才生效，防止误触。
-// - < 3 次：break_skip_count += 1，emit timer-tick 让 UI 显示「跳过 (n/3)」
-// - >= 3 次：跳过本次休息（不计入 completed_cycles），直接 start_work
+// 跳过休息（Breaking 阶段）：连点 break_skip_max 次才跳过（防误触；由 break_skip_max 配置控制，默认 2，范围 1-3）。
+// - < max：break_skip_count += 1，emit timer-tick 让 UI 显示「跳过 (n/max)」
+// - >= max：跳过本次休息（不计入 completed_cycles），直接 start_work
 #[tauri::command]
 #[specta::specta]
 pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
@@ -853,7 +873,12 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
             return Err("skip_break only valid in Breaking phase".into());
         }
         inner.break_skip_count = inner.break_skip_count.saturating_add(1);
-        if inner.break_skip_count < 3 {
+        let break_skip_max = {
+            let config_state = app.state::<ConfigState>();
+            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            read_break_skip_max(&conn)
+        };
+        if inner.break_skip_count < break_skip_max {
             (Some(build_payload(&inner, None)), None)
         } else {
             let prev = inner.phase;

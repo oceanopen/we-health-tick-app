@@ -50,8 +50,8 @@ pub struct TimerStatePayload {
     pub current_reminder: String,
     /// 本次休息是否为长休息。前端 breaking UI 据此显示「休息中」/「长休息中」标签与不同配色。
     pub is_long_break: bool,
-    /// 跳过休息的累计点击次数。前端 breaking 阶段按钮显示「跳过 (n/3)」；
-    /// 达到 3 才真正跳过，防止误触。进入 breaking 时清零。
+    /// 跳过休息的累计点击次数。前端 breaking 阶段按钮显示「跳过 (n/max)」；
+    /// 达到 break_skip_max 配置门槛才真正跳过。进入 breaking 时清零。
     pub break_skip_count: u32,
     /// 已完成的工作-休息轮数。长休息判定输入：
     /// `completed_cycles > 0 && completed_cycles % interval == 0`；

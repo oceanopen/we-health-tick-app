@@ -9,6 +9,7 @@ interface BreakingViewProps {
   reminder: string;
   isLongBreak: boolean;
   breakSkipCount: number;
+  breakSkipMax: number;
   onSkip: () => void;
 }
 
@@ -18,11 +19,12 @@ export function BreakingView({
   reminder,
   isLongBreak,
   breakSkipCount,
+  breakSkipMax,
   onSkip,
 }: BreakingViewProps) {
   const { t } = useTranslation();
   const phaseLabel = isLongBreak ? t('panel:longBreakLabel') : t('panel:phaseBreaking');
-  const skipLabel = `${t('panel:action.skipBreak')} (${breakSkipCount}/3)`;
+  const skipLabel = `${t('panel:action.skipBreak')} (${breakSkipCount}/${breakSkipMax})`;
 
   return (
     <>

@@ -22,6 +22,7 @@ export default function PanelApp() {
     currentReminder,
     isLongBreak,
     breakSkipCount,
+    breakSkipMax,
     togglePause,
     reset,
     manualBreak,
@@ -138,6 +139,7 @@ export default function PanelApp() {
                   reminder={currentReminder}
                   isLongBreak={isLongBreak}
                   breakSkipCount={breakSkipCount}
+                  breakSkipMax={breakSkipMax}
                   onSkip={skipBreak}
                 />
               )

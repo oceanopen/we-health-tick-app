@@ -1,7 +1,18 @@
-import type { TimerStatePayload } from '@src/shared/bindings';
+import type { ConfigChangedPayload, TimerStatePayload } from '@src/shared/bindings';
 import { commands } from '@src/shared/bindings';
 import { logOnError } from '@src/shared/commands';
-import { EVENT_PHASE_CHANGED, EVENT_TIMER_TICK } from '@src/shared/events';
+import {
+  BREAK_SKIP_MAX_KEY,
+  DEFAULT_BREAK_SKIP_MAX,
+  getConfig,
+  MAX_BREAK_SKIP_MAX,
+  MIN_BREAK_SKIP_MAX,
+} from '@src/shared/config';
+import {
+  EVENT_CONFIG_CHANGED,
+  EVENT_PHASE_CHANGED,
+  EVENT_TIMER_TICK,
+} from '@src/shared/events';
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -27,6 +38,36 @@ function formatDisplayTime(seconds: number): string {
 
 export function useTimerState() {
   const [state, setState] = useState<TimerStatePayload>(INITIAL_STATE);
+  const [breakSkipMax, setBreakSkipMax] = useState(DEFAULT_BREAK_SKIP_MAX);
+
+  // 读取休息跳过门槛（break_skip_max 配置）：mount 读一次 + 监听 config-changed 实时刷新
+  // （用户在设置页改完后 panel 立即更新分母）。值 clamp 到 [MIN,MAX]，与后端 read_break_skip_max 对齐。
+  useEffect(() => {
+    const apply = (raw: string | null) => {
+      const n = Number(raw);
+      if (Number.isFinite(n)) {
+        setBreakSkipMax(Math.min(MAX_BREAK_SKIP_MAX, Math.max(MIN_BREAK_SKIP_MAX, Math.trunc(n))));
+      }
+    };
+    let cancelled = false;
+    void (async () => {
+      const v = await getConfig(BREAK_SKIP_MAX_KEY);
+      if (!cancelled) {
+        apply(v);
+      }
+    })();
+    const promise = listen<ConfigChangedPayload>(EVENT_CONFIG_CHANGED, (e) => {
+      if (e.payload.key === BREAK_SKIP_MAX_KEY) {
+        apply(e.payload.value);
+      }
+    });
+    return () => {
+      cancelled = true;
+      promise
+        .then(fn => fn())
+        .catch(err => console.warn('[breakSkipMax] unlisten failed:', err));
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +121,7 @@ export function useTimerState() {
     currentReminder: state.currentReminder,
     isLongBreak: state.isLongBreak,
     breakSkipCount: state.breakSkipCount,
+    breakSkipMax,
     completedCycles: state.completedCycles,
     quietTriggered: state.quietTriggered,
     displayTime,
