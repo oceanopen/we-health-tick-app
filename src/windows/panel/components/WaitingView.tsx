@@ -20,17 +20,11 @@ export function WaitingView({ onReturn }: WaitingViewProps) {
         py: 1,
       }}
     >
-      <CheckCircleIcon sx={{ fontSize: 56, color: 'success.main' }} />
-      <Typography variant="h6" component="div">
+      <CheckCircleIcon sx={{ fontSize: 120, color: 'success.main' }} />
+      <Typography variant="body2" color="text.secondary">
         {t('panel:waitingTitle')}
       </Typography>
-      <Typography
-        variant="body1"
-        component="div"
-        align="center"
-        color="text.secondary"
-        sx={{ px: 1 }}
-      >
+      <Typography variant="body2" align="center" sx={{ fontStyle: 'italic', color: 'text.secondary', px: 1 }}>
         {t('panel:waitingSubtitle')}
       </Typography>
       <Button variant="contained" fullWidth onClick={onReturn} sx={{ mt: 1, textTransform: 'none' }}>
