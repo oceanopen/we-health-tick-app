@@ -842,7 +842,7 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
             return Err("manual_break only valid in Working phase".into());
         }
         let prev = inner.phase;
-        let (total_secs, is_long) = {
+        let (total_secs, is_long, reminder) = {
             let config_state = app.state::<ConfigState>();
             let conn = config_state.0.lock().map_err(|e| e.to_string())?;
             let break_min = read_break_duration_minutes(&conn);
@@ -852,8 +852,11 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
             let is_long =
                 check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
             let total_min = if is_long { lb_duration_min } else { break_min };
-            ((total_min as i64) * 60, is_long)
+            // 与 on_work_done 对齐：手动触发也抽取 reminder，BreakingView 底部显示提醒文案
+            let reminder = pick_random_reminder(&conn);
+            ((total_min as i64) * 60, is_long, reminder)
         };
+        inner.current_reminder = reminder;
         apply_start_break(&mut inner, total_secs, is_long);
         build_payload(&inner, Some(prev))
     };
