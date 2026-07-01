@@ -39,7 +39,13 @@ export function BreakingView({
       )}
       <Divider sx={{ width: '100%' }} />
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <IconButton aria-label={skipLabel} onClick={onSkip} size="small" color="secondary">
+        <IconButton
+          aria-label={skipLabel}
+          onClick={onSkip}
+          size="small"
+          color="secondary"
+          sx={{ 'opacity': 0.5, 'transition': 'opacity 0.2s', '&:hover': { opacity: 0.8 } }}
+        >
           <SkipNextIcon />
         </IconButton>
         <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
