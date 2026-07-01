@@ -1,4 +1,4 @@
-use chrono::Local;
+use rand::RngExt;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
@@ -238,8 +238,8 @@ fn is_in_quiet_periods(periods: &[(String, String)], hhmm: &str) -> bool {
 }
 
 // 从 reminders JSON 数组随机抽一条，空数组/解析失败 → 空串。
-// 伪随机源：本地时区纳秒精度（chrono），无需引入 rand crate。
-// 调用频率：仅在每次 on_work_done（工作结束）时一次，纳秒粒度足够避免重复。
+// 随机源：rand crate 的 ThreadRng（CSPRNG 种子 + 高质量 PRNG）。
+// 调用点：on_work_done（工作结束自动）与 manual_break（手动休息）。
 fn pick_random_reminder(conn: &Connection) -> String {
     let raw = read_config_conn(conn, KEY_REMINDERS)
         .ok()
@@ -249,7 +249,7 @@ fn pick_random_reminder(conn: &Connection) -> String {
     if list.is_empty() {
         return String::new();
     }
-    let idx = (Local::now().timestamp_nanos_opt().unwrap_or(0) as usize) % list.len();
+    let idx = rand::rng().random_range(0..list.len());
     list.into_iter().nth(idx).unwrap_or_default()
 }
 
