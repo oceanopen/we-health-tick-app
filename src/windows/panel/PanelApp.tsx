@@ -129,7 +129,13 @@ export default function PanelApp() {
           )
         : phase === 'alerting'
           ? (
-              <AlertingView reminder={currentReminder} onStartBreak={confirmBreak} />
+              <AlertingView
+                reminder={currentReminder}
+                breakSkipCount={breakSkipCount}
+                breakSkipMax={breakSkipMax}
+                onStartBreak={confirmBreak}
+                onSkip={skipBreak}
+              />
             )
           : phase === 'breaking'
             ? (

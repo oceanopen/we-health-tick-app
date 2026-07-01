@@ -861,7 +861,7 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
     Ok(())
 }
 
-// 跳过休息（Breaking 阶段）：连点 break_skip_max 次才跳过（防误触；由 break_skip_max 配置控制，默认 2，范围 1-3）。
+// 跳过休息（Alerting/Breaking 阶段）：连点 break_skip_max 次才跳过（防误触；由 break_skip_max 配置控制）。
 // - < max：break_skip_count += 1，emit timer-tick 让 UI 显示「跳过 (n/max)」
 // - >= max：跳过本次休息（不计入 completed_cycles），直接 start_work
 #[tauri::command]
@@ -869,8 +869,8 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
 pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
     let (tick_payload, phase_payload) = {
         let mut inner = lock_inner(&state.inner);
-        if inner.phase != Phase::Breaking {
-            return Err("skip_break only valid in Breaking phase".into());
+        if !matches!(inner.phase, Phase::Alerting | Phase::Breaking) {
+            return Err("skip_break only valid in Alerting or Breaking phase".into());
         }
         inner.break_skip_count = inner.break_skip_count.saturating_add(1);
         let break_skip_max = {

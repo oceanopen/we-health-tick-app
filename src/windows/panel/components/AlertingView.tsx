@@ -1,18 +1,23 @@
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
-import { Box, Button, Typography, useTheme } from '@mui/material';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
+import { Box, Button, IconButton, Typography, useTheme } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { PHASE_RING_COLORS } from '../phaseColors';
 
 interface AlertingViewProps {
   reminder: string;
+  breakSkipCount: number;
+  breakSkipMax: number;
   onStartBreak: () => void;
+  onSkip: () => void;
 }
 
-export function AlertingView({ reminder, onStartBreak }: AlertingViewProps) {
+export function AlertingView({ reminder, breakSkipCount, breakSkipMax, onStartBreak, onSkip }: AlertingViewProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const alertingColor
     = theme.palette.mode === 'light' ? PHASE_RING_COLORS.alerting.light : PHASE_RING_COLORS.alerting.dark;
+  const skipLabel = `${t('panel:action.skipBreak')} (${breakSkipCount}/${breakSkipMax})`;
 
   return (
     <Box
@@ -35,6 +40,14 @@ export function AlertingView({ reminder, onStartBreak }: AlertingViewProps) {
       <Button variant="contained" fullWidth onClick={onStartBreak} sx={{ mt: 1, textTransform: 'none' }}>
         {t('panel:action.startBreak')}
       </Button>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <IconButton aria-label={skipLabel} onClick={onSkip} size="small" color="secondary">
+          <SkipNextIcon />
+        </IconButton>
+        <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
+          {skipLabel}
+        </Typography>
+      </Box>
     </Box>
   );
 }
