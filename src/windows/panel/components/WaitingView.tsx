@@ -21,10 +21,10 @@ export function WaitingView({ onReturn }: WaitingViewProps) {
       }}
     >
       <CheckCircleIcon sx={{ fontSize: 120, color: 'success.main' }} />
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="subtitle1">
         {t('panel:waitingTitle')}
       </Typography>
-      <Typography variant="body2" align="center" sx={{ fontStyle: 'italic', color: 'text.secondary', px: 1 }}>
+      <Typography variant="caption" align="center" color="text.secondary" sx={{ px: 1 }}>
         {t('panel:waitingSubtitle')}
       </Typography>
       <Button variant="contained" fullWidth onClick={onReturn} sx={{ mt: 1, textTransform: 'none' }}>

@@ -29,15 +29,11 @@ export function BreakingView({
   return (
     <>
       <CountdownRing phase="breaking" displayTime={displayTime} progress={progress} />
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="subtitle1">
         {phaseLabel}
       </Typography>
       {reminder && (
-        <Typography
-          variant="body2"
-          align="center"
-          sx={{ fontStyle: 'italic', color: 'text.secondary', px: 1 }}
-        >
+        <Typography variant="caption" align="center" color="text.secondary" sx={{ px: 1 }}>
           {reminder}
         </Typography>
       )}

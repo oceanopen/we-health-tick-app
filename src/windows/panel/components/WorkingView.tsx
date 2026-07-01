@@ -29,7 +29,7 @@ export function WorkingView({
   return (
     <>
       <CountdownRing phase="working" displayTime={displayTime} progress={progress} />
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="subtitle1">
         {t('panel:phaseWorking')}
       </Typography>
       <Divider sx={{ width: '100%' }} />

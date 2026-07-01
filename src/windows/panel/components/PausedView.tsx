@@ -27,19 +27,21 @@ export function PausedView({ displayTime, quietTriggered, onResume }: PausedView
         py: 1,
       }}
     >
-      <PauseCircleFilledIcon sx={{ fontSize: 56, color: pausedColor }} />
-      <Typography variant="h6" component="div">
+      <PauseCircleFilledIcon sx={{ fontSize: 120, color: pausedColor }} />
+      <Typography variant="subtitle1" component="div">
         {title}
       </Typography>
       <Typography
-        variant="body1"
+        variant="caption"
         component="div"
-        sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 'bold' }}
+        align="center"
+        color="text.secondary"
+        sx={{ px: 1, fontVariantNumeric: 'tabular-nums' }}
       >
         {displayTime}
       </Typography>
       {quietTriggered && (
-        <Typography variant="body2" align="center" color="text.secondary" sx={{ px: 1 }}>
+        <Typography variant="caption" align="center" color="text.secondary" sx={{ px: 1 }}>
           {t('panel:pausedAutoResumeHint')}
         </Typography>
       )}
