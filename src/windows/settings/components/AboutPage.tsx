@@ -47,7 +47,9 @@ function AboutPage() {
     }
     setState({ kind: 'checking' });
     try {
-      const update = await check();
+      // 弱网下 plugin-updater 默认无应用层超时，会等到 OS/TCP 层才失败（最坏几分钟）。
+      // 给检查请求设 10s 硬超时，超时后落入下方 catch 的 error 状态，用户可点「重试」。
+      const update = await check({ timeout: 10_000 });
       if (update) {
         updateRef.current = update;
         setState({ kind: 'available', update });
