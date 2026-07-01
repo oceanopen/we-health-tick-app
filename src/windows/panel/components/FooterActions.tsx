@@ -7,7 +7,7 @@ interface FooterActionsProps {
   onExit: () => void;
 }
 
-const buttonSx = { textTransform: 'none', fontSize: 13 } as const;
+const buttonSx = { textTransform: 'none', fontSize: 10 } as const;
 
 export function FooterActions({ onSettings, onRelaunch, onExit }: FooterActionsProps) {
   const { t } = useTranslation();
