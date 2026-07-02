@@ -3,9 +3,11 @@ use tauri::{LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
 use crate::shared::screen::{work_area_center, MonitorInfo};
 use crate::shared::types::Phase;
 
+// async：WebviewWindowBuilder::build() 在 Windows 上于同步 #[tauri::command] 中会触发 wry#583
+// 死锁（白屏 + 主线程卡死）；改 async 让 IPC 线程不阻塞消息泵。macOS 无此问题（WKWebView 无 COM 模型）。
 #[tauri::command]
 #[specta::specta]
-pub fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     let settings_win = match app.get_webview_window("settings") {
         Some(w) => w,
         None => {
