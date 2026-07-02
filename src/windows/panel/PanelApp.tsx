@@ -23,6 +23,7 @@ export default function PanelApp() {
     isLongBreak,
     breakSkipCount,
     breakSkipMax,
+    quietHours,
     togglePause,
     reset,
     manualBreak,
@@ -30,6 +31,7 @@ export default function PanelApp() {
     confirmReturn,
     skipBreak,
     quietTriggered,
+    remainingSeconds,
   } = useTimerState();
   const hidingRef = useRef(false);
   const phaseRef = useRef<Phase>('working');
@@ -156,8 +158,9 @@ export default function PanelApp() {
               : phase === 'paused'
                 ? (
                     <PausedView
-                      displayTime={displayTime}
+                      remainingSeconds={remainingSeconds}
                       quietTriggered={quietTriggered}
+                      quietHours={quietHours}
                       onResume={togglePause}
                     />
                   )

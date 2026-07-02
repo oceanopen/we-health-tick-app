@@ -1,12 +1,17 @@
 import type { ConfigChangedPayload, TimerStatePayload } from '@src/shared/bindings';
+import type { QuietHours } from '@src/shared/config';
 import { commands } from '@src/shared/bindings';
 import { logOnError } from '@src/shared/commands';
 import {
   BREAK_SKIP_MAX_KEY,
+  decodeQuietHours,
   DEFAULT_BREAK_SKIP_MAX,
+  DEFAULT_QUIET_HOURS,
   getConfig,
   MAX_BREAK_SKIP_MAX,
   MIN_BREAK_SKIP_MAX,
+  QUIET_HOURS_KEY,
+
 } from '@src/shared/config';
 import {
   EVENT_CONFIG_CHANGED,
@@ -39,6 +44,7 @@ function formatDisplayTime(seconds: number): string {
 export function useTimerState() {
   const [state, setState] = useState<TimerStatePayload>(INITIAL_STATE);
   const [breakSkipMax, setBreakSkipMax] = useState(DEFAULT_BREAK_SKIP_MAX);
+  const [quietHours, setQuietHours] = useState<QuietHours>(DEFAULT_QUIET_HOURS);
 
   // 读取休息跳过门槛（break_skip_max 配置）：mount 读一次 + 监听 config-changed 实时刷新
   // （用户在设置页改完后 panel 立即更新分母）。值 clamp 到 [MIN,MAX]，与后端 read_break_skip_max 对齐。
@@ -66,6 +72,32 @@ export function useTimerState() {
       promise
         .then(fn => fn())
         .catch(err => console.warn('[breakSkipMax] unlisten failed:', err));
+    };
+  }, []);
+
+  // 读取休息时段配置（quiet_hours）：mount 读一次 + 监听 config-changed 实时刷新。
+  // PausedView 在 quietTriggered 时用它显示休息时段范围（如 "22:00:00 - 07:00:00"）。
+  useEffect(() => {
+    const apply = (raw: string | null) => {
+      setQuietHours(decodeQuietHours(raw));
+    };
+    let cancelled = false;
+    void (async () => {
+      const v = await getConfig(QUIET_HOURS_KEY);
+      if (!cancelled) {
+        apply(v);
+      }
+    })();
+    const promise = listen<ConfigChangedPayload>(EVENT_CONFIG_CHANGED, (e) => {
+      if (e.payload.key === QUIET_HOURS_KEY) {
+        apply(e.payload.value);
+      }
+    });
+    return () => {
+      cancelled = true;
+      promise
+        .then(fn => fn())
+        .catch(err => console.warn('[quietHours] unlisten failed:', err));
     };
   }, []);
 
@@ -122,6 +154,7 @@ export function useTimerState() {
     isLongBreak: state.isLongBreak,
     breakSkipCount: state.breakSkipCount,
     breakSkipMax,
+    quietHours,
     completedCycles: state.completedCycles,
     quietTriggered: state.quietTriggered,
     displayTime,

@@ -18,6 +18,8 @@
   "phasePaused": "Paused",
   "quietHoursActive": "Quiet Hours Active",
   "pausedAutoResumeHint": "Auto resumes after quiet hours",
+  "resumableRemainingLabel": "Time until next break after resume",
+  "quietHoursRangeLabel": "Currently in quiet hours",
   "exit": "Exit",
   "relaunch": "Restart"
 }

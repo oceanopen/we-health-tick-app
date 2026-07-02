@@ -18,6 +18,8 @@
   "phasePaused": "已暂停",
   "quietHoursActive": "休息时段中",
   "pausedAutoResumeHint": "休息时段结束后自动恢复",
+  "resumableRemainingLabel": "恢复后距离下次休息剩余时间",
+  "quietHoursRangeLabel": "当前时间在休息时段中",
   "exit": "退出",
   "relaunch": "重启"
 }
