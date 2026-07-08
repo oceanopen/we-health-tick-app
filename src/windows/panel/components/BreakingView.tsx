@@ -27,7 +27,16 @@ export function BreakingView({
   const skipLabel = `${t('panel:action.skipBreak')} (${breakSkipCount}/${breakSkipMax})`;
 
   return (
-    <>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 1.5,
+        width: '100%',
+        py: 1,
+      }}
+    >
       <CountdownRing phase="breaking" displayTime={displayTime} progress={progress} />
       <Typography variant="subtitle1">
         {phaseLabel}
@@ -52,6 +61,6 @@ export function BreakingView({
           {skipLabel}
         </Typography>
       </Box>
-    </>
+    </Box>
   );
 }

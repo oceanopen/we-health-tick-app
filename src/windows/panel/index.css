@@ -17,9 +17,3 @@ body {
   overflow: hidden;
   background: transparent;
 }
-
-[data-tauri-drag-region] {
-  -webkit-user-select: none;
-  user-select: none;
-  cursor: default;
-}

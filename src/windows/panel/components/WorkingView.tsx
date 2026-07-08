@@ -27,7 +27,16 @@ export function WorkingView({
   const toggleLabel = isPaused ? t('panel:action.resume') : t('panel:action.pause');
 
   return (
-    <>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 1.5,
+        width: '100%',
+        py: 1,
+      }}
+    >
       <CountdownRing phase="working" displayTime={displayTime} progress={progress} />
       <Typography variant="subtitle1">
         {t('panel:phaseWorking')}
@@ -74,6 +83,6 @@ export function WorkingView({
           </Typography>
         </Box>
       </Box>
-    </>
+    </Box>
   );
 }

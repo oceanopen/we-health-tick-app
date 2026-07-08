@@ -100,7 +100,6 @@ export default function PanelApp() {
   return (
     <Box
       ref={rootRef}
-      data-tauri-drag-region
       sx={theme => ({
         width: 240,
         display: 'flex',
