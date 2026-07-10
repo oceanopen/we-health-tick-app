@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
 use crate::shared::config::{read_config_conn, ConfigState};
 use crate::shared::time::{now_epoch, now_hhmm, today_string};
-use crate::shared::types::{Phase, TimerStatePayload};
+use crate::shared::types::{Phase, TimerStatePayload, YesNo};
 
 // ============================================================
 // 内部状态
@@ -94,7 +94,7 @@ const KEY_BREAK_DURATION: &str = "break_duration";
 const DEFAULT_BREAK_DURATION_MIN: u32 = 1;
 
 const KEY_LONG_BREAK_ENABLED: &str = "long_break_enabled";
-const DEFAULT_LONG_BREAK_ENABLED: bool = true; // Y
+const DEFAULT_LONG_BREAK_ENABLED: bool = true;
 
 const KEY_LONG_BREAK_INTERVAL: &str = "long_break_interval";
 const DEFAULT_LONG_BREAK_INTERVAL: u32 = 2;
@@ -103,7 +103,7 @@ const KEY_LONG_BREAK_DURATION: &str = "long_break_duration";
 const DEFAULT_LONG_BREAK_DURATION_MIN: u32 = 5;
 
 const KEY_REST_CONFIRM: &str = "rest_confirm";
-const DEFAULT_REST_CONFIRM: bool = true; // Y
+const DEFAULT_REST_CONFIRM: bool = true;
 
 const KEY_BREAK_SKIP_MAX: &str = "break_skip_max";
 // 休息跳过防误触门槛（连点 N 次才真正跳过）。与前端 DEFAULT_BREAK_SKIP_MAX 对齐。
@@ -153,12 +153,12 @@ fn read_break_duration_minutes(conn: &Connection) -> u32 {
         .unwrap_or(DEFAULT_BREAK_DURATION_MIN)
 }
 
-// 读 long_break_enabled（Y/N），容错回退默认 Y。
+// 读 long_break_enabled（YesNo），容错回退默认。
 fn read_long_break_enabled(conn: &Connection) -> bool {
     read_config_conn(conn, KEY_LONG_BREAK_ENABLED)
         .ok()
         .flatten()
-        .map(|s| s == "Y")
+        .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(false))
         .unwrap_or(DEFAULT_LONG_BREAK_ENABLED)
 }
 
@@ -191,13 +191,13 @@ fn read_break_skip_max(conn: &Connection) -> u32 {
         .unwrap_or(DEFAULT_BREAK_SKIP_MAX)
 }
 
-// 读 rest_confirm（Y/N），容错回退默认 Y。
-// Y：工作结束时先进 Alerting 等用户确认；N：直接进 Breaking。
+// 读 rest_confirm（YesNo），容错回退默认。
+// Yes：工作结束时先进 Alerting 等用户确认；No：直接进 Breaking。
 fn read_rest_confirm(conn: &Connection) -> bool {
     read_config_conn(conn, KEY_REST_CONFIRM)
         .ok()
         .flatten()
-        .map(|s| s == "Y")
+        .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(false))
         .unwrap_or(DEFAULT_REST_CONFIRM)
 }
 

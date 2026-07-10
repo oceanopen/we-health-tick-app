@@ -75,3 +75,36 @@ pub struct ConfigChangedPayload {
     /// 新值（配置统一以字符串形式存储，订阅方按 key 自行 decode）。
     pub value: String,
 }
+
+// ============================================================
+// YesNo：Y/N 布尔约定（rest_confirm / long_break_enabled）
+// ============================================================
+
+/// Y/N 布尔约定的 SSOT。
+///
+/// serde rename 决定 DB 存储格式（"Y"/"N"）+ 前端 bindings.ts 字面量联合类型。
+/// 前端 src/shared/config.ts 的 YES_NO 运行时对象受此类型约束
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, Type)]
+pub enum YesNo {
+    #[serde(rename = "Y")]
+    Yes,
+    #[serde(rename = "N")]
+    No,
+}
+
+impl YesNo {
+    pub fn is_yes(self) -> bool {
+        matches!(self, Self::Yes)
+    }
+}
+
+impl std::str::FromStr for YesNo {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Y" => Ok(Self::Yes),
+            "N" => Ok(Self::No),
+            _ => Err(()),
+        }
+    }
+}

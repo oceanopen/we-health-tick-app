@@ -1,16 +1,22 @@
+import type { YesNo } from './bindings';
 import { commands } from './bindings';
 import { unwrap } from './commands';
 
-// 本文件是所有配置项 key + 默认值的唯一可信源 (SSOT)。
-// 后端 src-tauri/src/timer.rs 中有对应常量副本（用于 DB 无值时兜底），
-// 修改任一 *KEY / DEFAULT_* 时必须同步后端，否则首次启动会出现前后端兜底不一致。
+// 本文件是所有配置项 key 命名 + 默认值的唯一可信源 (SSOT)。
+//
+// 后端 src-tauri/src/timer.rs 只对「计时逻辑需要读取」的 9 项建有对应常量副本
+// （work/break_duration、break_skip_max、long_break_*、rest_confirm、quiet_hours、reminders）；
+// appearance / rest_window / language / work_*_time 为纯 UI 配置，后端不读，仅前端使用。
+// 修改这 9 项中任一 *KEY / DEFAULT_* 时必须同步后端（对照表见 timer.rs 顶部）。
 
+// YES_NO 运行时常量：构造 / 比较 Y/N 字面量用。
+// 类型来源：YesNo（来自 ./bindings，SSOT 为后端 shared/types.rs 的 YesNo enum）。
+// specta 只导出类型不导出运行时 const，故字面量本地维护；satisfies 确保取值合法——
+// 改 'Y'/'N' 为非 YesNo 字符时 tsc 在此报错兜底。改字符必须同步后端 enum 并重跑 gen:bindings。
 export const YES_NO = {
   YES: 'Y',
   NO: 'N',
-} as const;
-
-export type YesNo = (typeof YES_NO)[keyof typeof YES_NO];
+} as const satisfies Record<string, YesNo>;
 
 export function isYes(value: string | null): boolean {
   return value === YES_NO.YES;

@@ -81,6 +81,14 @@ export type TimerStatePayload = {
 	quietTriggered: boolean,
 };
 
+/**
+ *  Y/N 布尔约定的 SSOT。
+ * 
+ *  serde rename 决定 DB 存储格式（"Y"/"N"）+ 前端 bindings.ts 字面量联合类型。
+ *  前端 src/shared/config.ts 的 YES_NO 运行时对象受此类型约束
+ */
+export type YesNo = "Y" | "N";
+
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
     try {
