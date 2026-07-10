@@ -1,3 +1,4 @@
+import InfoIcon from '@mui/icons-material/Info';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import { Box, Divider, IconButton, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,7 @@ interface BreakingViewProps {
   isLongBreak: boolean;
   breakSkipCount: number;
   breakSkipMax: number;
+  breakPaused: boolean;
   onSkip: () => void;
 }
 
@@ -20,6 +22,7 @@ export function BreakingView({
   isLongBreak,
   breakSkipCount,
   breakSkipMax,
+  breakPaused,
   onSkip,
 }: BreakingViewProps) {
   const { t } = useTranslation();
@@ -38,6 +41,26 @@ export function BreakingView({
       }}
     >
       <CountdownRing phase="breaking" displayTime={displayTime} progress={progress} />
+      {breakPaused && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            width: '100%',
+            px: 1.25,
+            py: 0.75,
+            borderRadius: 1,
+            bgcolor: 'warning.main',
+            color: 'warning.contrastText',
+          }}
+        >
+          <InfoIcon sx={{ fontSize: 16 }} />
+          <Typography variant="caption" sx={{ fontSize: 11, lineHeight: 1.3 }}>
+            {t('panel:breakActivityPaused')}
+          </Typography>
+        </Box>
+      )}
       <Typography variant="subtitle1">
         {phaseLabel}
       </Typography>

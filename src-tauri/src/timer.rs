@@ -52,6 +52,15 @@ struct TimerInner {
     /// 当前状态对应的日期（yyyy-MM-dd，本地时区）。
     /// 运行时跨天判断：tick 中若 save_date != today，触发 fresh_working 开始新一轮。
     save_date: String,
+    /// Breaking 内部「鼠标活动软暂停」标志。true 时不递减 remaining（倒计时冻结）。
+    /// 不切 phase（始终 Breaking），前端 BreakingView 据此显隐活动提示横幅。
+    break_paused: bool,
+    /// 进入本次 Breaking 的 epoch 秒，用于启动宽限期判定（进入后 4 秒内不触发活动暂停，
+    /// 避免用户点击「开始休息」按钮的鼠标余波误判）。apply_start_break 时设置。
+    break_start_epoch: Option<i64>,
+    /// 上次 skip_break 点击的 epoch 秒，用于跳过宽限期判定（点击后 3 秒内不触发活动暂停，
+    /// 避免点击「跳过」按钮的鼠标活动被误判为「在用电脑」）。
+    last_skip_epoch: Option<i64>,
 }
 
 // Tauri 全局状态容器：在 init 中通过 app.manage(TimerState) 注册，
@@ -276,6 +285,9 @@ fn fresh_working(conn: &Connection) -> TimerInner {
         current_reminder: String::new(),
         is_long_break: false,
         save_date: today_string(),
+        break_paused: false,
+        break_start_epoch: None,
+        last_skip_epoch: None,
     }
 }
 
@@ -328,7 +340,7 @@ fn apply_on_work_done(inner: &mut TimerInner, reminder: String, rest_confirm: bo
 
 // 进入 Breaking 阶段：清 break_skip_count + 设剩余/总秒数。
 // is_long 由调用方按 check_is_long_break 判定后传入（用递增前的 completed_cycles）。
-fn apply_start_break(inner: &mut TimerInner, break_total_secs: i64, is_long: bool) {
+fn apply_start_break(inner: &mut TimerInner, break_total_secs: i64, is_long: bool, now: i64) {
     inner.phase = Phase::Breaking;
     inner.target_epoch = 0; // breaking 不用 target_epoch（递减模式）
     inner.remaining_seconds = break_total_secs;
@@ -337,6 +349,9 @@ fn apply_start_break(inner: &mut TimerInner, break_total_secs: i64, is_long: boo
     inner.break_skip_count = 0;
     inner.paused_phase = None;
     inner.paused_by_quiet = false;
+    inner.break_paused = false;
+    inner.break_start_epoch = Some(now);
+    inner.last_skip_epoch = None;
 }
 
 // 休息正常结束（on_break_done）：后置递增 completed_cycles + 进 Waiting。
@@ -410,6 +425,7 @@ fn build_payload(inner: &TimerInner, prev_phase: Option<Phase>) -> TimerStatePay
         break_skip_count: inner.break_skip_count,
         completed_cycles: inner.completed_cycles,
         quiet_triggered: inner.paused_by_quiet,
+        break_paused: inner.break_paused,
     }
 }
 
@@ -549,6 +565,7 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                                         &mut state,
                                         (total_min as i64) * 60,
                                         is_long,
+                                        now,
                                     );
                                 }
                                 // Alerting 与 Breaking 都属于非 Working，panel.rs 监听 phase-changed 时唤起窗口
@@ -559,14 +576,26 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                     }
                 }
                 Phase::Breaking => {
-                    // breaking 用递减模式（与参考项目一致；M3 活动检测可在此基础上扩展暂停）
-                    if state.remaining_seconds > 0 {
-                        state.remaining_seconds -= 1;
-                    }
-                    if state.remaining_seconds == 0 {
-                        let prev = state.phase;
-                        apply_on_break_done(&mut state);
-                        phase_change_payload = Some(build_payload(&state, Some(prev)));
+                    // 鼠标活动检测：每秒查系统 idle 秒数，
+                    // idle < 3s 视为「在用电脑」→ 软暂停（不递减 remaining，不切 phase）。
+                    // 启动 4s / 跳过 3s 宽限期避免按钮点击余波误判。
+                    let idle_secs = crate::shared::idle::get_idle_seconds();
+                    let grace_start = state.break_start_epoch.map(|s| now - s < 4).unwrap_or(false);
+                    let grace_skip = state.last_skip_epoch.map(|s| now - s < 3).unwrap_or(false);
+                    let active = idle_secs < 3.0
+                        && state.remaining_seconds > 0
+                        && !grace_start
+                        && !grace_skip;
+                    state.break_paused = active;
+                    if !active {
+                        if state.remaining_seconds > 0 {
+                            state.remaining_seconds -= 1;
+                        }
+                        if state.remaining_seconds == 0 {
+                            let prev = state.phase;
+                            apply_on_break_done(&mut state);
+                            phase_change_payload = Some(build_payload(&state, Some(prev)));
+                        }
                     }
                 }
                 Phase::Alerting | Phase::Waiting | Phase::Paused => {
@@ -754,7 +783,7 @@ pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(),
             let total_min = if is_long { lb_duration_min } else { break_min };
             ((total_min as i64) * 60, is_long)
         };
-        apply_start_break(&mut inner, total_secs, is_long);
+        apply_start_break(&mut inner, total_secs, is_long, now_epoch());
         build_payload(&inner, Some(prev))
     };
     emit_phase_changed(&app, phase_payload);
@@ -857,7 +886,7 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
             ((total_min as i64) * 60, is_long, reminder)
         };
         inner.current_reminder = reminder;
-        apply_start_break(&mut inner, total_secs, is_long);
+        apply_start_break(&mut inner, total_secs, is_long, now_epoch());
         build_payload(&inner, Some(prev))
     };
     emit_phase_changed(&app, phase_payload);
@@ -876,6 +905,9 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
             return Err("skip_break only valid in Alerting or Breaking phase".into());
         }
         inner.break_skip_count = inner.break_skip_count.saturating_add(1);
+        if inner.phase == Phase::Breaking {
+            inner.last_skip_epoch = Some(now_epoch());
+        }
         let break_skip_max = {
             let config_state = app.state::<ConfigState>();
             let conn = config_state.0.lock().map_err(|e| e.to_string())?;

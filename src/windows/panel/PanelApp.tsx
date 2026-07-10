@@ -23,6 +23,7 @@ export default function PanelApp() {
     isLongBreak,
     breakSkipCount,
     breakSkipMax,
+    breakPaused,
     quietHours,
     togglePause,
     reset,
@@ -147,6 +148,7 @@ export default function PanelApp() {
                   isLongBreak={isLongBreak}
                   breakSkipCount={breakSkipCount}
                   breakSkipMax={breakSkipMax}
+                  breakPaused={breakPaused}
                   onSkip={skipBreak}
                 />
               )

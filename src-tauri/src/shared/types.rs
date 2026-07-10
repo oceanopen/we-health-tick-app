@@ -59,6 +59,9 @@ pub struct TimerStatePayload {
     pub completed_cycles: u32,
     /// 当前 Paused 是否由 quietHours 静音时段触发（vs 用户手动暂停）。
     pub quiet_triggered: bool,
+    /// Breaking 阶段是否因检测到鼠标活动而软暂停（不切 phase，仅冻结倒计时）。
+    /// 前端 BreakingView 据此显隐「检测到操作，倒计时已暂停」横幅。
+    pub break_paused: bool,
 }
 
 // ============================================================

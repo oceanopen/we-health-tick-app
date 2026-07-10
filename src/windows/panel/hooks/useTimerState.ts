@@ -32,6 +32,7 @@ const INITIAL_STATE: TimerStatePayload = {
   breakSkipCount: 0,
   completedCycles: 0,
   quietTriggered: false,
+  breakPaused: false,
 };
 
 function formatDisplayTime(seconds: number): string {
@@ -153,6 +154,7 @@ export function useTimerState() {
     currentReminder: state.currentReminder,
     isLongBreak: state.isLongBreak,
     breakSkipCount: state.breakSkipCount,
+    breakPaused: state.breakPaused,
     breakSkipMax,
     quietHours,
     completedCycles: state.completedCycles,
