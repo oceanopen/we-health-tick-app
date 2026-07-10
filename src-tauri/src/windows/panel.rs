@@ -82,10 +82,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 fn phase_icon_bytes(phase: Phase) -> &'static [u8] {
     match phase {
         Phase::Working => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/working-dev.png")),
-        Phase::Alerting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/alerting-dev.png")),
-        Phase::Breaking => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/breaking-dev.png")),
-        Phase::Waiting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/waiting-dev.png")),
-        Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/paused-dev.png")),
+        Phase::Alerting | Phase::Breaking | Phase::Waiting | Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/nonworking-dev.png")),
     }
 }
 
@@ -93,10 +90,7 @@ fn phase_icon_bytes(phase: Phase) -> &'static [u8] {
 fn phase_icon_bytes(phase: Phase) -> &'static [u8] {
     match phase {
         Phase::Working => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/working.png")),
-        Phase::Alerting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/alerting.png")),
-        Phase::Breaking => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/breaking.png")),
-        Phase::Waiting => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/waiting.png")),
-        Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/paused.png")),
+        Phase::Alerting | Phase::Breaking | Phase::Waiting | Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/nonworking.png")),
     }
 }
 
