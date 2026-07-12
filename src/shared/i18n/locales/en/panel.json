@@ -3,7 +3,6 @@
     "resume": "Resume",
     "pause": "Pause",
     "reset": "Reset",
-    "settings": "Settings",
     "manualBreak": "Break",
     "startBreak": "Start Break",
     "skipBreak": "Skip",
@@ -20,7 +19,5 @@
   "pausedAutoResumeHint": "Auto resumes after quiet hours",
   "breakActivityPaused": "Activity detected, countdown paused",
   "resumableRemainingLabel": "Time until next break after resume",
-  "quietHoursRangeLabel": "Currently in quiet hours",
-  "exit": "Exit",
-  "relaunch": "Restart"
+  "quietHoursRangeLabel": "Currently in quiet hours"
 }

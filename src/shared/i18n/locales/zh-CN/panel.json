@@ -3,7 +3,6 @@
     "resume": "恢复",
     "pause": "暂停",
     "reset": "重置",
-    "settings": "设置",
     "manualBreak": "休息",
     "startBreak": "开始休息",
     "skipBreak": "跳过",
@@ -20,7 +19,5 @@
   "pausedAutoResumeHint": "休息时段结束后自动恢复",
   "breakActivityPaused": "检测到操作，倒计时已暂停",
   "resumableRemainingLabel": "恢复后距离下次休息剩余时间",
-  "quietHoursRangeLabel": "当前时间在休息时段中",
-  "exit": "退出",
-  "relaunch": "重启"
+  "quietHoursRangeLabel": "当前时间在休息时段中"
 }

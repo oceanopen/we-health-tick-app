@@ -1,13 +1,11 @@
 import type { Phase } from '@src/shared/bindings';
 import { alpha, Box } from '@mui/material';
 import { commands } from '@src/shared/bindings';
-import { logOnError, safeAwait } from '@src/shared/commands';
+import { logOnError } from '@src/shared/commands';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { relaunch } from '@tauri-apps/plugin-process';
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { AlertingView } from './components/AlertingView';
 import { BreakingView } from './components/BreakingView';
-import { FooterActions } from './components/FooterActions';
 import { PausedView } from './components/PausedView';
 import { WaitingView } from './components/WaitingView';
 import { WorkingView } from './components/WorkingView';
@@ -34,7 +32,6 @@ export default function PanelApp() {
     quietTriggered,
     remainingSeconds,
   } = useTimerState();
-  const hidingRef = useRef(false);
   const phaseRef = useRef<Phase>('working');
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -42,10 +39,8 @@ export default function PanelApp() {
     const currentWin = getCurrentWindow();
     const unlisten = currentWin.onFocusChanged(({ payload: focused }) => {
       // 仅 Working 阶段失焦隐藏；Alerting/Breaking/Waiting/Paused 常驻桌面，由后端 phase-changed 事件唤起。
-      if (!focused && !hidingRef.current && phaseRef.current === 'working') {
+      if (!focused && phaseRef.current === 'working') {
         currentWin.hide();
-      } else if (focused) {
-        hidingRef.current = false;
       }
     });
     return () => {
@@ -82,20 +77,6 @@ export default function PanelApp() {
       cancelAnimationFrame(raf);
       observer.disconnect();
     };
-  }, []);
-
-  const handleSettings = useCallback(async () => {
-    hidingRef.current = true;
-    await logOnError(commands.showSettingsWindow(), 'showSettingsWindow');
-  }, []);
-
-  const handleExit = useCallback(async () => {
-    await safeAwait(commands.exitApp(), 'exitApp');
-  }, []);
-
-  const handleRelaunch = useCallback(() => {
-    relaunch()
-      .catch(err => console.warn('[relaunch] failed:', err));
   }, []);
 
   return (
@@ -170,7 +151,6 @@ export default function PanelApp() {
                       未识别状态: {phase}
                     </Box>
                   )}
-      <FooterActions onSettings={handleSettings} onRelaunch={handleRelaunch} onExit={handleExit} />
     </Box>
   );
 }
