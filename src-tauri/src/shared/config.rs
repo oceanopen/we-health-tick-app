@@ -4,6 +4,10 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::shared::types::ConfigChangedPayload;
 
+/// 语言偏好 key（前端镜像 src/shared/config.ts 的 LANGUAGE_KEY，修改任一处需同步）。
+/// 后端仅托盘菜单消费（current_language 读取），其余业务不读。
+pub const LANGUAGE_KEY: &str = "language";
+
 pub struct ConfigState(pub Mutex<Connection>);
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {

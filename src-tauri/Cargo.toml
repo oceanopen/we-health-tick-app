@@ -58,3 +58,5 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 tokio = { version = "1", features = ["time"] }
 chrono = "0.4"
 rand = "0.10"
+# 跨平台检测系统语言，用于托盘右键菜单文案中英文切换。
+sys-locale = "0.3"

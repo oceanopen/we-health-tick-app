@@ -1,9 +1,14 @@
+use std::sync::Mutex;
+
 use tauri::{
     AppHandle, Listener, LogicalPosition, LogicalSize, Manager, Position, WebviewUrl,
     WebviewWindowBuilder,
+    menu::{MenuBuilder, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
+use crate::shared::config::{read_config_raw, ConfigState, LANGUAGE_KEY};
+use crate::shared::i18n::{menu_text, resolve, ResolvedLanguage};
 use crate::shared::screen::{
     detect_taskbar_edge, find_monitor_for_rect, MonitorInfo, TaskbarEdge,
 };
@@ -19,6 +24,38 @@ const TOOLTIP: &str = if cfg!(debug_assertions) {
     "We Health Tick"
 };
 
+// 已构建的托盘菜单项引用，用于语言切换时动态更新文案（MenuItem::set_text）。
+struct TrayMenuItems {
+    settings: MenuItem<tauri::Wry>,
+    restart: MenuItem<tauri::Wry>,
+    exit: MenuItem<tauri::Wry>,
+}
+
+// 读取当前语言偏好（config 的 language key）并解析为具体语言。
+// 三态：zh-CN/en 直接映射，缺失或 "system" 走系统 locale 探测（默认英文）。
+fn current_language(app: &AppHandle) -> ResolvedLanguage {
+    let Some(state) = app.try_state::<ConfigState>() else {
+        return resolve(None);
+    };
+    let raw = read_config_raw(state.inner(), LANGUAGE_KEY).unwrap_or(None);
+    resolve(raw.as_deref())
+}
+
+// 语言切换时原地刷新托盘菜单文案，无需重建菜单或重启应用。
+// 由 setup 末尾的 config-changed 监听器在 LANGUAGE_KEY 变化时调用。
+pub fn refresh_menu_texts(app: &AppHandle) {
+    let Some(state) = app.try_state::<Mutex<TrayMenuItems>>() else {
+        return;
+    };
+    let Ok(items) = state.lock() else {
+        return;
+    };
+    let lang = current_language(app);
+    let _ = items.settings.set_text(menu_text(lang, "settings"));
+    let _ = items.restart.set_text(menu_text(lang, "restart"));
+    let _ = items.exit.set_text(menu_text(lang, "exit"));
+}
+
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // CARGO_MANIFEST_DIR 在编译期由 cargo 注入，指向 src-tauri/ 根目录的绝对路径。
     // 用 concat!() 拼成 include_bytes! 的路径，让 icon 资源路径与 panel.rs 当前所在目录解耦。
@@ -28,9 +65,40 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     )))
     .expect("failed to load tray icon");
 
+    // 右键菜单：系统设置 / 重启 / 退出。文案随当前语言偏好（config language，三态）。
+    let lang = current_language(app.handle());
+    let settings_item =
+        MenuItem::with_id(app, "settings", menu_text(lang, "settings"), true, None::<&str>)?;
+    let restart_item =
+        MenuItem::with_id(app, "restart", menu_text(lang, "restart"), true, None::<&str>)?;
+    let exit_item =
+        MenuItem::with_id(app, "exit", menu_text(lang, "exit"), true, None::<&str>)?;
+    let menu = MenuBuilder::new(app)
+        .items(&[&settings_item, &restart_item, &exit_item])
+        .build()?;
+
     TrayIconBuilder::with_id("tray")
         .icon(icon)
         .tooltip(TOOLTIP)
+        .menu(&menu)
+        // 关键：禁用左键弹菜单，保持左键 toggle panel 的现有行为（跨平台统一）。
+        // macOS 默认左键会弹菜单，此处显式关闭；Linux 上为 no-op（左键本就触发 event）。
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "settings" => {
+                let app = app.clone();
+                // show_settings_window 是 async（Windows 上同步调用会触发 wry#583 死锁），
+                // 在同步的 menu event 闭包里用 async_runtime::spawn 调度。
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = crate::windows::settings::show_settings_window(app).await {
+                        log::warn!("show_settings_window from tray menu failed: {e}");
+                    }
+                });
+            }
+            "restart" => app.request_restart(),
+            "exit" => app.exit(0),
+            _ => {}
+        })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
@@ -48,6 +116,13 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .build(app)?;
+
+    // 保存菜单项句柄，供 refresh_menu_texts 在语言切换时动态更新文案。
+    app.manage(Mutex::new(TrayMenuItems {
+        settings: settings_item,
+        restart: restart_item,
+        exit: exit_item,
+    }));
 
     let app_handle = app.handle().clone();
     // 启动即 fresh_working（L1），初始恒为 Working；显式设置一次避免启动瞬间显示默认 32x32.png（G3）。
@@ -69,6 +144,17 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             None => log::warn!("phase-changed payload parse failed, skip tray icon update"),
+        }
+    });
+
+    // 监听 config-changed：语言偏好变化时刷新托盘菜单文案（运行时切换，无需重启）。
+    let lang_handle = app.handle().clone();
+    app.listen(crate::shared::events::EVENT_CONFIG_CHANGED, move |event| {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) else {
+            return;
+        };
+        if value.get("key").and_then(|v| v.as_str()) == Some(LANGUAGE_KEY) {
+            refresh_menu_texts(&lang_handle);
         }
     });
 

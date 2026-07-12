@@ -65,8 +65,10 @@ pub fn run() {
                 )?;
             }
 
-            windows::panel::setup(app)?;
+            // config 先于 panel::setup：panel 构建托盘菜单时需读 ConfigState 解析语言偏好，
+            // 否则首次启动会 fallback 到系统语言而忽略用户存的 language 偏好。
             shared::config::init(app)?;
+            windows::panel::setup(app)?;
             timer::init(app)?;
 
             specta_builder.mount_events(app);
