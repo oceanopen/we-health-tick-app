@@ -18,9 +18,5 @@
     "reset": "重置",
     "cancel": "取消",
     "save": "保存"
-  },
-  "defaultMessage": {
-    "walk": "该起来走走了",
-    "water": "该喝水了"
   }
 }

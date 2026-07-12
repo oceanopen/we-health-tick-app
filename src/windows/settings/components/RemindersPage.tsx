@@ -1,4 +1,3 @@
-import type { TFunction } from 'i18next';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import {
@@ -41,10 +40,17 @@ function isInvalidReminder(text: string): boolean {
   return text.trim() === '' || text.length > MAX_REMINDER_LENGTH;
 }
 
-// 健康提醒默认文案（走动/喝水，走 i18n）。
-function defaultHealthTexts(t: TFunction): string[] {
-  return [t('reminders:defaultMessage.walk'), t('reminders:defaultMessage.water')];
-}
+// 健康提醒默认文案
+const DEFAULT_HEALTH_TEXTS: string[] = [
+  '起来走走，活动一下身体',
+  '远眺窗外，放松眼睛',
+  '喝杯水，补充水分',
+  '做几个简单的拉伸动作',
+  '深呼吸，放松身心',
+  '活动手腕，预防鼠标手',
+  '闭眼休息，让大脑放松',
+  '伸展脊柱，改善坐姿',
+];
 
 // 随笔心语默认文案（文学摘抄，固定中文）。
 const DEFAULT_WHISPER_TEXTS: string[] = [
@@ -85,7 +91,7 @@ function RemindersPage() {
   );
 
   const [saved, setSaved] = useState<ReminderList>(() => ({
-    health: buildItems(defaultHealthTexts(t)),
+    health: buildItems(DEFAULT_HEALTH_TEXTS),
     whisper: buildItems(DEFAULT_WHISPER_TEXTS),
   }));
   const [draft, setDraft] = useState<ReminderList>(saved);
@@ -95,7 +101,7 @@ function RemindersPage() {
       const decoded = decodeRemindersConfig(raw);
       const health = decoded.health.length > 0
         ? buildItems(decoded.health)
-        : buildItems(defaultHealthTexts(t));
+        : buildItems(DEFAULT_HEALTH_TEXTS);
       const whisper = decoded.whisper.length > 0
         ? buildItems(decoded.whisper)
         : buildItems(DEFAULT_WHISPER_TEXTS);
@@ -104,7 +110,7 @@ function RemindersPage() {
       setDraft(next);
       setHasValidationAttempted(false);
     });
-  }, [t, buildItems]);
+  }, [buildItems]);
 
   // —— CRUD 仅作用于当前激活 Tab 的列表 ——
   const updateReminder = (index: number, text: string) => {
@@ -133,7 +139,7 @@ function RemindersPage() {
     = JSON.stringify(saved[activeTab]) !== JSON.stringify(draft[activeTab]);
 
   const handleReset = () => {
-    const texts = activeTab === 'health' ? defaultHealthTexts(t) : DEFAULT_WHISPER_TEXTS;
+    const texts = activeTab === 'health' ? DEFAULT_HEALTH_TEXTS : DEFAULT_WHISPER_TEXTS;
     setDraft(prev => ({ ...prev, [activeTab]: buildItems(texts) }));
     setHasValidationAttempted(false);
   };

@@ -18,9 +18,5 @@
     "reset": "Reset",
     "cancel": "Cancel",
     "save": "Save"
-  },
-  "defaultMessage": {
-    "walk": "Time to stand up and walk",
-    "water": "Time to drink water"
   }
 }
