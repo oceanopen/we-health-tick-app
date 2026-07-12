@@ -1,3 +1,4 @@
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import InfoIcon from '@mui/icons-material/Info';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import { Box, Divider, IconButton, Typography } from '@mui/material';
@@ -7,7 +8,8 @@ import { CountdownRing } from './CountdownRing';
 interface BreakingViewProps {
   displayTime: string;
   progress: number;
-  reminder: string;
+  whisperReminder: string;
+  healthReminder: string;
   isLongBreak: boolean;
   breakSkipCount: number;
   breakSkipMax: number;
@@ -18,7 +20,8 @@ interface BreakingViewProps {
 export function BreakingView({
   displayTime,
   progress,
-  reminder,
+  whisperReminder,
+  healthReminder,
   isLongBreak,
   breakSkipCount,
   breakSkipMax,
@@ -64,9 +67,29 @@ export function BreakingView({
       <Typography variant="subtitle1">
         {phaseLabel}
       </Typography>
-      {reminder && (
+      {healthReminder && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+            width: '100%',
+            px: 1.25,
+            py: 0.75,
+            borderRadius: 1,
+            bgcolor: 'success.main',
+            color: 'success.contrastText',
+          }}
+        >
+          <FavoriteBorderIcon sx={{ fontSize: 16 }} />
+          <Typography variant="caption" sx={{ fontSize: 11, lineHeight: 1.3 }}>
+            {healthReminder}
+          </Typography>
+        </Box>
+      )}
+      {whisperReminder && (
         <Typography variant="caption" align="center" color="text.secondary" sx={{ px: 1 }}>
-          {reminder}
+          {whisperReminder}
         </Typography>
       )}
       <Divider sx={{ width: '100%' }} />

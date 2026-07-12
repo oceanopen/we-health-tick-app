@@ -128,30 +128,43 @@ export function decodeQuietHours(value: string | null): QuietHours {
   return DEFAULT_QUIET_HOURS;
 }
 
-export type Reminders = string[];
+// 提醒文案配置：单 key 存储结构化对象 { health, whisper }。
+//   - health：健康提醒（走动/喝水等），breaking 阶段绿色横幅展示；
+//   - whisper：随笔心语（文学摘抄），breaking 阶段小字展示。
+export type HealthReminders = string[];
+export type WhisperReminders = string[];
+
+export interface RemindersConfig {
+  health: HealthReminders;
+  whisper: WhisperReminders;
+}
 
 export const REMINDERS_KEY = 'reminders';
 
-export function encodeReminders(list: Reminders): string {
-  return JSON.stringify(list);
+export const EMPTY_REMINDERS_CONFIG: RemindersConfig = { health: [], whisper: [] };
+
+function filterStrings(arr: unknown): string[] {
+  return Array.isArray(arr) ? arr.filter((s): s is string => typeof s === 'string') : [];
 }
 
-export function decodeReminders(value: string | null): Reminders {
+export function encodeRemindersConfig(config: RemindersConfig): string {
+  return JSON.stringify(config);
+}
+
+export function decodeRemindersConfig(value: string | null): RemindersConfig {
   if (!value) {
-    return [];
+    return { ...EMPTY_REMINDERS_CONFIG };
   }
   try {
-    const parsed: unknown = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      const valid = parsed.filter((s): s is string => typeof s === 'string');
-      if (valid.length > 0) {
-        return valid;
-      }
-    }
+    // 值约定为 { health, whisper } 对象；filterStrings 对非数组/缺失字段兜底为 []。
+    const obj = JSON.parse(value) as { health?: unknown; whisper?: unknown };
+    return {
+      health: filterStrings(obj?.health),
+      whisper: filterStrings(obj?.whisper),
+    };
   } catch {
-    // ignore parse errors, fall through to empty
+    return { ...EMPTY_REMINDERS_CONFIG };
   }
-  return [];
 }
 
 // commands.xxx() 返回 tauri-specta 的 typedError 包装。unwrap 展开为 throw 风格，

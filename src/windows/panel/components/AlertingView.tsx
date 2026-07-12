@@ -5,14 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { PHASE_RING_COLORS } from '../phaseColors';
 
 interface AlertingViewProps {
-  reminder: string;
+  whisperReminder: string;
   breakSkipCount: number;
   breakSkipMax: number;
   onStartBreak: () => void;
   onSkip: () => void;
 }
 
-export function AlertingView({ reminder, breakSkipCount, breakSkipMax, onStartBreak, onSkip }: AlertingViewProps) {
+export function AlertingView({ whisperReminder, breakSkipCount, breakSkipMax, onStartBreak, onSkip }: AlertingViewProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const alertingColor
@@ -35,7 +35,7 @@ export function AlertingView({ reminder, breakSkipCount, breakSkipMax, onStartBr
         {t('panel:alertTitle')}
       </Typography>
       <Typography variant="caption" align="center" color="text.secondary" sx={{ px: 1 }}>
-        {reminder}
+        {whisperReminder}
       </Typography>
       <Button variant="contained" fullWidth onClick={onStartBreak} sx={{ mt: 1, textTransform: 'none' }}>
         {t('panel:action.startBreak')}

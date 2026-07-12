@@ -17,7 +17,8 @@ export default function PanelApp() {
     displayTime,
     progress,
     phase,
-    currentReminder,
+    currentWhisperReminder,
+    currentHealthReminder,
     isLongBreak,
     breakSkipCount,
     breakSkipMax,
@@ -113,7 +114,7 @@ export default function PanelApp() {
         : phase === 'alerting'
           ? (
               <AlertingView
-                reminder={currentReminder}
+                whisperReminder={currentWhisperReminder}
                 breakSkipCount={breakSkipCount}
                 breakSkipMax={breakSkipMax}
                 onStartBreak={confirmBreak}
@@ -125,7 +126,8 @@ export default function PanelApp() {
                 <BreakingView
                   displayTime={displayTime}
                   progress={progress}
-                  reminder={currentReminder}
+                  whisperReminder={currentWhisperReminder}
+                  healthReminder={currentHealthReminder}
                   isLongBreak={isLongBreak}
                   breakSkipCount={breakSkipCount}
                   breakSkipMax={breakSkipMax}

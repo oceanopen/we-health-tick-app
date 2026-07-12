@@ -45,9 +45,12 @@ pub struct TimerStatePayload {
     /// UI 圆环进度分母，与 remaining_seconds 配合算百分比。
     #[specta(type = Number)]
     pub total_seconds: i64,
-    /// 当前随机抽取的提醒文案。alerting 阶段大字显示唤起注意，breaking 阶段小字辅助；
+    /// 当前随机抽取的随笔心语文案（whisper 池）。alerting 阶段大字显示唤起注意，breaking 阶段小字辅助；
     /// working / waiting / paused 阶段为空字符串。
-    pub current_reminder: String,
+    pub current_whisper_reminder: String,
+    /// 当前随机抽取的健康提醒文案（health 池）。breaking 阶段在 BreakingView 以绿色横幅展示；
+    /// alerting 阶段已抽取但暂不展示；working / waiting / paused 阶段为空字符串。
+    pub current_health_reminder: String,
     /// 本次休息是否为长休息。前端 breaking UI 据此显示「休息中」/「长休息中」标签与不同配色。
     pub is_long_break: bool,
     /// 跳过休息的累计点击次数。前端 breaking 阶段按钮显示「跳过 (n/max)」；

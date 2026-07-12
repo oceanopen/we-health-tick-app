@@ -44,9 +44,12 @@ struct TimerInner {
     /// 跳过休息的累计点击次数。M2 skip_break 中递增，达到 break_skip_max 次才真正跳过；
     /// 每次 start_break 进入 breaking 时清零。前端按钮显示「跳过 (n/max)」。
     break_skip_count: u32,
-    /// 当前随机抽取的提醒文案（来自 reminders 配置）。M2 的 on_work_done 中抽取；
+    /// 当前随机抽取的随笔心语文案（来自 reminders 配置的 whisper 池）。M2 的 on_work_done 中抽取；
     /// working / waiting / paused 阶段为空字符串。
-    current_reminder: String,
+    current_whisper_reminder: String,
+    /// 当前随机抽取的健康提醒文案（来自 reminders 配置的 health 池）。
+    /// breaking 阶段在 BreakingView 以绿色横幅展示；alerting 已抽取但不展示；其他阶段为空字符串。
+    current_health_reminder: String,
     /// 本次休息是否为长休息。M3 的 start_break 中判定；前端 breaking UI 据此切换标签。
     is_long_break: bool,
     /// 当前状态对应的日期（yyyy-MM-dd，本地时区）。
@@ -246,20 +249,36 @@ fn is_in_quiet_periods(periods: &[(String, String)], hhmm: &str) -> bool {
     })
 }
 
-// 从 reminders JSON 数组随机抽一条，空数组/解析失败 → 空串。
+// 从 reminders 配置随机抽取两条：返回 (whisper, health)。
+// reminders 的 JSON 形态为对象 { health: string[], whisper: string[] }：
+//   - whisper 池 = 随笔心语（文学摘抄），写入 current_whisper_reminder，展示交互不变；
+//   - health 池 = 健康提醒（走动/喝水等），写入 current_health_reminder，BreakingView 绿色横幅展示。
 // 随机源：rand crate 的 ThreadRng（CSPRNG 种子 + 高质量 PRNG）。
 // 调用点：on_work_done（工作结束自动）与 manual_break（手动休息）。
-fn pick_random_reminder(conn: &Connection) -> String {
+fn pick_random_reminders(conn: &Connection) -> (String, String) {
     let raw = read_config_conn(conn, KEY_REMINDERS)
         .ok()
         .flatten()
         .unwrap_or_default();
-    let list: Vec<String> = serde_json::from_str(&raw).unwrap_or_default();
-    if list.is_empty() {
-        return String::new();
+    #[derive(serde::Deserialize)]
+    struct RemindersConfig {
+        #[serde(default)]
+        health: Vec<String>,
+        #[serde(default)]
+        whisper: Vec<String>,
     }
-    let idx = rand::rng().random_range(0..list.len());
-    list.into_iter().nth(idx).unwrap_or_default()
+    let cfg: RemindersConfig = serde_json::from_str(&raw).unwrap_or(RemindersConfig {
+        health: Vec::new(),
+        whisper: Vec::new(),
+    });
+    let pick = |list: &[String]| -> String {
+        if list.is_empty() {
+            return String::new();
+        }
+        let idx = rand::rng().random_range(0..list.len());
+        list.get(idx).cloned().unwrap_or_default()
+    };
+    (pick(&cfg.whisper), pick(&cfg.health))
 }
 
 // ============================================================
@@ -282,7 +301,8 @@ fn fresh_working(conn: &Connection) -> TimerInner {
         paused_by_quiet: false,
         completed_cycles: 0,
         break_skip_count: 0,
-        current_reminder: String::new(),
+        current_whisper_reminder: String::new(),
+        current_health_reminder: String::new(),
         is_long_break: false,
         save_date: today_string(),
         break_paused: false,
@@ -318,15 +338,22 @@ fn apply_start_work(inner: &mut TimerInner, work_total_secs: i64, now: i64) {
     inner.paused_phase = None;
     inner.paused_by_quiet = false;
     inner.break_skip_count = 0;
-    inner.current_reminder = String::new();
+    inner.current_whisper_reminder = String::new();
+    inner.current_health_reminder = String::new();
     inner.is_long_break = false;
 }
 
 // 工作倒计时归零：抽取 reminder + 按 rest_confirm 分流。
 // rest_confirm=true → 进 Alerting（等用户确认）；=false → 调用方继续 apply_start_break。
 // 返回进入的下一个 phase，调用方据此决定是否继续 breaking 流程。
-fn apply_on_work_done(inner: &mut TimerInner, reminder: String, rest_confirm: bool) -> Phase {
-    inner.current_reminder = reminder;
+fn apply_on_work_done(
+    inner: &mut TimerInner,
+    whisper_reminder: String,
+    health_reminder: String,
+    rest_confirm: bool,
+) -> Phase {
+    inner.current_whisper_reminder = whisper_reminder;
+    inner.current_health_reminder = health_reminder;
     if rest_confirm {
         inner.phase = Phase::Alerting;
         inner.remaining_seconds = 0;
@@ -420,7 +447,8 @@ fn build_payload(inner: &TimerInner, prev_phase: Option<Phase>) -> TimerStatePay
         prev_phase,
         remaining_seconds: inner.remaining_seconds,
         total_seconds: inner.total_seconds,
-        current_reminder: inner.current_reminder.clone(),
+        current_whisper_reminder: inner.current_whisper_reminder.clone(),
+        current_health_reminder: inner.current_health_reminder.clone(),
         is_long_break: inner.is_long_break,
         break_skip_count: inner.break_skip_count,
         completed_cycles: inner.completed_cycles,
@@ -543,10 +571,15 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                         let config_state = app.state::<ConfigState>();
                         match config_state.0.lock() {
                             Ok(conn) => {
-                                let reminder = pick_random_reminder(&conn);
+                                let (whisper_reminder, health_reminder) =
+                                    pick_random_reminders(&conn);
                                 let rest_confirm = read_rest_confirm(&conn);
-                                let next =
-                                    apply_on_work_done(&mut state, reminder, rest_confirm);
+                                let next = apply_on_work_done(
+                                    &mut state,
+                                    whisper_reminder,
+                                    health_reminder,
+                                    rest_confirm,
+                                );
 
                                 if next == Phase::Breaking {
                                     // rest_confirm=N：直接进 Breaking
@@ -871,7 +904,7 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
             return Err("manual_break only valid in Working phase".into());
         }
         let prev = inner.phase;
-        let (total_secs, is_long, reminder) = {
+        let (total_secs, is_long, whisper_reminder, health_reminder) = {
             let config_state = app.state::<ConfigState>();
             let conn = config_state.0.lock().map_err(|e| e.to_string())?;
             let break_min = read_break_duration_minutes(&conn);
@@ -882,10 +915,11 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
                 check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
             let total_min = if is_long { lb_duration_min } else { break_min };
             // 与 on_work_done 对齐：手动触发也抽取 reminder，BreakingView 底部显示提醒文案
-            let reminder = pick_random_reminder(&conn);
-            ((total_min as i64) * 60, is_long, reminder)
+            let (whisper_reminder, health_reminder) = pick_random_reminders(&conn);
+            ((total_min as i64) * 60, is_long, whisper_reminder, health_reminder)
         };
-        inner.current_reminder = reminder;
+        inner.current_whisper_reminder = whisper_reminder;
+        inner.current_health_reminder = health_reminder;
         apply_start_break(&mut inner, total_secs, is_long, now_epoch());
         build_payload(&inner, Some(prev))
     };

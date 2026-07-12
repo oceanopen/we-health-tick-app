@@ -6,6 +6,10 @@
     "title": "Reminders",
     "hint": "A random reminder is shown during breaks"
   },
+  "tab": {
+    "health": "Health",
+    "whisper": "Whispers"
+  },
   "row": {
     "placeholder": "Enter reminder text..."
   },
