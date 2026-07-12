@@ -1,4 +1,4 @@
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
 import InfoIcon from '@mui/icons-material/Info';
 import SkipNextIcon from '@mui/icons-material/SkipNext';
 import { Box, Divider, IconButton, Typography } from '@mui/material';
@@ -49,6 +49,7 @@ export function BreakingView({
           sx={{
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: 0.75,
             width: '100%',
             px: 1.25,
@@ -72,6 +73,7 @@ export function BreakingView({
           sx={{
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: 0.75,
             width: '100%',
             px: 1.25,
@@ -81,7 +83,7 @@ export function BreakingView({
             color: 'success.contrastText',
           }}
         >
-          <FavoriteBorderIcon sx={{ fontSize: 16 }} />
+          <DirectionsRunIcon sx={{ fontSize: 16 }} />
           <Typography variant="caption" sx={{ fontSize: 11, lineHeight: 1.3 }}>
             {healthReminder}
           </Typography>
