@@ -11,18 +11,10 @@ pub const LANGUAGE_KEY: &str = "language";
 pub struct ConfigState(pub Mutex<Connection>);
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let app_data_dir = app.path().app_data_dir()?;
-    // dev 构建使用独立子目录，避免调试时改动污染正式版用户数据
-    // （dev/release 共用同一 identifier com.we.health.tick，app_data_dir 相同，靠此子目录隔离 db）
-    let data_dir = if cfg!(debug_assertions) {
-        app_data_dir.join("dev")
-    } else {
-        app_data_dir
-    };
+    let data_dir = app.path().app_data_dir()?;
+    // dev/release 通过不同 identifier（com.we.health.tick.dev / com.we.health.tick）自动隔离
+    // app_data_dir，无需手动拼接子目录。
     std::fs::create_dir_all(&data_dir)?;
-    if cfg!(debug_assertions) {
-        log::info!("[config] dev data dir: {}", data_dir.display());
-    }
     let db_path = data_dir.join("app.db");
     let conn = Connection::open(db_path)?;
     conn.execute(

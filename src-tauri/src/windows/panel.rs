@@ -17,13 +17,6 @@ use crate::shared::types::{Phase, TimerStatePayload};
 const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
 
-// dev build（pnpm tauri dev）tooltip 带 [DEV] 后缀，肉眼即可区分 dev/prod 产物。
-const TOOLTIP: &str = if cfg!(debug_assertions) {
-    "We Health Tick [DEV]"
-} else {
-    "We Health Tick"
-};
-
 // 已构建的托盘菜单项引用，用于语言切换时动态更新文案（MenuItem::set_text）。
 struct TrayMenuItems {
     settings: MenuItem<tauri::Wry>,
@@ -114,9 +107,13 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .items(&[&settings_item, &restart_item, &exit_item])
         .build()?;
 
+    // tooltip 从配置文件 productName 读取：dev 构建（tauri.dev.conf.json）为 "We Health Tick [DEV]"，
+    // release 构建（tauri.conf.json）为 "We Health Tick"，肉眼即可区分 dev/prod 产物。
+    let tooltip = app.config().product_name.as_deref().unwrap_or("We Health Tick");
+
     TrayIconBuilder::with_id("tray")
         .icon(icon)
-        .tooltip(TOOLTIP)
+        .tooltip(tooltip)
         .menu(&menu)
         // 关键：禁用左键弹菜单，保持左键 toggle panel 的现有行为（跨平台统一）。
         // macOS 默认左键会弹菜单，此处显式关闭；Linux 上为 no-op（左键本就触发 event）。
