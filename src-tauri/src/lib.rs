@@ -57,13 +57,27 @@ pub fn run() {
                 let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // 日志插件：dev/release 均注册。
+            // dev：Info + Stdout（终端实时观察）+ LogDir；release：Warn + LogDir 并启用轮转，方便生产排障。
+            use tauri_plugin_log::{Target, TargetKind};
+            let log_plugin = if cfg!(debug_assertions) {
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .targets([
+                        Target::new(TargetKind::Stdout),
+                        Target::new(TargetKind::LogDir { file_name: None }),
+                    ])
+                    .build()
+            } else {
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Warn)
+                    .targets([Target::new(TargetKind::LogDir { file_name: None })])
+                    // 1 MiB/文件，保留最近 1 份（旧的重命名带日期），总量 ~1 MiB 有界
+                    .max_file_size(1_048_576)
+                    .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(1))
+                    .build()
+            };
+            app.handle().plugin(log_plugin)?;
 
             // config 先于 panel::setup：panel 构建托盘菜单时需读 ConfigState 解析语言偏好，
             // 否则首次启动会 fallback 到系统语言而忽略用户存的 language 偏好。
