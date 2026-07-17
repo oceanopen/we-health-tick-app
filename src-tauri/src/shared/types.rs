@@ -56,6 +56,11 @@ pub struct TimerStatePayload {
     /// 跳过休息的累计点击次数。前端 breaking 阶段按钮显示「跳过 (n/max)」；
     /// 达到 break_skip_max 配置门槛才真正跳过。进入 breaking 时清零。
     pub break_skip_count: u32,
+    /// 今日累计「真正跳过休息」的次数（break_skip_count 达到 break_skip_max 才计一次）。
+    /// 持久化到 config 表 today_skip_count（{date,count} JSON），跨天自动归零。
+    /// 与 break_skip_count（单次休息防误触、进休息清零、不持久化）严格区分。
+    /// AlertingView 据此 + skip_count_reminder 阈值决定是否显示「今日多次跳过休息」警示横幅。
+    pub today_skip_count: u32,
     /// 已完成的工作-休息轮数。长休息判定输入：
     /// `completed_cycles > 0 && completed_cycles % interval == 0`；
     /// 仅正常完成 on_break_done 才递增，跳过休息不计入。

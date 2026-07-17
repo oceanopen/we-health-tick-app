@@ -22,6 +22,8 @@ export default function PanelApp() {
     isLongBreak,
     breakSkipCount,
     breakSkipMax,
+    skipCountReminder,
+    todaySkipCount,
     breakPaused,
     quietHours,
     togglePause,
@@ -117,6 +119,8 @@ export default function PanelApp() {
                 whisperReminder={currentWhisperReminder}
                 breakSkipCount={breakSkipCount}
                 breakSkipMax={breakSkipMax}
+                todaySkipCount={todaySkipCount}
+                skipCountReminder={skipCountReminder}
                 onStartBreak={confirmBreak}
                 onSkip={skipBreak}
               />

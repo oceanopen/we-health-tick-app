@@ -1,6 +1,7 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { RestConfirm, RestWindow } from '@src/shared/config';
+import type { RestConfirm, RestWindow, SkipCountReminder } from '@src/shared/config';
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import WeekendOutlinedIcon from '@mui/icons-material/WeekendOutlined';
 import {
   Box,
@@ -10,16 +11,22 @@ import {
   MenuItem,
   Select,
   Switch,
+  TextField,
   Typography,
 } from '@mui/material';
 import {
+  decodeSkipCountReminder,
   DEFAULT_REST_CONFIRM,
   DEFAULT_REST_WINDOW,
+  DEFAULT_SKIP_COUNT_REMINDER,
   getConfig,
+  MAX_SKIP_COUNT_REMINDER,
+  MIN_SKIP_COUNT_REMINDER,
   parseYesNo,
   REST_CONFIRM_KEY,
   REST_WINDOW_KEY,
   setConfig,
+  SKIP_COUNT_REMINDER_KEY,
   toYesNo,
   YES_NO,
 } from '@src/shared/config';
@@ -30,11 +37,13 @@ import { useTranslation } from 'react-i18next';
 interface RestConfig {
   restWindow: RestWindow;
   restConfirm: RestConfirm;
+  skipCountReminder: SkipCountReminder;
 }
 
 const DEFAULT_REST_CONFIG: RestConfig = {
   restWindow: DEFAULT_REST_WINDOW,
   restConfirm: DEFAULT_REST_CONFIRM,
+  skipCountReminder: DEFAULT_SKIP_COUNT_REMINDER,
 };
 
 function RestPage() {
@@ -46,13 +55,15 @@ function RestPage() {
     Promise.all([
       getConfig(REST_WINDOW_KEY),
       getConfig(REST_CONFIRM_KEY),
-    ]).then(([window, confirm]) => {
+      getConfig(SKIP_COUNT_REMINDER_KEY),
+    ]).then(([window, confirm, skipCountReminder]) => {
       const next: RestConfig = {
         restWindow:
           window === 'tray' || window === 'topRight' || window === 'fullscreen'
             ? window
             : DEFAULT_REST_WINDOW,
         restConfirm: parseYesNo(confirm, DEFAULT_REST_CONFIRM),
+        skipCountReminder: decodeSkipCountReminder(skipCountReminder),
       };
       setSaved(next);
       setDraft(next);
@@ -64,7 +75,9 @@ function RestPage() {
   };
 
   const dirty
-    = saved.restWindow !== draft.restWindow || saved.restConfirm !== draft.restConfirm;
+    = saved.restWindow !== draft.restWindow
+      || saved.restConfirm !== draft.restConfirm
+      || saved.skipCountReminder !== draft.skipCountReminder;
 
   const handleReset = () => setDraft(DEFAULT_REST_CONFIG);
   const handleCancel = () => setDraft(saved);
@@ -73,6 +86,7 @@ function RestPage() {
     await Promise.all([
       setConfig(REST_WINDOW_KEY, draft.restWindow),
       setConfig(REST_CONFIRM_KEY, draft.restConfirm),
+      setConfig(SKIP_COUNT_REMINDER_KEY, String(draft.skipCountReminder)),
     ]);
     setSaved(draft);
   };
@@ -140,6 +154,45 @@ function RestPage() {
             <Switch
               checked={draft.restConfirm === YES_NO.YES}
               onChange={e => update('restConfirm', toYesNo(e.target.checked))}
+            />
+          </Box>
+
+          <Divider />
+
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 1.5,
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <WarningAmberOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              <Box>
+                <Typography>{t('rest:row.skipCountReminder')}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+                  {t('rest:row.skipCountReminderHint')}
+                </Typography>
+              </Box>
+            </Box>
+            <TextField
+              type="number"
+              size="small"
+              value={draft.skipCountReminder}
+              slotProps={{ htmlInput: { min: MIN_SKIP_COUNT_REMINDER, max: MAX_SKIP_COUNT_REMINDER, step: 1 } }}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                update(
+                  'skipCountReminder',
+                  Number.isFinite(n)
+                    ? Math.min(MAX_SKIP_COUNT_REMINDER, Math.max(MIN_SKIP_COUNT_REMINDER, Math.trunc(n)))
+                    : DEFAULT_SKIP_COUNT_REMINDER,
+                );
+              }}
+              sx={{ width: 100 }}
             />
           </Box>
         </Box>

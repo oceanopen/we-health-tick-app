@@ -60,7 +60,7 @@ export function BreakingView({
           }}
         >
           <InfoIcon sx={{ fontSize: 16 }} />
-          <Typography variant="caption" sx={{ fontSize: 11, lineHeight: 1.3 }}>
+          <Typography variant="caption" sx={{ fontSize: 11, lineHeight: 1 }}>
             {t('panel:breakActivityPaused')}
           </Typography>
         </Box>

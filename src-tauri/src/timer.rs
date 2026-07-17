@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
-use crate::shared::config::{read_config_conn, ConfigState};
+use crate::shared::config::{read_config_conn, write_config_conn, ConfigState};
 use crate::shared::time::{now_epoch, now_hhmm, today_string};
 use crate::shared::types::{Phase, TimerStatePayload, YesNo};
 
@@ -44,6 +44,11 @@ struct TimerInner {
     /// 跳过休息的累计点击次数。M2 skip_break 中递增，达到 break_skip_max 次才真正跳过；
     /// 每次 start_break 进入 breaking 时清零。前端按钮显示「跳过 (n/max)」。
     break_skip_count: u32,
+    /// 今日累计「真正跳过休息」次数（break_skip_count 达到 break_skip_max 才计一次）。
+    /// 持久化到 config 表 today_skip_count（{date,count} JSON），跨天自动归零；
+    /// init / 跨天时由 fresh_working 从 DB 读取（date 校验自带归零），skip_break 真正跳过时 +1 并回写。
+    /// 与 break_skip_count（防误触、不持久化）严格区分。payload 暴露给 AlertingView 显隐警示横幅。
+    today_skip_count: u32,
     /// 当前随机抽取的随笔心语文案（来自 reminders 配置的 whisper 池）。M2 的 on_work_done 中抽取；
     /// working / waiting / paused 阶段为空字符串。
     current_whisper_reminder: String,
@@ -203,6 +208,48 @@ fn read_break_skip_max(conn: &Connection) -> u32 {
         .unwrap_or(DEFAULT_BREAK_SKIP_MAX)
 }
 
+// 今日累计跳过次数（内部统计，非用户配置）：持久化到 config 表 key today_skip_count，
+// 值为 JSON {"date":"yyyy-MM-dd","count":N}。date != today 或缺失/非法 → 视为 0（跨天自然归零）。
+// 与 KEY_BREAK_SKIP_MAX（用户可配的防误触门槛）完全独立——后者控制「点几次才真跳过」，
+// 本项统计「今日真正跳过了几次」。前端 skip_count_reminder 阈值是纯 UI 配置，后端不读。
+const KEY_TODAY_SKIP_COUNT: &str = "today_skip_count";
+
+// today_skip_count 的持久化结构。与前端无契约（前端经 TimerStatePayload.todaySkipCount 读缓存值，
+// 不直接读此 key），故 schema 仅后端内部约定。
+#[derive(serde::Serialize, serde::Deserialize)]
+struct TodaySkipRecord {
+    date: String,
+    count: u32,
+}
+
+// 读今日累计跳过次数。fresh_working（init + 跨天）调用，date 校验自带跨天归零：
+// DB 中记录的 date != today（昨日及更早）→ 返回 0。
+fn read_today_skip_count(conn: &Connection) -> u32 {
+    let today = today_string();
+    read_config_conn(conn, KEY_TODAY_SKIP_COUNT)
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str::<TodaySkipRecord>(&s).ok())
+        .filter(|r| r.date == today)
+        .map(|r| r.count)
+        .unwrap_or(0)
+}
+
+// 写今日累计跳过次数（连同一日日期）。skip_break 真正跳过分支调用。
+// 用 write_config_conn（conn 级，不 emit config-changed）——内部统计非用户配置变更，
+// 不应触发 on_config_changed handler 或广播给前端窗口（前端经 payload 获取最新值）。
+fn write_today_skip_count(conn: &Connection, count: u32) {
+    let record = TodaySkipRecord { date: today_string(), count };
+    match serde_json::to_string(&record) {
+        Ok(value) => {
+            if let Err(e) = write_config_conn(conn, KEY_TODAY_SKIP_COUNT, &value) {
+                log::warn!("write today_skip_count failed: {e}");
+            }
+        }
+        Err(e) => log::warn!("serialize today_skip_count failed: {e}"),
+    }
+}
+
 // 读 rest_confirm（YesNo），容错回退默认。
 // Yes：工作结束时先进 Alerting 等用户确认；No：直接进 Breaking。
 fn read_rest_confirm(conn: &Connection) -> bool {
@@ -301,6 +348,7 @@ fn fresh_working(conn: &Connection) -> TimerInner {
         paused_by_quiet: false,
         completed_cycles: 0,
         break_skip_count: 0,
+        today_skip_count: read_today_skip_count(conn),
         current_whisper_reminder: String::new(),
         current_health_reminder: String::new(),
         is_long_break: false,
@@ -451,6 +499,7 @@ fn build_payload(inner: &TimerInner, prev_phase: Option<Phase>) -> TimerStatePay
         current_health_reminder: inner.current_health_reminder.clone(),
         is_long_break: inner.is_long_break,
         break_skip_count: inner.break_skip_count,
+        today_skip_count: inner.today_skip_count,
         completed_cycles: inner.completed_cycles,
         quiet_triggered: inner.paused_by_quiet,
         break_paused: inner.break_paused,
@@ -954,6 +1003,11 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
             let work_min = {
                 let config_state = app.state::<ConfigState>();
                 let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+                // 真正跳过：今日累计跳过次数 +1 并持久化（与 work_min 共用同一 ConfigState 锁，
+                // 保持 inner→config 加锁顺序）。apply_start_work 不触碰 today_skip_count，
+                // 故增量保留至 build_payload。
+                inner.today_skip_count = inner.today_skip_count.saturating_add(1);
+                write_today_skip_count(&conn, inner.today_skip_count);
                 read_work_duration_minutes(&conn)
             };
             apply_start_work(&mut inner, (work_min as i64) * 60, now_epoch());

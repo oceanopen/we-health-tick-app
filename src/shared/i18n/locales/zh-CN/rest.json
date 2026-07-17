@@ -7,7 +7,9 @@
   },
   "row": {
     "restWindow": "休息窗口",
-    "restConfirm": "休息前确认"
+    "restConfirm": "休息前确认",
+    "skipCountReminder": "跳过次数提醒",
+    "skipCountReminderHint": "今日累计跳过达到该值时提醒（填 0 关闭）"
   },
   "option": {
     "tray": "托盘提醒",

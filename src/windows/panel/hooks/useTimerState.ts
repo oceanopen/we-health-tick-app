@@ -4,11 +4,14 @@ import { logOnError } from '@src/shared/commands';
 import {
   BREAK_SKIP_MAX_KEY,
   decodeQuietHours,
+  decodeSkipCountReminder,
   DEFAULT_BREAK_SKIP_MAX,
   DEFAULT_QUIET_HOURS,
+  DEFAULT_SKIP_COUNT_REMINDER,
   MAX_BREAK_SKIP_MAX,
   MIN_BREAK_SKIP_MAX,
   QUIET_HOURS_KEY,
+  SKIP_COUNT_REMINDER_KEY,
 } from '@src/shared/config';
 import {
   EVENT_PHASE_CHANGED,
@@ -28,6 +31,7 @@ const INITIAL_STATE: TimerStatePayload = {
   currentHealthReminder: '',
   isLongBreak: false,
   breakSkipCount: 0,
+  todaySkipCount: 0,
   completedCycles: 0,
   quietTriggered: false,
   breakPaused: false,
@@ -57,6 +61,8 @@ export function useTimerState() {
   // quiet_hours 供 PausedView 在 quietTriggered 时显示休息时段范围（如 "22:00:00 - 07:00:00"）。
   const breakSkipMax = useConfigValue(BREAK_SKIP_MAX_KEY, decodeBreakSkipMax, DEFAULT_BREAK_SKIP_MAX);
   const quietHours = useConfigValue(QUIET_HOURS_KEY, decodeQuietHours, DEFAULT_QUIET_HOURS);
+  // 跳过次数提醒阈值（纯 UI 配置）：AlertingView 据此 + state.todaySkipCount 判断是否显示警示横幅。
+  const skipCountReminder = useConfigValue(SKIP_COUNT_REMINDER_KEY, decodeSkipCountReminder, DEFAULT_SKIP_COUNT_REMINDER);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,8 +117,10 @@ export function useTimerState() {
     currentHealthReminder: state.currentHealthReminder,
     isLongBreak: state.isLongBreak,
     breakSkipCount: state.breakSkipCount,
+    todaySkipCount: state.todaySkipCount,
     breakPaused: state.breakPaused,
     breakSkipMax,
+    skipCountReminder,
     quietHours,
     completedCycles: state.completedCycles,
     quietTriggered: state.quietTriggered,

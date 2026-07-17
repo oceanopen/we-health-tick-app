@@ -7,7 +7,9 @@
   },
   "row": {
     "restWindow": "Break Window",
-    "restConfirm": "Confirm Before Break"
+    "restConfirm": "Confirm Before Break",
+    "skipCountReminder": "Skip Count Reminder",
+    "skipCountReminderHint": "Remind when today's skips reach this (0 = off)"
   },
   "option": {
     "tray": "Tray Notification",

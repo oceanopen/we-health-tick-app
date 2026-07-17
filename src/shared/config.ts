@@ -68,6 +68,25 @@ export const DEFAULT_BREAK_SKIP_MAX = 1;
 export const MIN_BREAK_SKIP_MAX = 1;
 export const MAX_BREAK_SKIP_MAX = 3;
 
+// 跳过次数提醒阈值：今日累计「真正跳过休息」≥ 该值时，休息提醒弹窗（AlertingView）显示警示横幅。
+// 纯 UI 配置：后端不读取（与 appearance / rest_window 同类），仅前端 AlertingView 判断显隐。
+// 0 = 关闭提醒。与 BREAK_SKIP_MAX（单次休息防误触点击门槛）语义不同，勿混用。
+export type SkipCountReminder = number;
+
+export const SKIP_COUNT_REMINDER_KEY = 'skip_count_reminder';
+export const DEFAULT_SKIP_COUNT_REMINDER: SkipCountReminder = 3;
+export const MIN_SKIP_COUNT_REMINDER = 0;
+export const MAX_SKIP_COUNT_REMINDER = 20;
+
+// 模块级 decode：稳定引用，供 useConfigValue 订阅（避免每次渲染重订阅）。
+// clamp 到 [MIN,MAX]，非有限数 / 缺失回落默认（与 decodeBreakSkipMax 同构，但范围不同）。
+export function decodeSkipCountReminder(v: string | null): SkipCountReminder {
+  const n = Number(v);
+  return Number.isFinite(n)
+    ? Math.min(MAX_SKIP_COUNT_REMINDER, Math.max(MIN_SKIP_COUNT_REMINDER, Math.trunc(n)))
+    : DEFAULT_SKIP_COUNT_REMINDER;
+}
+
 export const LONG_BREAK_INTERVAL_KEY = 'long_break_interval';
 export const DEFAULT_LONG_BREAK_INTERVAL: LongBreakInterval = 2;
 

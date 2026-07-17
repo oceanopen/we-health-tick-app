@@ -18,6 +18,7 @@
   "quietHoursActive": "Quiet Hours Active",
   "pausedAutoResumeHint": "Auto resumes after quiet hours",
   "breakActivityPaused": "Activity detected, countdown paused",
+  "skipWarning": "Breaks skipped today, take care",
   "resumableRemainingLabel": "Time until next break after resume",
   "quietHoursRangeLabel": "Currently in quiet hours"
 }
