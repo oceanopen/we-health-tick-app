@@ -45,7 +45,7 @@ export type RestConfirm = YesNo;
 export const REST_CONFIRM_KEY = 'rest_confirm';
 export const DEFAULT_REST_CONFIRM: RestConfirm = YES_NO.YES;
 
-// 离开暂停：锁屏 / 休眠 / 60s 无操作时冻结工作倒计时（idle 检测，复用 idle.rs）。
+// 离开暂停：锁屏 / 休眠 / 长时间无操作时冻结工作倒计时（idle 检测，复用 idle.rs）。
 // YesNo 配置，后端 timer.rs 每秒现读（同 quiet_hours），改设置 ≤1s 生效。
 export type PauseOnIdle = YesNo;
 
