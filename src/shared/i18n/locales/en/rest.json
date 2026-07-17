@@ -8,8 +8,13 @@
   "row": {
     "restWindow": "Break Window",
     "restConfirm": "Confirm Before Break",
+    "breakSkipMax": "Taps to Skip",
+    "breakSkipMaxHint": "Number of times to tap Skip before actually skipping the break (prevents accidental taps)",
     "skipCountReminder": "Skip Count Reminder",
-    "skipCountReminderHint": "Remind when today's skips reach this (0 = off)"
+    "skipCountReminderHint": "Remind when today's skips reach this (0 = off)",
+    "pauseOnIdle": "Pause When Away",
+    "pauseOnIdleHint": "Pause the work timer when the screen locks, system sleeps, or you're idle",
+    "idlePauseThreshold": "Idle Time"
   },
   "option": {
     "tray": "Tray Notification",
@@ -20,5 +25,8 @@
     "reset": "Reset",
     "cancel": "Cancel",
     "save": "Save"
+  },
+  "unit": {
+    "seconds": "s"
   }
 }

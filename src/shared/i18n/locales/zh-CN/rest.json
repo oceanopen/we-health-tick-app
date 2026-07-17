@@ -8,8 +8,13 @@
   "row": {
     "restWindow": "休息窗口",
     "restConfirm": "休息前确认",
+    "breakSkipMax": "跳过确认次数",
+    "breakSkipMaxHint": "连点几次「跳过」才真正跳过休息（防手滑误触）",
     "skipCountReminder": "跳过次数提醒",
-    "skipCountReminderHint": "今日累计跳过达到该值时提醒（填 0 关闭）"
+    "skipCountReminderHint": "今日累计跳过达到该值时提醒（填 0 关闭）",
+    "pauseOnIdle": "离开时暂停",
+    "pauseOnIdleHint": "锁屏、休眠或长时间无操作时暂停工作计时",
+    "idlePauseThreshold": "空闲时长"
   },
   "option": {
     "tray": "托盘提醒",
@@ -20,5 +25,8 @@
     "reset": "重置",
     "cancel": "取消",
     "save": "保存"
+  },
+  "unit": {
+    "seconds": "秒"
   }
 }

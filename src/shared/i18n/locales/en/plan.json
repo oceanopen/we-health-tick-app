@@ -15,7 +15,6 @@
     "longBreakEnabled": "Long Break",
     "longBreakInterval": "Long Break Interval",
     "longBreakDuration": "Long Break Duration",
-    "breakSkipMax": "Skip Threshold",
     "workTime": "Work Hours",
     "quietHours": "Quiet Hours"
   },

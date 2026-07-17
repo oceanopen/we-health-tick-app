@@ -4,10 +4,10 @@ import { unwrap } from './commands';
 
 // 本文件是所有配置项 key 命名 + 默认值的唯一可信源 (SSOT)。
 //
-// 后端 src-tauri/src/timer.rs 只对「计时逻辑需要读取」的 9 项建有对应常量副本
-// （work/break_duration、break_skip_max、long_break_*、rest_confirm、quiet_hours、reminders）；
+// 后端 src-tauri/src/timer.rs 只对「计时逻辑需要读取」的 11 项建有对应常量副本
+// （work/break_duration、break_skip_max、long_break_*、rest_confirm、pause_on_idle、idle_pause_threshold、quiet_hours、reminders）；
 // appearance / rest_window / language / work_*_time 为纯 UI 配置，后端不读，仅前端使用。
-// 修改这 9 项中任一 *KEY / DEFAULT_* 时必须同步后端（对照表见 timer.rs 顶部）。
+// 修改这 11 项中任一 *KEY / DEFAULT_* 时必须同步后端（对照表见 timer.rs 顶部）。
 
 // YES_NO 运行时常量：构造 / 比较 Y/N 字面量用。
 // 类型来源：YesNo（来自 ./bindings，SSOT 为后端 shared/types.rs 的 YesNo enum）。
@@ -44,6 +44,32 @@ export type RestConfirm = YesNo;
 
 export const REST_CONFIRM_KEY = 'rest_confirm';
 export const DEFAULT_REST_CONFIRM: RestConfirm = YES_NO.YES;
+
+// 离开暂停：锁屏 / 休眠 / 60s 无操作时冻结工作倒计时（idle 检测，复用 idle.rs）。
+// YesNo 配置，后端 timer.rs 每秒现读（同 quiet_hours），改设置 ≤1s 生效。
+export type PauseOnIdle = YesNo;
+
+export const PAUSE_ON_IDLE_KEY = 'pause_on_idle';
+export const DEFAULT_PAUSE_ON_IDLE: PauseOnIdle = YES_NO.YES;
+
+// 离开暂停的空闲阈值（秒）：idle 超该值且 pause_on_idle 开启 → 冻结工作倒计时。
+// number 配置，后端 timer.rs 每秒现读（同 quiet_hours）。STEP 仅前端 Slider 用，后端不校验。
+export type IdlePauseThreshold = number;
+
+export const IDLE_PAUSE_THRESHOLD_KEY = 'idle_pause_threshold';
+export const DEFAULT_IDLE_PAUSE_THRESHOLD: IdlePauseThreshold = 60;
+export const MIN_IDLE_PAUSE_THRESHOLD = 30;
+export const MAX_IDLE_PAUSE_THRESHOLD = 300;
+export const IDLE_PAUSE_THRESHOLD_STEP = 30;
+
+// 模块级 decode：稳定引用，供 useConfigValue / PlanPage 订阅与初始化。
+// clamp 到 [MIN,MAX]，非有限数 / 缺失回落默认（与 decodeSkipCountReminder 同构）。
+export function decodeIdlePauseThreshold(v: string | null): IdlePauseThreshold {
+  const n = Number(v);
+  return Number.isFinite(n)
+    ? Math.min(MAX_IDLE_PAUSE_THRESHOLD, Math.max(MIN_IDLE_PAUSE_THRESHOLD, Math.trunc(n)))
+    : DEFAULT_IDLE_PAUSE_THRESHOLD;
+}
 
 export type Language = 'system' | 'zh-CN' | 'en';
 

@@ -100,6 +100,8 @@ pub struct TimerState {
 //   KEY_LONG_BREAK_INTERVAL    ↔ LONG_BREAK_INTERVAL_KEY   / DEFAULT_LONG_BREAK_INTERVAL
 //   KEY_LONG_BREAK_DURATION    ↔ LONG_BREAK_DURATION_KEY   / DEFAULT_LONG_BREAK_DURATION
 //   KEY_REST_CONFIRM           ↔ REST_CONFIRM_KEY          / DEFAULT_REST_CONFIRM
+//   KEY_PAUSE_ON_IDLE          ↔ PAUSE_ON_IDLE_KEY         / DEFAULT_PAUSE_ON_IDLE
+//   KEY_IDLE_PAUSE_THRESHOLD   ↔ IDLE_PAUSE_THRESHOLD_KEY  / DEFAULT_IDLE_PAUSE_THRESHOLD (MIN/MAX)
 //   KEY_QUIET_HOURS            ↔ QUIET_HOURS_KEY           / DEFAULT_QUIET_HOURS (DEFAULT_QUIET_HOURS_JSON)
 //   KEY_REMINDERS              ↔ REMINDERS_KEY             / （无默认，运行时 decode/pick）
 //   KEY_BREAK_SKIP_MAX         ↔ BREAK_SKIP_MAX_KEY        / DEFAULT_BREAK_SKIP_MAX
@@ -121,6 +123,20 @@ const DEFAULT_LONG_BREAK_DURATION_MIN: u32 = 5;
 
 const KEY_REST_CONFIRM: &str = "rest_confirm";
 const DEFAULT_REST_CONFIRM: bool = true;
+
+const KEY_PAUSE_ON_IDLE: &str = "pause_on_idle";
+// 离开（锁屏/休眠/AFK）时冻结工作倒计时。与前端 DEFAULT_PAUSE_ON_IDLE 对齐。
+// read_pause_on_idle 容错回退此项（DB 无值/非法 → 默认开启）。
+const DEFAULT_PAUSE_ON_IDLE: bool = true;
+
+// 判定「用户离开」的空闲阈值（秒），用户可配（前端 Slider 30-300 step 30，默认 60）。
+// idle > 该值且处于 Working 且 pause_on_idle 开启 → 冻结工作倒计时。
+// 与前端 IDLE_PAUSE_THRESHOLD_KEY / DEFAULT / MIN / MAX 对齐；STEP 仅前端 UI 用，后端不校验。
+const KEY_IDLE_PAUSE_THRESHOLD: &str = "idle_pause_threshold";
+const DEFAULT_IDLE_PAUSE_THRESHOLD: f64 = 60.0;
+// 合法范围（闭区间，秒）。read_idle_pause_threshold 会 clamp，防 DB 被外部写入异常值。改范围同步前端。
+const MIN_IDLE_PAUSE_THRESHOLD: f64 = 30.0;
+const MAX_IDLE_PAUSE_THRESHOLD: f64 = 300.0;
 
 const KEY_BREAK_SKIP_MAX: &str = "break_skip_max";
 // 休息跳过防误触门槛（连点 N 次才真正跳过）。与前端 DEFAULT_BREAK_SKIP_MAX 对齐。
@@ -258,6 +274,27 @@ fn read_rest_confirm(conn: &Connection) -> bool {
         .flatten()
         .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(false))
         .unwrap_or(DEFAULT_REST_CONFIRM)
+}
+
+// 读 pause_on_idle（YesNo），容错回退默认（DB 无值/非法 → 默认开启）。
+// 场景：run_timer_loop 每秒现读，Working 阶段离开冻结判定；与前端 PAUSE_ON_IDLE_KEY 对齐。
+fn read_pause_on_idle(conn: &Connection) -> bool {
+    read_config_conn(conn, KEY_PAUSE_ON_IDLE)
+        .ok()
+        .flatten()
+        .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(DEFAULT_PAUSE_ON_IDLE))
+        .unwrap_or(DEFAULT_PAUSE_ON_IDLE)
+}
+
+// 读 idle_pause_threshold（f64 秒），容错回退默认。clamp 到 [MIN,MAX]，防止 DB 被外部写入异常值。
+// 场景：run_timer_loop 每秒现读，Working 阶段离开冻结判定（idle > 该值且开关开启 → 冻结）。
+fn read_idle_pause_threshold(conn: &Connection) -> f64 {
+    read_config_conn(conn, KEY_IDLE_PAUSE_THRESHOLD)
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<f64>().ok())
+        .map(|n| n.clamp(MIN_IDLE_PAUSE_THRESHOLD, MAX_IDLE_PAUSE_THRESHOLD))
+        .unwrap_or(DEFAULT_IDLE_PAUSE_THRESHOLD)
 }
 
 // 读 quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 与前端一致。
@@ -571,16 +608,23 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
             // 一次性读 quiet_hours + work_duration（M3 quiet 判断 + 自动 start_work 共用，
             // 避免在 quiet 分支里再锁一次 ConfigState）。
             // 锁失败时回退空 quiet_periods（视为无静音）+ 默认 work 时长。
-            let (quiet_periods, work_min) = {
+            let (quiet_periods, work_min, pause_on_idle, idle_pause_threshold) = {
                 let config_state = app.state::<ConfigState>();
                 match config_state.0.lock() {
                     Ok(conn) => (
                         read_quiet_hours(&conn),
                         read_work_duration_minutes(&conn),
+                        read_pause_on_idle(&conn),
+                        read_idle_pause_threshold(&conn),
                     ),
                     Err(e) => {
                         log::warn!("config lock failed, skip quiet check: {e}");
-                        (Vec::new(), DEFAULT_WORK_DURATION_MIN)
+                        (
+                            Vec::new(),
+                            DEFAULT_WORK_DURATION_MIN,
+                            DEFAULT_PAUSE_ON_IDLE,
+                            DEFAULT_IDLE_PAUSE_THRESHOLD,
+                        )
                     }
                 }
             };
@@ -607,6 +651,15 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
             // phase 推进（若 quiet 切到了 Paused 或 Working，下方 match 会自然落到对应分支处理新 phase）
             match state.phase {
                 Phase::Working => {
+                    // 离开冻结（锁屏/休眠/AFK）：pause_on_idle 开启且系统空闲超阈值时，
+                    // 把 target_epoch 重新锚定为 now + remaining，使下方重算保持 remaining 不变 → 冻结工作倒计时。
+                    // 用户回来（idle 回落）后停止锚定，倒计时从原进度自然恢复。阈值内短暂思考/阅读照常计时。
+                    if pause_on_idle && state.remaining_seconds > 0 {
+                        let idle_secs = crate::shared::idle::get_idle_seconds();
+                        if idle_secs > idle_pause_threshold {
+                            state.target_epoch = now + state.remaining_seconds;
+                        }
+                    }
                     // 绝对时间机制：按 target_epoch 重算 remaining_seconds
                     state.remaining_seconds = if state.target_epoch > now {
                         state.target_epoch - now

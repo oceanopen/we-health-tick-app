@@ -9,7 +9,6 @@ import NightsStayOutlinedIcon from '@mui/icons-material/NightsStayOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import SelfImprovementOutlinedIcon from '@mui/icons-material/SelfImprovementOutlined';
-import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
 import {
   Box,
   Button,
@@ -25,10 +24,8 @@ import {
 } from '@mui/material';
 import {
   BREAK_DURATION_KEY,
-  BREAK_SKIP_MAX_KEY,
   decodeQuietHours,
   DEFAULT_BREAK_DURATION,
-  DEFAULT_BREAK_SKIP_MAX,
   DEFAULT_LONG_BREAK_DURATION,
   DEFAULT_LONG_BREAK_ENABLED,
   DEFAULT_LONG_BREAK_INTERVAL,
@@ -41,8 +38,6 @@ import {
   LONG_BREAK_DURATION_KEY,
   LONG_BREAK_ENABLED_KEY,
   LONG_BREAK_INTERVAL_KEY,
-  MAX_BREAK_SKIP_MAX,
-  MIN_BREAK_SKIP_MAX,
   parseYesNo,
   QUIET_HOURS_KEY,
   setConfig,
@@ -66,7 +61,6 @@ interface PlanConfig {
   longBreakEnabled: LongBreakEnabled;
   longBreakInterval: number;
   longBreakDuration: number;
-  breakSkipMax: number;
   workStartTime: string;
   workEndTime: string;
   quietHours: QuietHourItem[];
@@ -78,7 +72,6 @@ const DEFAULT_PLAN_CONFIG: PlanConfig = {
   longBreakEnabled: DEFAULT_LONG_BREAK_ENABLED,
   longBreakInterval: DEFAULT_LONG_BREAK_INTERVAL,
   longBreakDuration: DEFAULT_LONG_BREAK_DURATION,
-  breakSkipMax: DEFAULT_BREAK_SKIP_MAX,
   workStartTime: DEFAULT_WORK_START_TIME,
   workEndTime: DEFAULT_WORK_END_TIME,
   quietHours: DEFAULT_QUIET_HOURS.map((p, i) => ({ ...p, id: i + 1 })),
@@ -102,18 +95,16 @@ function PlanPage() {
       getConfig(LONG_BREAK_ENABLED_KEY),
       getConfig(LONG_BREAK_INTERVAL_KEY),
       getConfig(LONG_BREAK_DURATION_KEY),
-      getConfig(BREAK_SKIP_MAX_KEY),
       getConfig(WORK_START_TIME_KEY),
       getConfig(WORK_END_TIME_KEY),
       getConfig(QUIET_HOURS_KEY),
-    ]).then(([wd, bd, lbe, lbi, lbdu, bsm, wst, wet, qh]) => {
+    ]).then(([wd, bd, lbe, lbi, lbdu, wst, wet, qh]) => {
       const next: PlanConfig = {
         workDuration: wd ? Number(wd) : DEFAULT_WORK_DURATION,
         breakDuration: bd ? Number(bd) : DEFAULT_BREAK_DURATION,
         longBreakEnabled: parseYesNo(lbe, DEFAULT_LONG_BREAK_ENABLED),
         longBreakInterval: lbi ? Number(lbi) : DEFAULT_LONG_BREAK_INTERVAL,
         longBreakDuration: lbdu ? Number(lbdu) : DEFAULT_LONG_BREAK_DURATION,
-        breakSkipMax: bsm ? Number(bsm) : DEFAULT_BREAK_SKIP_MAX,
         workStartTime: wst ?? DEFAULT_WORK_START_TIME,
         workEndTime: wet ?? DEFAULT_WORK_END_TIME,
         quietHours: decodeQuietHours(qh).map(p => ({ ...p, id: allocateQuietHourId() })),
@@ -163,7 +154,6 @@ function PlanPage() {
       || saved.longBreakEnabled !== draft.longBreakEnabled
       || saved.longBreakInterval !== draft.longBreakInterval
       || saved.longBreakDuration !== draft.longBreakDuration
-      || saved.breakSkipMax !== draft.breakSkipMax
       || saved.workStartTime !== draft.workStartTime
       || saved.workEndTime !== draft.workEndTime
       || JSON.stringify(saved.quietHours) !== JSON.stringify(draft.quietHours);
@@ -178,7 +168,6 @@ function PlanPage() {
       setConfig(LONG_BREAK_ENABLED_KEY, draft.longBreakEnabled),
       setConfig(LONG_BREAK_INTERVAL_KEY, String(draft.longBreakInterval)),
       setConfig(LONG_BREAK_DURATION_KEY, String(draft.longBreakDuration)),
-      setConfig(BREAK_SKIP_MAX_KEY, String(draft.breakSkipMax)),
       setConfig(WORK_START_TIME_KEY, draft.workStartTime),
       setConfig(WORK_END_TIME_KEY, draft.workEndTime),
       setConfig(
@@ -354,49 +343,6 @@ function PlanPage() {
               max={30}
               step={1}
               size="small"
-            />
-          </Box>
-
-          <Divider />
-
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              px: 2,
-              py: 1.5,
-              gap: 2,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <SkipNextOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-              <Typography>{t('plan:row.breakSkipMax')}</Typography>
-            </Box>
-            <TextField
-              type="number"
-              size="small"
-              value={draft.breakSkipMax}
-              slotProps={{
-                htmlInput: {
-                  min: MIN_BREAK_SKIP_MAX,
-                  max: MAX_BREAK_SKIP_MAX,
-                  step: 1,
-                },
-              }}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                update(
-                  'breakSkipMax',
-                  Number.isFinite(n)
-                    ? Math.min(
-                        MAX_BREAK_SKIP_MAX,
-                        Math.max(MIN_BREAK_SKIP_MAX, Math.trunc(n)),
-                      )
-                    : DEFAULT_BREAK_SKIP_MAX,
-                );
-              }}
-              sx={{ width: 100 }}
             />
           </Box>
         </Box>
