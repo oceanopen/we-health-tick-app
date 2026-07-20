@@ -1,6 +1,6 @@
 [package]
 name = "we-health-tick"
-version = "0.1.36"
+version = "0.1.37"
 description = "We Health Tick Desktop App"
 authors = ["oceangao"]
 license = ""
