@@ -33,7 +33,7 @@ import urllib.request
 # 行缓冲：每行 print 立即 flush 到 Actions 日志，实时可见（CI 非 TTY 默认块缓冲）
 sys.stdout.reconfigure(line_buffering=True)
 
-API_TIMEOUT = 30              # Gitee API（dedup 查询）超时（秒）
+API_TIMEOUT = 60              # Gitee API（dedup 查询）超时（秒）
 UPLOAD_MAX_TIME = "300"       # curl 总超时（秒）—— 整个上传必须在此时长内完成
 UPLOAD_SPEED_LIMIT = "10240"  # curl：平均速度低于此值（字节/秒，10KB/s）…
 UPLOAD_SPEED_TIME = "30"      # …持续 30s 即中止 → 快速识别 Gitee 彻底卡死

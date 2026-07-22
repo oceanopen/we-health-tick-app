@@ -26,7 +26,7 @@ import urllib.request
 # 行缓冲：每行 print 立即 flush 到 Actions 日志，实时可见
 sys.stdout.reconfigure(line_buffering=True)
 
-API_TIMEOUT = 30  # Gitee API 超时（秒）
+API_TIMEOUT = 60  # Gitee API 超时（秒）
 
 
 def _read_json(resp):
