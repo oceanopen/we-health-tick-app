@@ -13,7 +13,7 @@ push tag v* ──► 触发两个 workflow
         ├─► release-assets.yml  (mac universal + windows)
         │       tauri-action 用 TAURI_SIGNING_PRIVATE_KEY 给产物签名
         │       生成 *.sig + latest.json，全部上传到 GitHub Release
-        │       └─► sync-gitee job（调用 sync-gitee.yml 可复用 workflow，矩阵完成后 best-effort 执行）
+        │       └─► sync-gitee job（调用 release-gitee-sync.yml 可复用 workflow，矩阵完成后 best-effort 执行）
         │             · commit+tag 镜像到 Gitee（hub-mirror-action）
         │             · 构建资产上传到 Gitee Release（attach_files）
         │             · 改写出「下载 URL 指向 Gitee」的 latest-gitee.json
@@ -137,9 +137,9 @@ pnpm tauri signer generate -w ~/.tauri/we-health-tick.key
 - **触发**：push 匹配 `v*` 的 tag。
 - **关键步骤**：`pnpx changelogithub` 根据 conventional commits 自动生成更新日志并创建 Release。
 
-### 3. 可复用 workflow `sync-gitee.yml` — Gitee 镜像同步
+### 3. 可复用 workflow `release-gitee-sync.yml` — Gitee 镜像同步
 
-抽离为独立文件 `.github/workflows/sync-gitee.yml`（`on: workflow_call`），由 `release-assets.yml` 在 `build` 矩阵全部成功后经 `needs: build` + `uses: ./.github/workflows/sync-gitee.yml` + `secrets: inherit` 调用。`github.ref_name` / `github.sha` / 所有 secrets 通过调用上下文自动继承，故被调用 workflow 无需 inputs。best-effort（secrets 缺失自动跳过，绝不阻塞 GitHub 主流程）。7 步：
+抽离为独立文件 `.github/workflows/release-gitee-sync.yml`（`on: workflow_call`），由 `release-assets.yml` 在 `build` 矩阵全部成功后经 `needs: build` + `uses: ./.github/workflows/release-gitee-sync.yml` + `secrets: inherit` 调用。`github.ref_name` / `github.sha` / 所有 secrets 通过调用上下文自动继承，故被调用 workflow 无需 inputs。best-effort（secrets 缺失自动跳过，绝不阻塞 GitHub 主流程）。7 步：
 
 1. **Gate**：检查 `GITEE_TOKEN` / `GITEE_USER` / `GITEE_PRIVATE_KEY` 齐全性。
 2. **镜像 commit+tag**：`Yikun/hub-mirror-action@master`（`force_update` 强推含 tags）。

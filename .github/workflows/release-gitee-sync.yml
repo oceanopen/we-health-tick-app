@@ -1,0 +1,121 @@
+# Gitee 同步（可复用 workflow）：把 GitHub Release 的产物同步到 Gitee 镜像仓库。
+# 由 .github/workflows/release-assets.yml 在 build 矩阵完成后经 needs: build + uses: 调用，
+# 因此本文件 job 不需要自己的 needs / if —— 何时运行由调用方决定。
+# github.ref_name（tag）/ github.sha（commit）/ 所有 secrets 通过调用上下文自动继承（secrets: inherit）。
+#
+# 同步内容：commit+tag 镜像、构建资产上传到 Gitee Release、Gitee 专属 latest.json
+# 复杂逻辑（创建 release / 查询资产 URL / 改写 manifest）抽到 .github/scripts/*.py，本文件只编排。
+# 设计要点：
+#   - secrets 缺失（如 fork 仓库）自动跳过整 job
+#   - 镜像 / 资产上传单点失败 / orphan 分支推送失败均不阻塞其余步骤
+#   - Gitee v5 鉴权坑：access_token 一律放 body / form field，绝不放 header
+#   - manifest 双推 GitHub + Gitee：Gitee 端即时可用（不等下次镜像）；
+#     GitHub 端留存便于审计，且对镜像 ref 处理策略保持稳健
+name: Sync to Gitee
+
+on:
+  workflow_call:
+
+jobs:
+  sync-gitee:
+    name: Sync to Gitee (mirror + release + manifest)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 推送 release-manifest orphan 分支到 GitHub 需要
+    env:
+      # 注意 owner 拼写差异：GitHub=oceanopen（无连字符），Gitee=ocean-open（有连字符）
+      GITEE_OWNER: ocean-open
+      GITEE_REPO: we-health-tick-app
+      GH_REPO: oceanopen/we-health-tick-app
+      TAG: ${{ github.ref_name }}
+    steps:
+      # ---------- 前置：secrets 齐全性门控 ----------
+      - name: Gate on Gitee secrets
+        id: gate
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_USER: ${{ secrets.GITEE_USER }}
+          GITEE_PRIVATE_KEY: ${{ secrets.GITEE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$GITEE_TOKEN" ] || [ -z "$GITEE_USER" ] || [ -z "$GITEE_PRIVATE_KEY" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Gitee secrets missing, skipping sync-gitee job"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ---------- checkout 仓库（取 .github/scripts/*.py 脚本）----------
+      - name: Checkout
+        if: steps.gate.outputs.skip != 'true'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1 # 只需脚本文件，无需完整历史
+
+      # ---------- 步骤 1：commit + tag 镜像（hub-mirror-action，force_update 强推含 tags） ----------
+      - name: Mirror commits and tags to Gitee
+        if: steps.gate.outputs.skip != 'true'
+        continue-on-error: true # tag 可能已存在或 SSH 抽风，不阻塞后续资产上传
+        uses: Yikun/hub-mirror-action@master
+        with:
+          src: 'github/${{ github.repository_owner }}'
+          dst: 'gitee/${{ secrets.GITEE_USER }}'
+          dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
+          dst_token: ${{ secrets.GITEE_TOKEN }}
+          static_list: ${{ github.event.repository.name }}
+          force_update: true
+          src_account_type: org
+          dst_account_type: org
+          clone_style: ssh
+
+      # ---------- 步骤 2：下载 GitHub Release 全部资产 ----------
+      - name: Download GitHub Release assets
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ./assets
+          gh release download "$TAG" --repo "$GH_REPO" --dir ./assets --clobber
+          echo "Downloaded assets:"
+          ls -la ./assets
+
+      # ---------- 步骤 3：创建 / 复用 Gitee Release（脚本：gitee_create_release.py；best-effort） ----------
+      - name: Create or get Gitee Release
+        if: steps.gate.outputs.skip != 'true'
+        id: gitee_release
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          # tag 实际指向的 commit（比硬编码 main 更严谨；Gitee Release 会指向该 commit）
+          GITHUB_SHA: ${{ github.sha }}
+        run: python3 .github/scripts/gitee_create_release.py
+
+      # ---------- 步骤 4：上传资产到 Gitee Release（脚本：gitee_upload_assets.py；幂等+重试） ----------
+      - name: Upload assets to Gitee Release
+        if: steps.gate.outputs.skip != 'true' && steps.gitee_release.outputs.release_id
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          RELEASE_ID: ${{ steps.gitee_release.outputs.release_id }}
+        run: python3 .github/scripts/gitee_upload_assets.py
+
+      # ---------- 步骤 5：查 Gitee Release 拿真实 browser_download_url（脚本：gitee_fetch_urls.py；best-effort） ----------
+      - name: Fetch Gitee Release asset URLs
+        if: steps.gate.outputs.skip != 'true' && steps.gitee_release.outputs.release_id
+        id: fetch_urls
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          RELEASE_ID: ${{ steps.gitee_release.outputs.release_id }}
+        run: python3 .github/scripts/gitee_fetch_urls.py
+
+      # ---------- 步骤 6：改写 latest.json → latest-gitee.json（脚本：gitee_rewrite_manifest.py） ----------
+      - name: Rewrite manifest to latest-gitee.json
+        if: steps.gate.outputs.skip != 'true' && steps.fetch_urls.outputs.ok == 'true'
+        run: python3 .github/scripts/gitee_rewrite_manifest.py
+
+      # ---------- 步骤 7：双推 orphan 分支 release-manifest（脚本：gitee_publish_manifest.sh；两次 push 独立） ----------
+      - name: Publish latest-gitee.json to release-manifest branch
+        if: success() && steps.gate.outputs.skip != 'true' && steps.fetch_urls.outputs.ok == 'true'
+        continue-on-error: true # manifest 托管失败不阻塞（资产已上传，可手动补）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITEE_USER: ${{ secrets.GITEE_USER }}
+        run: bash .github/scripts/gitee_publish_manifest.sh

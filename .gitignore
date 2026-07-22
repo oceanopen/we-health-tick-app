@@ -18,6 +18,10 @@ dist
 dist-ssr
 *.local
 
+# Python（CI 脚本字节码缓存，勿提交）
+__pycache__/
+*.pyc
+
 # Editor directories and files
 # .vscode/*
 !.vscode/extensions.json

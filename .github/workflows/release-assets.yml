@@ -78,7 +78,7 @@ jobs:
 
   # ============================================================
   # Gitee 同步：矩阵构建全部完成后执行（best-effort，绝不阻塞 GitHub 主流程）
-  # 实现已抽离为可复用 workflow（.github/workflows/sync-gitee.yml），此处仅声明依赖与调用。
+  # 实现已抽离为可复用 workflow（.github/workflows/release-gitee-sync.yml），此处仅声明依赖与调用。
   # github.ref_name / github.sha / 所有 secrets 通过调用上下文自动继承（secrets: inherit），
   # 故被调用 workflow 无需 inputs，何时运行由此处的 needs / if 决定。
   # ============================================================
@@ -86,5 +86,5 @@ jobs:
     needs: build
     # 仅当 mac+windows 矩阵全部成功才同步（构建失败则无资产可同步）
     if: ${{ !cancelled() && needs.build.result == 'success' }}
-    uses: ./.github/workflows/sync-gitee.yml
+    uses: ./.github/workflows/release-gitee-sync.yml
     secrets: inherit
