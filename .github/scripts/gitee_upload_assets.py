@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""上传构建资产到 Gitee Release（幂等 + per-file 重试）。
+"""上传构建资产到 Gitee Release（幂等，单次尝试，失败即红）。
 
 由 .github/workflows/release-gitee-sync.yml 在 gitee_create_release.py 之后调用。
 遍历 ./assets/*（跳过 GitHub 版 latest.json 与已存在同名附件），逐个 multipart 上传到
 Gitee Release 的 attach_files。
 
-失败语义：任一文件重试耗尽仍失败 → exit 非 0 → 步骤红（release 缺资产会让 manifest 改写失败，必须暴露）。
-唯一非致命点：「拉已有附件去重」的 fetch 失败 → 仅 warning 降级（非核心优化，失败只是不去重）。
+失败语义：任一文件失败（含超时）→ exit 非 0 → 步骤红。不重试（快速暴露问题）。
+唯一非致命点：「拉已有附件去重」的 fetch 失败 → 仅 warning 降级（非核心优化）。
+实时日志：stdout 行缓冲，每步 print 立即刷到 Actions 日志。
 
 输入（环境变量）：
   GITEE_OWNER   Gitee 组织/用户名（job 级）
@@ -22,14 +23,17 @@ Gitee Release 的 attach_files。
 import glob
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
 import uuid
 
-RETRIES = 3
-RETRY_DELAY = 5  # 秒
-UPLOAD_TIMEOUT = 300  # 单次上传超时（大文件 dmg ~50MB）
+# 行缓冲：每行 print 立即 flush 到 Actions 日志，实时可见（CI 非 TTY 默认块缓冲）
+sys.stdout.reconfigure(line_buffering=True)
+
+UPLOAD_TIMEOUT = 60  # 单次上传 socket 超时（秒）；超时即失败，不重试
+API_TIMEOUT = 30     # Gitee API（dedup 查询）超时
 
 
 def _read_json(resp):
@@ -71,38 +75,28 @@ def _build_multipart(fields, file_path, file_name):
     return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
 
-def upload_one(upload_url, token, name, path):
-    """上传单个文件，带重试。返回 True 成功 / False 最终失败。"""
+def upload_one(upload_url, token, name, path, idx, total):
+    """上传单个文件（单次尝试，不重试）。返回 True 成功 / False 失败。"""
+    size = os.path.getsize(path)
+    print(f"  [{idx}/{total}] {name} ({size / 1_000_000:.1f} MB) uploading…")
+    t0 = time.time()
     # access_token 放 form field（Gitee v5 鉴权坑）
-    body, content_type = _build_multipart(
-        [("access_token", token), ("name", name)], path, name
+    body, content_type = _build_multipart([("access_token", token), ("name", name)], path, name)
+    req = urllib.request.Request(
+        upload_url, data=body, method="POST", headers={"Content-Type": content_type}
     )
-    for attempt in range(1, RETRIES + 1):
-        try:
-            req = urllib.request.Request(
-                upload_url, data=body, method="POST", headers={"Content-Type": content_type}
-            )
-            with urllib.request.urlopen(req, timeout=UPLOAD_TIMEOUT) as resp:
-                resp.read()
-                print(f"  HTTP {resp.status} Uploaded {name}")
-                return True
-        except urllib.error.HTTPError as e:
-            # 4xx 客户端错误不重试；5xx 服务端错误重试
-            if e.code >= 500 and attempt < RETRIES:
-                print(f"    {name}: HTTP {e.code}, retry {attempt}/{RETRIES}...")
-                time.sleep(RETRY_DELAY)
-                continue
-            print(f"::error::Failed to upload {name}: HTTP {e.code}")
-            return False
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
-            # 网络层错误（DNS / 超时 / 连接拒绝）重试
-            if attempt < RETRIES:
-                print(f"    {name}: network error, retry {attempt}/{RETRIES}...")
-                time.sleep(RETRY_DELAY)
-                continue
-            print(f"::error::Failed to upload {name}: {e}")
-            return False
-    return False
+    try:
+        with urllib.request.urlopen(req, timeout=UPLOAD_TIMEOUT) as resp:
+            resp.read()
+            print(f"  [{idx}/{total}] {name} uploaded in {time.time() - t0:.1f}s (HTTP {resp.status})")
+            return True
+    except urllib.error.HTTPError as e:
+        print(f"::error::[{idx}/{total}] {name} failed after {time.time() - t0:.1f}s: HTTP {e.code}")
+        return False
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        # 含 socket.timeout（达到 UPLOAD_TIMEOUT，Gitee 不响应）
+        print(f"::error::[{idx}/{total}] {name} failed after {time.time() - t0:.1f}s: {type(e).__name__}: {e}")
+        return False
 
 
 def main() -> None:
@@ -112,38 +106,43 @@ def main() -> None:
     release_id = os.environ["RELEASE_ID"]
     base = f"https://gitee.com/api/v5/repos/{owner}/{repo}"
     upload_url = f"{base}/releases/{release_id}/attach_files"
+    print(f"Upload assets to Gitee Release {release_id} (timeout={UPLOAD_TIMEOUT}s, no retry)")
 
     # 幂等：拉已有附件名集合，re-run 时跳过已存在同名文件。
     # 此 fetch 为非核心优化 —— 失败仅降级为不去重，不废整个上传。
     existing = set()
+    print("Fetching existing assets for dedup…")
     try:
         with urllib.request.urlopen(
-            f"{base}/releases/{release_id}?access_token={token}"
+            f"{base}/releases/{release_id}?access_token={token}", timeout=API_TIMEOUT
         ) as r:
             rel = _read_json(r)
         if not isinstance(rel, dict):
             raise RuntimeError(f"non-object response: {rel!r:.100}")
         assets = rel.get("assets") or rel.get("attach_files") or []
         existing = {a.get("name", "") for a in assets if isinstance(a, dict)}
+        print(f"  {len(existing)} existing asset(s); already-attached will be skipped")
     except Exception as e:
-        print(f"::warning::Failed to fetch existing assets (dedup disabled): {type(e).__name__}: {e}")
+        print(f"::warning::dedup fetch failed ({type(e).__name__}: {e}), dedup disabled")
+
+    paths = [p for p in sorted(glob.glob("./assets/*")) if os.path.basename(p) != "latest.json"]
+    total = len(paths)
+    total_size = sum(os.path.getsize(p) for p in paths)
+    print(f"{total} asset(s) to upload, ~{total_size / 1_000_000:.1f} MB total")
 
     failed = []
-    for path in sorted(glob.glob("./assets/*")):
+    for i, path in enumerate(paths, 1):
         name = os.path.basename(path)
-        # 跳过 GitHub 版 latest.json —— Gitee 专属 manifest 由 gitee_rewrite_manifest.py 单独生成
-        if name == "latest.json":
-            continue
         if name in existing:
-            print(f"  Skip {name} (already attached)")
+            print(f"  [{i}/{total}] {name} skipped (already attached)")
             continue
-        if not upload_one(upload_url, token, name, path):
+        if not upload_one(upload_url, token, name, path, i, total):
             failed.append(name)
 
-    # 任一文件重试耗尽仍失败 → 视为步骤失败（release 缺资产会让 manifest 改写失败）
     if failed:
-        print(f"::error::{len(failed)} asset(s) failed to upload after retries: {failed}", flush=True)
+        print(f"::error::{len(failed)}/{total} asset(s) failed: {failed}")
         raise SystemExit(1)
+    print(f"All {total} asset(s) uploaded")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,8 @@
 """查询 Gitee Release 的附件，构建 {文件名: browser_download_url} 映射。
 
 由 .github/workflows/release-gitee-sync.yml 在上传资产之后调用，供 gitee_rewrite_manifest.py 改写 manifest。
-失败语义：真异常直接抛出 → exit 非 0 → 步骤红；成功才写 ok=true。
+失败语义：真异常（含超时）直接抛出 → exit 非 0 → 步骤红；成功才写 ok=true。
+实时日志：stdout 行缓冲，每步 print 立即刷到 Actions 日志。
 
 输入（环境变量）：
   GITEE_OWNER   Gitee 组织/用户名
@@ -17,7 +18,13 @@
 """
 import json
 import os
+import sys
 import urllib.request
+
+# 行缓冲：每行 print 立即 flush 到 Actions 日志，实时可见
+sys.stdout.reconfigure(line_buffering=True)
+
+API_TIMEOUT = 30  # Gitee API 超时（秒）
 
 
 def _read_json(resp):
@@ -34,11 +41,13 @@ def _read_json(resp):
 def main() -> None:
     owner = os.environ["GITEE_OWNER"]
     repo = os.environ["GITEE_REPO"]
+    release_id = os.environ["RELEASE_ID"]
     url = (
         f"https://gitee.com/api/v5/repos/{owner}/{repo}/releases/"
-        f"{os.environ['RELEASE_ID']}?access_token={os.environ['GITEE_TOKEN']}"
+        f"{release_id}?access_token={os.environ['GITEE_TOKEN']}"
     )
-    with urllib.request.urlopen(url) as r:
+    print(f"Fetch Gitee Release {release_id} asset URLs…")
+    with urllib.request.urlopen(url, timeout=API_TIMEOUT) as r:
         rel = _read_json(r)
     # Gitee 偶发返回 null/非对象（如 release 刚建好尚未就绪）→ 明确报错（真异常，让步骤红）
     if not isinstance(rel, dict):
@@ -50,6 +59,7 @@ def main() -> None:
         for a in assets
         if isinstance(a, dict) and a.get("name") and a.get("browser_download_url")
     }
+    print(f"  {len(mapping)} asset(s) with download URL")
     with open("/tmp/gitee_url_map.json", "w") as f:
         json.dump(mapping, f, indent=2)
     with open(os.environ["GITHUB_OUTPUT"], "a") as f:
