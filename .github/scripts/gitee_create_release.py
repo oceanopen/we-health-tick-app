@@ -2,8 +2,8 @@
 """创建或复用 Gitee Release（幂等），输出 release_id 供下游步骤守卫使用。
 
 由 .github/workflows/release-gitee-sync.yml 在镜像 tag 到 Gitee 之后调用。
-best-effort：tag 可能尚未镜像 / 网络抽风 / token 问题 → 仅 ::warning:: 不写 release_id，
-下游步骤凭 release_id 守卫自动跳过，绝不硬失败阻塞 job。
+失败语义：真异常（网络/鉴权/Gitee 错误/bug）直接抛出 → exit 非 0 → 步骤红，绝不静默吞掉。
+仅「良性幂等条件」优雅处理：tag 已镜像但无 release（Gitee 返回 200+null 或 404）→ 进入创建。
 
 输入（环境变量）：
   GITEE_OWNER   Gitee 组织/用户名（ocean-open）
@@ -22,6 +22,17 @@ import urllib.error
 import urllib.request
 
 
+def _read_json(resp):
+    """读取响应体并解析 JSON。空 body / 非 JSON（如 Gitee 偶发的 HTML 错误页）→ 返回 None。"""
+    raw = resp.read().decode("utf-8", errors="replace")
+    if not raw.strip():
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+
+
 def main() -> None:
     owner = os.environ["GITEE_OWNER"]
     repo = os.environ["GITEE_REPO"]
@@ -31,14 +42,22 @@ def main() -> None:
     base = f"https://gitee.com/api/v5/repos/{owner}/{repo}"
 
     # 幂等：先查 tag 是否已有 release
-    rid = ""
+    # 注意 Gitee 怪癖：tag 已镜像但尚无 Release 时，GET /releases/tags/{tag} 返回 200 + null（非 404）。
+    # 故不能盲下标 ["id"] —— 只有「是 dict 且含 id」才算已有 release，否则进入创建分支。
     try:
         with urllib.request.urlopen(f"{base}/releases/tags/{tag}?access_token={token}") as r:
-            rid = str(json.load(r)["id"])
-            print(f"Existing Gitee release found: id={rid}")
+            data = _read_json(r)
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
+        data = None
+
+    rid = ""
+    if isinstance(data, dict) and data.get("id") is not None:
+        rid = str(data["id"])
+        print(f"Existing Gitee release found: id={rid}")
+    else:
+        print(f"No existing release for {tag} (query returned: {data!r:.100})")
 
     if not rid:
         # Gitee v5 鉴权坑：access_token 放 body，放 header 会返回 HTML 错误页
@@ -54,7 +73,11 @@ def main() -> None:
             data=body,
             headers={"Content-Type": "application/json"},
         )
-        rid = str(json.load(urllib.request.urlopen(req))["id"])
+        with urllib.request.urlopen(req) as r:
+            data = _read_json(r)
+        if not isinstance(data, dict) or data.get("id") is None:
+            raise RuntimeError(f"Gitee create-release returned unexpected response: {data!r:.200}")
+        rid = str(data["id"])
         print(f"Created Gitee release: id={rid}")
 
     with open(os.environ["GITHUB_OUTPUT"], "a") as f:
@@ -62,9 +85,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # best-effort：任何异常都优雅跳过，不阻塞 job
-    try:
-        main()
-    except Exception as e:
-        # 含 HTTPError / URLError（DNS / 超时 / 连接拒绝）/ JSON 解析等
-        print(f"::warning::Gitee release creation skipped (downstream steps will skip): {e}")
+    # 真异常直接抛出 → Python 打印 traceback + exit 非 0 → 步骤红，绝不静默吞掉
+    main()

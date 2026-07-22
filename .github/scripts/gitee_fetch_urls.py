@@ -2,7 +2,7 @@
 """查询 Gitee Release 的附件，构建 {文件名: browser_download_url} 映射。
 
 由 .github/workflows/release-gitee-sync.yml 在上传资产之后调用，供 gitee_rewrite_manifest.py 改写 manifest。
-best-effort：查询失败 → 仅 ::warning:: 写 ok=false，下游 rewrite/publish 步骤凭 ok 守卫跳过。
+失败语义：真异常直接抛出 → exit 非 0 → 步骤红；成功才写 ok=true。
 
 输入（环境变量）：
   GITEE_OWNER   Gitee 组织/用户名
@@ -13,11 +13,22 @@ best-effort：查询失败 → 仅 ::warning:: 写 ok=false，下游 rewrite/pub
 
 输出：
   /tmp/gitee_url_map.json   {filename: browser_download_url}
-  GITHUB_OUTPUT 追加 `ok=true`（成功）或 `ok=false`（失败）
+  GITHUB_OUTPUT 追加 `ok=true`（仅成功时；失败则不写，脚本已 exit 非 0）
 """
 import json
 import os
 import urllib.request
+
+
+def _read_json(resp):
+    """读取响应体并解析 JSON。空 body / 非 JSON（如 Gitee 偶发的 HTML 错误页）→ 返回 None。"""
+    raw = resp.read().decode("utf-8", errors="replace")
+    if not raw.strip():
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
 
 
 def main() -> None:
@@ -27,10 +38,18 @@ def main() -> None:
         f"https://gitee.com/api/v5/repos/{owner}/{repo}/releases/"
         f"{os.environ['RELEASE_ID']}?access_token={os.environ['GITEE_TOKEN']}"
     )
-    rel = json.load(urllib.request.urlopen(url))
+    with urllib.request.urlopen(url) as r:
+        rel = _read_json(r)
+    # Gitee 偶发返回 null/非对象（如 release 刚建好尚未就绪）→ 明确报错（真异常，让步骤红）
+    if not isinstance(rel, dict):
+        raise RuntimeError(f"Gitee release query returned non-object response: {rel!r:.200}")
     # Gitee API 字段名可能是 assets 或 attach_files，两者都兜底
     assets = rel.get("assets") or rel.get("attach_files") or []
-    mapping = {a["name"]: a["browser_download_url"] for a in assets}
+    mapping = {
+        a["name"]: a["browser_download_url"]
+        for a in assets
+        if isinstance(a, dict) and a.get("name") and a.get("browser_download_url")
+    }
     with open("/tmp/gitee_url_map.json", "w") as f:
         json.dump(mapping, f, indent=2)
     with open(os.environ["GITHUB_OUTPUT"], "a") as f:
@@ -40,10 +59,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        # 含 HTTPError / URLError（DNS / 超时 / 连接拒绝）—— 优雅跳过
-        print(f"::warning::Failed to fetch Gitee asset URLs (manifest rewrite will skip): {e}")
-        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-            f.write("ok=false\n")
+    # 真异常直接抛出 → exit 非 0 → 步骤红，绝不静默吞掉
+    main()
