@@ -4927,7 +4927,7 @@ dependencies = [
 
 [[package]]
 name = "we-health-tick"
-version = "0.1.38-beta.6"
+version = "0.1.38-beta.7"
 dependencies = [
  "chrono",
  "log",
