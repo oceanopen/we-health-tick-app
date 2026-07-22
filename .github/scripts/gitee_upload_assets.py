@@ -34,7 +34,7 @@ import urllib.request
 sys.stdout.reconfigure(line_buffering=True)
 
 API_TIMEOUT = 60              # Gitee API（dedup 查询）超时（秒）
-UPLOAD_MAX_TIME = "600"       # curl 总超时（秒）—— 整个上传必须在此时长内完成
+UPLOAD_MAX_TIME = "1200"       # curl 总超时（秒）—— 整个上传必须在此时长内完成
 UPLOAD_SPEED_LIMIT = "10240"  # curl：平均速度低于此值（字节/秒，10KB/s）…
 UPLOAD_SPEED_TIME = "30"      # …持续 30s 即中止 → 快速识别 Gitee 彻底卡死
 
