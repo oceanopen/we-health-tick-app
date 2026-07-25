@@ -1,5 +1,11 @@
 use tauri::{AppHandle, Monitor, Position, Rect};
 
+/// 默认/回退窗口尺寸（逻辑像素）。
+pub const DEFAULT_SIZE: (f64, f64) = (800.0, 600.0);
+
+/// settings 窗口占目标屏的比例。
+pub const SETTINGS_RATIO: f64 = 0.6;
+
 /// 显示器逻辑化几何：把 Tauri 物理像素几何 + work_area 除以 scale_factor 转成逻辑像素，
 /// 供窗口定位算法统一消费，避免各调用方重复 `/ sf`。
 ///
@@ -69,6 +75,14 @@ pub fn find_monitor_for_rect(app: &AppHandle, rect: &Rect) -> Option<MonitorInfo
     None
 }
 
+/// 通过 tray_id 取托盘图标几何，再用其物理坐标定位所在屏。
+/// 找不到（tray 不存在 / rect 缺失 / 不在任何屏内）返回 None，调用方用 DEFAULT_SIZE 兜底。
+pub fn find_monitor_for_tray(app: &AppHandle, tray_id: &str) -> Option<MonitorInfo> {
+    let tray = app.tray_by_id(tray_id)?;
+    let rect = tray.rect().ok()??;
+    find_monitor_for_rect(app, &rect)
+}
+
 /// 检测图标（通常是托盘图标）落在显示器的哪条边——即任务栏朝向。
 /// 原理：算图标中心到显示器四边的距离，取最小者。纯几何，不读任何窗口状态。
 pub fn detect_taskbar_edge(
@@ -104,4 +118,9 @@ pub fn work_area_center(monitor: &MonitorInfo, width: f64, height: f64) -> (f64,
     let x = monitor.wa_x + ((monitor.wa_width - width) / 2.0).max(0.0);
     let y = monitor.wa_y + ((monitor.wa_height - height) / 2.0).max(0.0);
     (x, y)
+}
+
+/// 按目标屏逻辑尺寸和给定比例算窗口尺寸（逻辑像素）。
+pub fn ratio_size(monitor: &MonitorInfo, ratio: f64) -> (f64, f64) {
+    (monitor.width * ratio, monitor.height * ratio)
 }

@@ -168,10 +168,6 @@ function RemindersPage() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Box sx={{ p: 3, flex: 1, overflow: 'auto' }}>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          {t('reminders:page.title')}
-        </Typography>
-
         <Tabs
           value={activeTab}
           onChange={(_, value: ReminderTab) => {
