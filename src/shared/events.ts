@@ -5,4 +5,4 @@ export const EVENT_TIMER_TICK = 'timer-tick';
 
 export const EVENT_PHASE_CHANGED = 'phase-changed';
 
-export const EVENT_CONFIG_CHANGED = 'config-changed';
+export const EVENT_APP_CONFIG_CHANGED = 'app-config-changed';

@@ -1,4 +1,4 @@
-import type { QuietHourPeriod, QuietHours } from '@src/shared/config';
+import type { QuietHourPeriod, QuietHours } from '@src/shared/appConfig';
 import PauseCircleFilledIcon from '@mui/icons-material/PauseCircleFilled';
 import { Box, Button, Typography, useTheme } from '@mui/material';
 import { useTranslation } from 'react-i18next';

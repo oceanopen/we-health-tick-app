@@ -12,12 +12,12 @@ import {
   Typography,
 } from '@mui/material';
 import {
-  decodeRemindersConfig,
-  encodeRemindersConfig,
-  getConfig,
+  decodeAppRemindersConfig,
+  encodeAppRemindersConfig,
+  getAppConfig,
   REMINDERS_KEY,
-  setConfig,
-} from '@src/shared/config';
+  setAppConfig,
+} from '@src/shared/appConfig';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -97,8 +97,8 @@ function RemindersPage() {
   const [draft, setDraft] = useState<ReminderList>(saved);
 
   useEffect(() => {
-    getConfig(REMINDERS_KEY).then((raw) => {
-      const decoded = decodeRemindersConfig(raw);
+    getAppConfig(REMINDERS_KEY).then((raw) => {
+      const decoded = decodeAppRemindersConfig(raw);
       const health = decoded.health.length > 0
         ? buildItems(decoded.health)
         : buildItems(DEFAULT_HEALTH_TEXTS);
@@ -159,7 +159,7 @@ function RemindersPage() {
       health: (activeTab === 'health' ? draft.health : saved.health).map(({ text }) => text),
       whisper: (activeTab === 'whisper' ? draft.whisper : saved.whisper).map(({ text }) => text),
     };
-    await setConfig(REMINDERS_KEY, encodeRemindersConfig(merged));
+    await setAppConfig(REMINDERS_KEY, encodeAppRemindersConfig(merged));
     setSaved(prev => ({ ...prev, [activeTab]: draft[activeTab] }));
   };
 

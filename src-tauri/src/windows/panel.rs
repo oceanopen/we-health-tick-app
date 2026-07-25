@@ -7,7 +7,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
-use crate::shared::config::{read_config_raw, ConfigState, LANGUAGE_KEY};
+use crate::shared::app_config::{read_app_config_raw, AppConfigState, LANGUAGE_KEY};
 use crate::shared::i18n::{menu_text, resolve, ResolvedLanguage};
 use crate::shared::screen::{
     detect_taskbar_edge, find_monitor_for_rect, MonitorInfo, TaskbarEdge,
@@ -24,18 +24,18 @@ struct TrayMenuItems {
     exit: MenuItem<tauri::Wry>,
 }
 
-// 读取当前语言偏好（config 的 language key）并解析为具体语言。
+// 读取当前语言偏好（app_config 的 language key）并解析为具体语言。
 // 三态：zh-CN/en 直接映射，缺失或 "system" 走系统 locale 探测（默认英文）。
 fn current_language(app: &AppHandle) -> ResolvedLanguage {
-    let Some(state) = app.try_state::<ConfigState>() else {
+    let Some(state) = app.try_state::<AppConfigState>() else {
         return resolve(None);
     };
-    let raw = read_config_raw(state.inner(), LANGUAGE_KEY).unwrap_or(None);
+    let raw = read_app_config_raw(state.inner(), LANGUAGE_KEY).unwrap_or(None);
     resolve(raw.as_deref())
 }
 
 // 语言切换时原地刷新托盘菜单文案，无需重建菜单或重启应用。
-// 由 setup 末尾的 config-changed 监听器在 LANGUAGE_KEY 变化时调用。
+// 由 setup 末尾的 app-config-changed 监听器在 LANGUAGE_KEY 变化时调用。
 pub fn refresh_menu_texts(app: &AppHandle) {
     let Some(state) = app.try_state::<Mutex<TrayMenuItems>>() else {
         return;
@@ -95,7 +95,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     )))
     .expect("failed to load tray icon");
 
-    // 右键菜单：系统设置 / 重启 / 退出。文案随当前语言偏好（config language，三态）。
+    // 右键菜单：系统设置 / 重启 / 退出。文案随当前语言偏好（app_config language，三态）。
     let lang = current_language(app.handle());
     let settings_item =
         MenuItem::with_id(app, "settings", menu_text(lang, "settings"), true, None::<&str>)?;
@@ -198,9 +198,9 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // 监听 config-changed：语言偏好变化时刷新托盘菜单文案（运行时切换，无需重启）。
+    // 监听 app-config-changed：语言偏好变化时刷新托盘菜单文案（运行时切换，无需重启）。
     let lang_handle = app.handle().clone();
-    app.listen(crate::shared::events::EVENT_CONFIG_CHANGED, move |event| {
+    app.listen(crate::shared::events::EVENT_APP_CONFIG_CHANGED, move |event| {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) else {
             return;
         };

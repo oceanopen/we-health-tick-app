@@ -1,4 +1,4 @@
-import type { Appearance, Language, LongBreakInterval, RestWindow } from './config';
+import type { Appearance, Language, LongBreakInterval, RestWindow } from './appConfig';
 
 export interface LanguageOption {
   value: Language;

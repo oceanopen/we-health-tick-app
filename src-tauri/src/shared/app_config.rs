@@ -2,13 +2,13 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::shared::types::ConfigChangedPayload;
+use crate::shared::types::AppConfigChangedPayload;
 
-/// 语言偏好 key（前端镜像 src/shared/config.ts 的 LANGUAGE_KEY，修改任一处需同步）。
+/// 语言偏好 key（前端镜像 src/shared/appConfig.ts 的 LANGUAGE_KEY，修改任一处需同步）。
 /// 后端仅托盘菜单消费（current_language 读取），其余业务不读。
 pub const LANGUAGE_KEY: &str = "language";
 
-pub struct ConfigState(pub Mutex<Connection>);
+pub struct AppConfigState(pub Mutex<Connection>);
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
@@ -18,59 +18,59 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let db_path = data_dir.join("app.db");
     let conn = Connection::open(db_path)?;
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
         [],
     )?;
-    app.manage(ConfigState(Mutex::new(conn)));
+    app.manage(AppConfigState(Mutex::new(conn)));
     Ok(())
 }
 
-pub fn read_config_conn(conn: &Connection, key: &str) -> Result<Option<String>, String> {
+pub fn read_app_config_conn(conn: &Connection, key: &str) -> Result<Option<String>, String> {
     let mut stmt = conn
-        .prepare("SELECT value FROM config WHERE key = ?1")
+        .prepare("SELECT value FROM app_config WHERE key = ?1")
         .map_err(|e| e.to_string())?;
     stmt.query_row(params![key], |row| row.get::<_, String>(0))
         .optional()
         .map_err(|e| e.to_string())
 }
 
-pub fn read_config_raw(state: &ConfigState, key: &str) -> Result<Option<String>, String> {
+pub fn read_app_config_raw(state: &AppConfigState, key: &str) -> Result<Option<String>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    read_config_conn(&conn, key)
+    read_app_config_conn(&conn, key)
 }
 
-pub fn write_config_conn(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
+pub fn write_app_config_conn(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
     conn.execute(
-        "INSERT OR REPLACE INTO config (key, value) VALUES (?1, ?2)",
+        "INSERT OR REPLACE INTO app_config (key, value) VALUES (?1, ?2)",
         params![key, value],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-pub fn write_config_raw(state: &ConfigState, key: &str, value: &str) -> Result<(), String> {
+pub fn write_app_config_raw(state: &AppConfigState, key: &str, value: &str) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    write_config_conn(&conn, key, value)
+    write_app_config_conn(&conn, key, value)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn get_config(state: State<'_, ConfigState>, key: String) -> Result<Option<String>, String> {
-    read_config_raw(&state, &key)
+pub fn get_app_config(state: State<'_, AppConfigState>, key: String) -> Result<Option<String>, String> {
+    read_app_config_raw(&state, &key)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_config(
+pub fn set_app_config(
     app: AppHandle,
-    state: State<'_, ConfigState>,
+    state: State<'_, AppConfigState>,
     key: String,
     value: String,
 ) -> Result<(), String> {
-    write_config_raw(&state, &key, &value)?;
+    write_app_config_raw(&state, &key, &value)?;
     app.emit(
-        crate::shared::events::EVENT_CONFIG_CHANGED,
-        ConfigChangedPayload { key, value },
+        crate::shared::events::EVENT_APP_CONFIG_CHANGED,
+        AppConfigChangedPayload { key, value },
     )
         .map_err(|e| e.to_string())?;
     Ok(())

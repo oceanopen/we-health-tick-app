@@ -10,8 +10,8 @@ export const commands = {
 	exitApp: () => __TAURI_INVOKE<void>("exit_app"),
 	showSettingsWindow: () => typedError<null, string>(__TAURI_INVOKE("show_settings_window")),
 	fitPanel: (height: number | null) => typedError<null, string>(__TAURI_INVOKE("fit_panel", { height })),
-	getConfig: (key: string) => typedError<string | null, string>(__TAURI_INVOKE("get_config", { key })),
-	setConfig: (key: string, value: string) => typedError<null, string>(__TAURI_INVOKE("set_config", { key, value })),
+	getAppConfig: (key: string) => typedError<string | null, string>(__TAURI_INVOKE("get_app_config", { key })),
+	setAppConfig: (key: string, value: string) => typedError<null, string>(__TAURI_INVOKE("set_app_config", { key, value })),
 	getTimerState: () => typedError<TimerStatePayload, string>(__TAURI_INVOKE("get_timer_state")),
 	startWork: () => typedError<null, string>(__TAURI_INVOKE("start_work")),
 	confirmBreak: () => typedError<null, string>(__TAURI_INVOKE("confirm_break")),
@@ -24,11 +24,11 @@ export const commands = {
 
 /* Types */
 /**
- *  set_config 命令成功后通过 `config-changed` 事件广播给所有窗口的载荷。
+ *  set_app_config 命令成功后通过 `app-config-changed` 事件广播给所有窗口的载荷。
  *  订阅方（AppThemeProvider / AppI18nProvider）据此响应配置变化。
  */
-export type ConfigChangedPayload = {
-	/**  变更的配置 key（与 src/shared/config.ts 中的 *_KEY 常量对齐）。 */
+export type AppConfigChangedPayload = {
+	/**  变更的配置 key（与 src/shared/appConfig.ts 中的 *_KEY 常量对齐）。 */
 	key: string,
 	/**  新值（配置统一以字符串形式存储，订阅方按 key 自行 decode）。 */
 	value: string,
@@ -78,7 +78,7 @@ export type TimerStatePayload = {
 	breakSkipCount: number,
 	/**
 	 *  今日累计「真正跳过休息」的次数（break_skip_count 达到 break_skip_max 才计一次）。
-	 *  持久化到 config 表 today_skip_count（{date,count} JSON），跨天自动归零。
+	 *  持久化到 app_config 表 today_skip_count（{date,count} JSON），跨天自动归零。
 	 *  与 break_skip_count（单次休息防误触、进休息清零、不持久化）严格区分。
 	 *  AlertingView 据此 + skip_count_reminder 阈值决定是否显示「今日多次跳过休息」警示横幅。
 	 */
@@ -102,7 +102,7 @@ export type TimerStatePayload = {
  *  Y/N 布尔约定的 SSOT。
  * 
  *  serde rename 决定 DB 存储格式（"Y"/"N"）+ 前端 bindings.ts 字面量联合类型。
- *  前端 src/shared/config.ts 的 YES_NO 运行时对象受此类型约束
+ *  前端 src/shared/appConfig.ts 的 YES_NO 运行时对象受此类型约束
  */
 export type YesNo = "Y" | "N";
 

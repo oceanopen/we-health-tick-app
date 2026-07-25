@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
-use crate::shared::config::{read_config_conn, write_config_conn, ConfigState};
+use crate::shared::app_config::{read_app_config_conn, write_app_config_conn, AppConfigState};
 use crate::shared::time::{now_epoch, now_hhmm, today_string};
 use crate::shared::types::{Phase, TimerStatePayload, YesNo};
 
@@ -45,7 +45,7 @@ struct TimerInner {
     /// 每次 start_break 进入 breaking 时清零。前端按钮显示「跳过 (n/max)」。
     break_skip_count: u32,
     /// 今日累计「真正跳过休息」次数（break_skip_count 达到 break_skip_max 才计一次）。
-    /// 持久化到 config 表 today_skip_count（{date,count} JSON），跨天自动归零；
+    /// 持久化到 app_config 表 today_skip_count（{date,count} JSON），跨天自动归零；
     /// init / 跨天时由 fresh_working 从 DB 读取（date 校验自带归零），skip_break 真正跳过时 +1 并回写。
     /// 与 break_skip_count（防误触、不持久化）严格区分。payload 暴露给 AlertingView 显隐警示横幅。
     today_skip_count: u32,
@@ -74,8 +74,8 @@ struct TimerInner {
 // Tauri 全局状态容器：在 init 中通过 app.manage(TimerState) 注册，
 // 之后 command 函数（如 get_timer_state）通过 State<'_, TimerState> 注入访问。
 // 内部用 Arc<Mutex<TimerInner>> 而非直接 Mutex：因为 1Hz 定时器循环（spawn 的 async 任务）
-// 和 config-changed handler（listen 闭包）都需要 owned 句柄跨上下文共享同一份状态。
-// 与 ConfigState 的 newtype 风格保持一致。
+// 和 app-config-changed handler（listen 闭包）都需要 owned 句柄跨上下文共享同一份状态。
+// 与 AppConfigState 的 newtype 风格保持一致。
 pub struct TimerState {
     inner: Arc<Mutex<TimerInner>>,
 }
@@ -84,9 +84,9 @@ pub struct TimerState {
 // 业务配置 key + 默认值
 // ============================================================
 //
-// ⚠️ SSOT (Single Source of Truth)：src/shared/config.ts
+// ⚠️ SSOT (Single Source of Truth)：src/shared/appConfig.ts
 //
-// 下方 key 与默认值与前端 config.ts 一一对应（前端是可信源）。
+// 下方 key 与默认值与前端 appConfig.ts 一一对应（前端是可信源）。
 // 修改任一项时，必须同步另一侧；否则会出现「DB 无值时前后端兜底不一致」的 bug
 // （例：后端读 work_duration 默认 30，前端 UI 显示 25，用户首次进设置页看到错值）。
 //
@@ -142,14 +142,14 @@ const KEY_BREAK_SKIP_MAX: &str = "break_skip_max";
 // 休息跳过防误触门槛（连点 N 次才真正跳过）。与前端 DEFAULT_BREAK_SKIP_MAX 对齐。
 // read_break_skip_max 会 clamp 到 [MIN, MAX]，防止 DB 被外部写入异常值。
 const DEFAULT_BREAK_SKIP_MAX: u32 = 1;
-// 跳过次数的合法范围（闭区间）。前后端均引用，改范围时同步 src/shared/config.ts。
+// 跳过次数的合法范围（闭区间）。前后端均引用，改范围时同步 src/shared/appConfig.ts。
 const MIN_BREAK_SKIP_MAX: u32 = 1;
 const MAX_BREAK_SKIP_MAX: u32 = 3;
 
 const KEY_REMINDERS: &str = "reminders";
 
 // quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 与前端
-// src/shared/config.ts 的 QuietHourPeriod 一致；支持跨午夜（start > end）。
+// src/shared/appConfig.ts 的 QuietHourPeriod 一致；支持跨午夜（start > end）。
 const KEY_QUIET_HOURS: &str = "quiet_hours";
 // 默认静音时段（与前端 DEFAULT_QUIET_HOURS 一一对应）。
 // DB 无值 / 解析失败时回退此项，避免「前端显示 2 项但后端不静音」的兜底不一致。
@@ -167,10 +167,10 @@ fn lock_inner(inner: &Mutex<TimerInner>) -> MutexGuard<'_, TimerInner> {
 // ============================================================
 
 // 从 DB 读 work_duration 配置（单位：分钟）。
-// 容错：DB 无值 / 非数字 / 解析失败 → 回退默认 30 分钟（与 src/shared/config.ts 对齐）。
-// 场景：fresh_working 初始化工作时长 + on_config_changed 响应配置变化时重新读取。
+// 容错：DB 无值 / 非数字 / 解析失败 → 回退默认 30 分钟（与 src/shared/appConfig.ts 对齐）。
+// 场景：fresh_working 初始化工作时长 + on_app_config_changed 响应配置变化时重新读取。
 fn read_work_duration_minutes(conn: &Connection) -> u32 {
-    read_config_conn(conn, KEY_WORK_DURATION)
+    read_app_config_conn(conn, KEY_WORK_DURATION)
         .ok()
         .flatten()
         .and_then(|s| s.parse::<u32>().ok())
@@ -179,7 +179,7 @@ fn read_work_duration_minutes(conn: &Connection) -> u32 {
 
 // 读 break_duration（分钟），同样容错回退。
 fn read_break_duration_minutes(conn: &Connection) -> u32 {
-    read_config_conn(conn, KEY_BREAK_DURATION)
+    read_app_config_conn(conn, KEY_BREAK_DURATION)
         .ok()
         .flatten()
         .and_then(|s| s.parse::<u32>().ok())
@@ -188,7 +188,7 @@ fn read_break_duration_minutes(conn: &Connection) -> u32 {
 
 // 读 long_break_enabled（YesNo），容错回退默认。
 fn read_long_break_enabled(conn: &Connection) -> bool {
-    read_config_conn(conn, KEY_LONG_BREAK_ENABLED)
+    read_app_config_conn(conn, KEY_LONG_BREAK_ENABLED)
         .ok()
         .flatten()
         .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(false))
@@ -197,7 +197,7 @@ fn read_long_break_enabled(conn: &Connection) -> bool {
 
 // 读 long_break_interval（轮），容错回退 2。
 fn read_long_break_interval(conn: &Connection) -> u32 {
-    read_config_conn(conn, KEY_LONG_BREAK_INTERVAL)
+    read_app_config_conn(conn, KEY_LONG_BREAK_INTERVAL)
         .ok()
         .flatten()
         .and_then(|s| s.parse::<u32>().ok())
@@ -206,7 +206,7 @@ fn read_long_break_interval(conn: &Connection) -> u32 {
 
 // 读 long_break_duration（分钟），容错回退 5。
 fn read_long_break_duration_minutes(conn: &Connection) -> u32 {
-    read_config_conn(conn, KEY_LONG_BREAK_DURATION)
+    read_app_config_conn(conn, KEY_LONG_BREAK_DURATION)
         .ok()
         .flatten()
         .and_then(|s| s.parse::<u32>().ok())
@@ -216,7 +216,7 @@ fn read_long_break_duration_minutes(conn: &Connection) -> u32 {
 // 读 break_skip_max（休息跳过防误触门槛）。容错：非数字/超范围 → clamp 到 [MIN,MAX]；无值 → 回退默认。
 // 场景：skip_break 判定门槛时实时读取（不缓存，保证用户改配置后立即生效）。
 fn read_break_skip_max(conn: &Connection) -> u32 {
-    read_config_conn(conn, KEY_BREAK_SKIP_MAX)
+    read_app_config_conn(conn, KEY_BREAK_SKIP_MAX)
         .ok()
         .flatten()
         .and_then(|s| s.parse::<u32>().ok())
@@ -224,7 +224,7 @@ fn read_break_skip_max(conn: &Connection) -> u32 {
         .unwrap_or(DEFAULT_BREAK_SKIP_MAX)
 }
 
-// 今日累计跳过次数（内部统计，非用户配置）：持久化到 config 表 key today_skip_count，
+// 今日累计跳过次数（内部统计，非用户配置）：持久化到 app_config 表 key today_skip_count，
 // 值为 JSON {"date":"yyyy-MM-dd","count":N}。date != today 或缺失/非法 → 视为 0（跨天自然归零）。
 // 与 KEY_BREAK_SKIP_MAX（用户可配的防误触门槛）完全独立——后者控制「点几次才真跳过」，
 // 本项统计「今日真正跳过了几次」。前端 skip_count_reminder 阈值是纯 UI 配置，后端不读。
@@ -242,7 +242,7 @@ struct TodaySkipRecord {
 // DB 中记录的 date != today（昨日及更早）→ 返回 0。
 fn read_today_skip_count(conn: &Connection) -> u32 {
     let today = today_string();
-    read_config_conn(conn, KEY_TODAY_SKIP_COUNT)
+    read_app_config_conn(conn, KEY_TODAY_SKIP_COUNT)
         .ok()
         .flatten()
         .and_then(|s| serde_json::from_str::<TodaySkipRecord>(&s).ok())
@@ -252,13 +252,13 @@ fn read_today_skip_count(conn: &Connection) -> u32 {
 }
 
 // 写今日累计跳过次数（连同一日日期）。skip_break 真正跳过分支调用。
-// 用 write_config_conn（conn 级，不 emit config-changed）——内部统计非用户配置变更，
-// 不应触发 on_config_changed handler 或广播给前端窗口（前端经 payload 获取最新值）。
+// 用 write_app_config_conn（conn 级，不 emit app-config-changed）——内部统计非用户配置变更，
+// 不应触发 on_app_config_changed handler 或广播给前端窗口（前端经 payload 获取最新值）。
 fn write_today_skip_count(conn: &Connection, count: u32) {
     let record = TodaySkipRecord { date: today_string(), count };
     match serde_json::to_string(&record) {
         Ok(value) => {
-            if let Err(e) = write_config_conn(conn, KEY_TODAY_SKIP_COUNT, &value) {
+            if let Err(e) = write_app_config_conn(conn, KEY_TODAY_SKIP_COUNT, &value) {
                 log::warn!("write today_skip_count failed: {e}");
             }
         }
@@ -269,7 +269,7 @@ fn write_today_skip_count(conn: &Connection, count: u32) {
 // 读 rest_confirm（YesNo），容错回退默认。
 // Yes：工作结束时先进 Alerting 等用户确认；No：直接进 Breaking。
 fn read_rest_confirm(conn: &Connection) -> bool {
-    read_config_conn(conn, KEY_REST_CONFIRM)
+    read_app_config_conn(conn, KEY_REST_CONFIRM)
         .ok()
         .flatten()
         .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(false))
@@ -279,7 +279,7 @@ fn read_rest_confirm(conn: &Connection) -> bool {
 // 读 pause_on_idle（YesNo），容错回退默认（DB 无值/非法 → 默认开启）。
 // 场景：run_timer_loop 每秒现读，Working 阶段离开冻结判定；与前端 PAUSE_ON_IDLE_KEY 对齐。
 fn read_pause_on_idle(conn: &Connection) -> bool {
-    read_config_conn(conn, KEY_PAUSE_ON_IDLE)
+    read_app_config_conn(conn, KEY_PAUSE_ON_IDLE)
         .ok()
         .flatten()
         .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(DEFAULT_PAUSE_ON_IDLE))
@@ -289,7 +289,7 @@ fn read_pause_on_idle(conn: &Connection) -> bool {
 // 读 idle_pause_threshold（f64 秒），容错回退默认。clamp 到 [MIN,MAX]，防止 DB 被外部写入异常值。
 // 场景：run_timer_loop 每秒现读，Working 阶段离开冻结判定（idle > 该值且开关开启 → 冻结）。
 fn read_idle_pause_threshold(conn: &Connection) -> f64 {
-    read_config_conn(conn, KEY_IDLE_PAUSE_THRESHOLD)
+    read_app_config_conn(conn, KEY_IDLE_PAUSE_THRESHOLD)
         .ok()
         .flatten()
         .and_then(|s| s.parse::<f64>().ok())
@@ -309,7 +309,7 @@ fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
         start: String,
         end: String,
     }
-    let raw = read_config_conn(conn, KEY_QUIET_HOURS).ok().flatten();
+    let raw = read_app_config_conn(conn, KEY_QUIET_HOURS).ok().flatten();
     let json = raw.as_deref().unwrap_or(DEFAULT_QUIET_HOURS_JSON);
     let fallback: Vec<Period> =
         serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
@@ -340,18 +340,18 @@ fn is_in_quiet_periods(periods: &[(String, String)], hhmm: &str) -> bool {
 // 随机源：rand crate 的 ThreadRng（CSPRNG 种子 + 高质量 PRNG）。
 // 调用点：on_work_done（工作结束自动）与 manual_break（手动休息）。
 fn pick_random_reminders(conn: &Connection) -> (String, String) {
-    let raw = read_config_conn(conn, KEY_REMINDERS)
+    let raw = read_app_config_conn(conn, KEY_REMINDERS)
         .ok()
         .flatten()
         .unwrap_or_default();
     #[derive(serde::Deserialize)]
-    struct RemindersConfig {
+    struct AppRemindersConfig {
         #[serde(default)]
         health: Vec<String>,
         #[serde(default)]
         whisper: Vec<String>,
     }
-    let cfg: RemindersConfig = serde_json::from_str(&raw).unwrap_or(RemindersConfig {
+    let cfg: AppRemindersConfig = serde_json::from_str(&raw).unwrap_or(AppRemindersConfig {
         health: Vec::new(),
         whisper: Vec::new(),
     });
@@ -403,7 +403,7 @@ fn fresh_working(conn: &Connection) -> TimerInner {
 // 这些函数由 command（持有 State）与定时器循环（持有 Arc<Mutex>）共享调用，
 // 确保状态修改规则集中、可测试。调用方负责：
 //   1. 持有 TimerInner 锁
-//   2. 临时锁 ConfigState 读 DB（按 inner → config 顺序避免死锁）
+//   2. 临时锁 AppConfigState 读 DB（按 inner → app_config 顺序避免死锁）
 //   3. 锁外 emit phase-changed / timer-tick
 
 // 长休息判定（读取递增前的 completed_cycles）：
@@ -596,21 +596,21 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
             let today = today_string();
             if state.save_date != today {
                 let prev = state.phase;
-                let config_state = app.state::<ConfigState>();
-                if let Ok(conn) = config_state.0.lock() {
+                let app_config_state = app.state::<AppConfigState>();
+                if let Ok(conn) = app_config_state.0.lock() {
                     *state = fresh_working(&conn);
                     phase_change_payload = Some(build_payload(&state, Some(prev)));
                 } else {
-                    log::warn!("config lock poisoned, skip cross-day reset");
+                    log::warn!("app_config lock poisoned, skip cross-day reset");
                 }
             }
 
             // 一次性读 quiet_hours + work_duration（M3 quiet 判断 + 自动 start_work 共用，
-            // 避免在 quiet 分支里再锁一次 ConfigState）。
+            // 避免在 quiet 分支里再锁一次 AppConfigState）。
             // 锁失败时回退空 quiet_periods（视为无静音）+ 默认 work 时长。
             let (quiet_periods, work_min, pause_on_idle, idle_pause_threshold) = {
-                let config_state = app.state::<ConfigState>();
-                match config_state.0.lock() {
+                let app_config_state = app.state::<AppConfigState>();
+                match app_config_state.0.lock() {
                     Ok(conn) => (
                         read_quiet_hours(&conn),
                         read_work_duration_minutes(&conn),
@@ -618,7 +618,7 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                         read_idle_pause_threshold(&conn),
                     ),
                     Err(e) => {
-                        log::warn!("config lock failed, skip quiet check: {e}");
+                        log::warn!("app_config lock failed, skip quiet check: {e}");
                         (
                             Vec::new(),
                             DEFAULT_WORK_DURATION_MIN,
@@ -670,8 +670,8 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                     // 工作倒计时归零 → on_work_done
                     if state.remaining_seconds == 0 {
                         let prev = state.phase;
-                        let config_state = app.state::<ConfigState>();
-                        match config_state.0.lock() {
+                        let app_config_state = app.state::<AppConfigState>();
+                        match app_config_state.0.lock() {
                             Ok(conn) => {
                                 let (whisper_reminder, health_reminder) =
                                     pick_random_reminders(&conn);
@@ -706,7 +706,7 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                                 // Alerting 与 Breaking 都属于非 Working，panel.rs 监听 phase-changed 时唤起窗口
                                 phase_change_payload = Some(build_payload(&state, Some(prev)));
                             }
-                            Err(e) => log::warn!("config lock poisoned, skip on_work_done: {e}"),
+                            Err(e) => log::warn!("app_config lock poisoned, skip on_work_done: {e}"),
                         }
                     }
                 }
@@ -751,14 +751,14 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
 }
 
 // ============================================================
-// config-changed handler
+// app-config-changed handler
 // ============================================================
 
-// 订阅 "config-changed" 事件的 handler：用户在设置页改配置后由 set_config 触发。
+// 订阅 "app-config-changed" 事件的 handler：用户在设置页改配置后由 set_app_config 触发。
 // M1 仅响应 work_duration：若当前在 Working 阶段，重算 target_epoch + total + remaining，
 //   并立即 emit timer-tick 让前端看到新剩余时间（无需等下一秒）。
 // 其他 key（break_duration / long_break_* / rest_confirm / quiet_hours / reminders）由 M2/M3 接管。
-fn on_config_changed(app: AppHandle, inner: Arc<Mutex<TimerInner>>, event: tauri::Event) {
+fn on_app_config_changed(app: AppHandle, inner: Arc<Mutex<TimerInner>>, event: tauri::Event) {
     let key = serde_json::from_str::<serde_json::Value>(event.payload())
         .ok()
         .and_then(|v| v.get("key").and_then(|k| k.as_str()).map(|s| s.to_string()));
@@ -776,11 +776,11 @@ fn on_config_changed(app: AppHandle, inner: Arc<Mutex<TimerInner>>, event: tauri
                     return;
                 }
                 let minutes = {
-                    let config_state = app.state::<ConfigState>();
-                    match config_state.0.lock() {
+                    let app_config_state = app.state::<AppConfigState>();
+                    match app_config_state.0.lock() {
                         Ok(conn) => read_work_duration_minutes(&conn),
                         Err(e) => {
-                            log::warn!("config lock failed: {e}");
+                            log::warn!("app_config lock failed: {e}");
                             return;
                         }
                     }
@@ -808,17 +808,17 @@ fn on_config_changed(app: AppHandle, inner: Arc<Mutex<TimerInner>>, event: tauri
 // 公开 API：init + get_timer_state
 // ============================================================
 
-// 模块初始化入口，在 lib.rs setup 中调用（必须在 shared::config::init 之后，因为依赖 ConfigState）。
+// 模块初始化入口，在 lib.rs setup 中调用（必须在 shared::app_config::init 之后，因为依赖 AppConfigState）。
 // 执行步骤：
 //   1. fresh_working 创建初始 Working 状态（重启即重新计时，不读历史）
 //   2. app.manage(TimerState) 注册全局状态供 command 访问
 //   3. tauri::async_runtime::spawn 启动 1Hz 定时器循环
-//   4. app.listen("config-changed", ...) 订阅配置变更事件
+//   4. app.listen("app-config-changed", ...) 订阅配置变更事件
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // 重启即重新计时：直接 fresh_working，不读历史状态
     let inner_state = {
-        let config_state = app.state::<ConfigState>();
-        let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+        let app_config_state = app.state::<AppConfigState>();
+        let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
         fresh_working(&conn)
     };
 
@@ -836,8 +836,8 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle_listen = app.handle().clone();
     let inner_listen = inner.clone();
     app.handle()
-        .listen(crate::shared::events::EVENT_CONFIG_CHANGED, move |event| {
-            on_config_changed(app_handle_listen.clone(), inner_listen.clone(), event);
+        .listen(crate::shared::events::EVENT_APP_CONFIG_CHANGED, move |event| {
+            on_app_config_changed(app_handle_listen.clone(), inner_listen.clone(), event);
         });
 
     Ok(())
@@ -869,7 +869,7 @@ pub fn current_phase(app: &AppHandle) -> Phase {
 //
 // 共同模式：
 //   1. 锁 inner（同步块）
-//   2. 必要时锁 ConfigState 读配置（保持 inner → config 顺序避免死锁）
+//   2. 必要时锁 AppConfigState 读配置（保持 inner → app_config 顺序避免死锁）
 //   3. 调 apply_* 纯函数修改状态
 //   4. 锁外 emit phase-changed / timer-tick
 // 错误策略：锁 poisoned → 返回 Err；读配置失败 → 回退默认值（不返回 Err）。
@@ -884,8 +884,8 @@ pub fn start_work(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
         let prev = inner.phase;
         let now = now_epoch();
         let work_min = {
-            let config_state = app.state::<ConfigState>();
-            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            let app_config_state = app.state::<AppConfigState>();
+            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
             read_work_duration_minutes(&conn)
         };
         apply_start_work(&mut inner, (work_min as i64) * 60, now);
@@ -907,8 +907,8 @@ pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(),
         }
         let prev = inner.phase;
         let (total_secs, is_long) = {
-            let config_state = app.state::<ConfigState>();
-            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            let app_config_state = app.state::<AppConfigState>();
+            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
             let break_min = read_break_duration_minutes(&conn);
             let lb_enabled = read_long_break_enabled(&conn);
             let lb_interval = read_long_break_interval(&conn);
@@ -937,8 +937,8 @@ pub fn confirm_return(app: AppHandle, state: State<'_, TimerState>) -> Result<()
         let prev = inner.phase;
         let now = now_epoch();
         let work_min = {
-            let config_state = app.state::<ConfigState>();
-            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            let app_config_state = app.state::<AppConfigState>();
+            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
             read_work_duration_minutes(&conn)
         };
         apply_start_work(&mut inner, (work_min as i64) * 60, now);
@@ -983,8 +983,8 @@ pub fn reset(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String>
         let mut inner = lock_inner(&state.inner);
         let prev = inner.phase;
         let work_min = {
-            let config_state = app.state::<ConfigState>();
-            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            let app_config_state = app.state::<AppConfigState>();
+            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
             read_work_duration_minutes(&conn)
         };
         apply_start_work(&mut inner, (work_min as i64) * 60, now_epoch());
@@ -1007,8 +1007,8 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
         }
         let prev = inner.phase;
         let (total_secs, is_long, whisper_reminder, health_reminder) = {
-            let config_state = app.state::<ConfigState>();
-            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            let app_config_state = app.state::<AppConfigState>();
+            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
             let break_min = read_break_duration_minutes(&conn);
             let lb_enabled = read_long_break_enabled(&conn);
             let lb_interval = read_long_break_interval(&conn);
@@ -1045,8 +1045,8 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
             inner.last_skip_epoch = Some(now_epoch());
         }
         let break_skip_max = {
-            let config_state = app.state::<ConfigState>();
-            let conn = config_state.0.lock().map_err(|e| e.to_string())?;
+            let app_config_state = app.state::<AppConfigState>();
+            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
             read_break_skip_max(&conn)
         };
         if inner.break_skip_count < break_skip_max {
@@ -1054,10 +1054,10 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
         } else {
             let prev = inner.phase;
             let work_min = {
-                let config_state = app.state::<ConfigState>();
-                let conn = config_state.0.lock().map_err(|e| e.to_string())?;
-                // 真正跳过：今日累计跳过次数 +1 并持久化（与 work_min 共用同一 ConfigState 锁，
-                // 保持 inner→config 加锁顺序）。apply_start_work 不触碰 today_skip_count，
+                let app_config_state = app.state::<AppConfigState>();
+                let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+                // 真正跳过：今日累计跳过次数 +1 并持久化（与 work_min 共用同一 AppConfigState 锁，
+                // 保持 inner→app_config 加锁顺序）。apply_start_work 不触碰 today_skip_count，
                 // 故增量保留至 build_payload。
                 inner.today_skip_count = inner.today_skip_count.saturating_add(1);
                 write_today_skip_count(&conn, inner.today_skip_count);

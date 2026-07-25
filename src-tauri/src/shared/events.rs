@@ -7,5 +7,5 @@ pub const EVENT_TIMER_TICK: &str = "timer-tick";
 /// phase 切换时推送（TimerStatePayload，带 prev_phase）。前端 PanelApp 用于切换 UI 分支。
 pub const EVENT_PHASE_CHANGED: &str = "phase-changed";
 
-/// 配置项变更时广播（ConfigChangedPayload）。订阅方据此响应配置变化。
-pub const EVENT_CONFIG_CHANGED: &str = "config-changed";
+/// 配置项变更时广播（AppConfigChangedPayload）。订阅方据此响应配置变化。
+pub const EVENT_APP_CONFIG_CHANGED: &str = "app-config-changed";

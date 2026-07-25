@@ -1,5 +1,5 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { LongBreakEnabled, QuietHourPeriod } from '@src/shared/config';
+import type { LongBreakEnabled, QuietHourPeriod } from '@src/shared/appConfig';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AvTimerOutlinedIcon from '@mui/icons-material/AvTimerOutlined';
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
@@ -34,19 +34,19 @@ import {
   DEFAULT_WORK_END_TIME,
   DEFAULT_WORK_START_TIME,
   encodeQuietHours,
-  getConfig,
+  getAppConfig,
   LONG_BREAK_DURATION_KEY,
   LONG_BREAK_ENABLED_KEY,
   LONG_BREAK_INTERVAL_KEY,
   parseYesNo,
   QUIET_HOURS_KEY,
-  setConfig,
+  setAppConfig,
   toYesNo,
   WORK_DURATION_KEY,
   WORK_END_TIME_KEY,
   WORK_START_TIME_KEY,
   YES_NO,
-} from '@src/shared/config';
+} from '@src/shared/appConfig';
 import { longBreakIntervalOptions } from '@src/shared/settingOption';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,7 +55,7 @@ interface QuietHourItem extends QuietHourPeriod {
   id: number;
 }
 
-interface PlanConfig {
+interface AppPlanConfig {
   workDuration: number;
   breakDuration: number;
   longBreakEnabled: LongBreakEnabled;
@@ -66,7 +66,7 @@ interface PlanConfig {
   quietHours: QuietHourItem[];
 }
 
-const DEFAULT_PLAN_CONFIG: PlanConfig = {
+const DEFAULT_APP_PLAN_CONFIG: AppPlanConfig = {
   workDuration: DEFAULT_WORK_DURATION,
   breakDuration: DEFAULT_BREAK_DURATION,
   longBreakEnabled: DEFAULT_LONG_BREAK_ENABLED,
@@ -79,9 +79,9 @@ const DEFAULT_PLAN_CONFIG: PlanConfig = {
 
 function PlanPage() {
   const { t } = useTranslation();
-  const [saved, setSaved] = useState<PlanConfig>(DEFAULT_PLAN_CONFIG);
-  const [draft, setDraft] = useState<PlanConfig>(DEFAULT_PLAN_CONFIG);
-  const quietHourIdRef = useRef(DEFAULT_PLAN_CONFIG.quietHours.length);
+  const [saved, setSaved] = useState<AppPlanConfig>(DEFAULT_APP_PLAN_CONFIG);
+  const [draft, setDraft] = useState<AppPlanConfig>(DEFAULT_APP_PLAN_CONFIG);
+  const quietHourIdRef = useRef(DEFAULT_APP_PLAN_CONFIG.quietHours.length);
 
   const allocateQuietHourId = () => {
     quietHourIdRef.current += 1;
@@ -90,16 +90,16 @@ function PlanPage() {
 
   useEffect(() => {
     Promise.all([
-      getConfig(WORK_DURATION_KEY),
-      getConfig(BREAK_DURATION_KEY),
-      getConfig(LONG_BREAK_ENABLED_KEY),
-      getConfig(LONG_BREAK_INTERVAL_KEY),
-      getConfig(LONG_BREAK_DURATION_KEY),
-      getConfig(WORK_START_TIME_KEY),
-      getConfig(WORK_END_TIME_KEY),
-      getConfig(QUIET_HOURS_KEY),
+      getAppConfig(WORK_DURATION_KEY),
+      getAppConfig(BREAK_DURATION_KEY),
+      getAppConfig(LONG_BREAK_ENABLED_KEY),
+      getAppConfig(LONG_BREAK_INTERVAL_KEY),
+      getAppConfig(LONG_BREAK_DURATION_KEY),
+      getAppConfig(WORK_START_TIME_KEY),
+      getAppConfig(WORK_END_TIME_KEY),
+      getAppConfig(QUIET_HOURS_KEY),
     ]).then(([wd, bd, lbe, lbi, lbdu, wst, wet, qh]) => {
-      const next: PlanConfig = {
+      const next: AppPlanConfig = {
         workDuration: wd ? Number(wd) : DEFAULT_WORK_DURATION,
         breakDuration: bd ? Number(bd) : DEFAULT_BREAK_DURATION,
         longBreakEnabled: parseYesNo(lbe, DEFAULT_LONG_BREAK_ENABLED),
@@ -114,7 +114,7 @@ function PlanPage() {
     });
   }, []);
 
-  const update = <K extends keyof PlanConfig>(key: K, value: PlanConfig[K]) => {
+  const update = <K extends keyof AppPlanConfig>(key: K, value: AppPlanConfig[K]) => {
     setDraft(prev => ({ ...prev, [key]: value }));
   };
 
@@ -158,19 +158,19 @@ function PlanPage() {
       || saved.workEndTime !== draft.workEndTime
       || JSON.stringify(saved.quietHours) !== JSON.stringify(draft.quietHours);
 
-  const handleReset = () => setDraft(DEFAULT_PLAN_CONFIG);
+  const handleReset = () => setDraft(DEFAULT_APP_PLAN_CONFIG);
   const handleCancel = () => setDraft(saved);
 
   const handleSave = async () => {
     await Promise.all([
-      setConfig(WORK_DURATION_KEY, String(draft.workDuration)),
-      setConfig(BREAK_DURATION_KEY, String(draft.breakDuration)),
-      setConfig(LONG_BREAK_ENABLED_KEY, draft.longBreakEnabled),
-      setConfig(LONG_BREAK_INTERVAL_KEY, String(draft.longBreakInterval)),
-      setConfig(LONG_BREAK_DURATION_KEY, String(draft.longBreakDuration)),
-      setConfig(WORK_START_TIME_KEY, draft.workStartTime),
-      setConfig(WORK_END_TIME_KEY, draft.workEndTime),
-      setConfig(
+      setAppConfig(WORK_DURATION_KEY, String(draft.workDuration)),
+      setAppConfig(BREAK_DURATION_KEY, String(draft.breakDuration)),
+      setAppConfig(LONG_BREAK_ENABLED_KEY, draft.longBreakEnabled),
+      setAppConfig(LONG_BREAK_INTERVAL_KEY, String(draft.longBreakInterval)),
+      setAppConfig(LONG_BREAK_DURATION_KEY, String(draft.longBreakDuration)),
+      setAppConfig(WORK_START_TIME_KEY, draft.workStartTime),
+      setAppConfig(WORK_END_TIME_KEY, draft.workEndTime),
+      setAppConfig(
         QUIET_HOURS_KEY,
         encodeQuietHours(draft.quietHours.map(({ id: _id, ...rest }) => rest)),
       ),

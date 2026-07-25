@@ -1,6 +1,4 @@
 import type { TimerStatePayload } from '@src/shared/bindings';
-import { commands } from '@src/shared/bindings';
-import { logOnError } from '@src/shared/commands';
 import {
   BREAK_SKIP_MAX_KEY,
   decodeQuietHours,
@@ -12,12 +10,14 @@ import {
   MIN_BREAK_SKIP_MAX,
   QUIET_HOURS_KEY,
   SKIP_COUNT_REMINDER_KEY,
-} from '@src/shared/config';
+} from '@src/shared/appConfig';
+import { commands } from '@src/shared/bindings';
+import { logOnError } from '@src/shared/commands';
 import {
   EVENT_PHASE_CHANGED,
   EVENT_TIMER_TICK,
 } from '@src/shared/events';
-import { useConfigValue } from '@src/shared/useConfigValue';
+import { useAppConfigValue } from '@src/shared/useAppConfigValue';
 import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -44,7 +44,7 @@ function formatDisplayTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-// 模块级 decode：稳定引用，避免 useConfigValue 每次渲染重复订阅。
+// 模块级 decode：稳定引用，避免 useAppConfigValue 每次渲染重复订阅。
 // 与后端 read_break_skip_max 对齐：clamp 到 [MIN,MAX]，非有限数回落默认。
 function decodeBreakSkipMax(v: string | null): number {
   const n = Number(v);
@@ -56,13 +56,13 @@ function decodeBreakSkipMax(v: string | null): number {
 export function useTimerState() {
   const [state, setState] = useState<TimerStatePayload>(INITIAL_STATE);
 
-  // break_skip_max / quiet_hours：经 useConfigValue 订阅（mount 读 + config-changed 实时刷新，
+  // break_skip_max / quiet_hours：经 useAppConfigValue 订阅（mount 读 + app-config-changed 实时刷新，
   // 用户在设置页改完后 panel 立即更新），解码在模块级 decode 函数中完成。
   // quiet_hours 供 PausedView 在 quietTriggered 时显示休息时段范围（如 "22:00:00 - 07:00:00"）。
-  const breakSkipMax = useConfigValue(BREAK_SKIP_MAX_KEY, decodeBreakSkipMax, DEFAULT_BREAK_SKIP_MAX);
-  const quietHours = useConfigValue(QUIET_HOURS_KEY, decodeQuietHours, DEFAULT_QUIET_HOURS);
+  const breakSkipMax = useAppConfigValue(BREAK_SKIP_MAX_KEY, decodeBreakSkipMax, DEFAULT_BREAK_SKIP_MAX);
+  const quietHours = useAppConfigValue(QUIET_HOURS_KEY, decodeQuietHours, DEFAULT_QUIET_HOURS);
   // 跳过次数提醒阈值（纯 UI 配置）：AlertingView 据此 + state.todaySkipCount 判断是否显示警示横幅。
-  const skipCountReminder = useConfigValue(SKIP_COUNT_REMINDER_KEY, decodeSkipCountReminder, DEFAULT_SKIP_COUNT_REMINDER);
+  const skipCountReminder = useAppConfigValue(SKIP_COUNT_REMINDER_KEY, decodeSkipCountReminder, DEFAULT_SKIP_COUNT_REMINDER);
 
   useEffect(() => {
     let cancelled = false;

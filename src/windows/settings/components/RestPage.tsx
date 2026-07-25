@@ -1,5 +1,5 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { IdlePauseThreshold, PauseOnIdle, RestConfirm, RestWindow, SkipCountReminder } from '@src/shared/config';
+import type { IdlePauseThreshold, PauseOnIdle, RestConfirm, RestWindow, SkipCountReminder } from '@src/shared/appConfig';
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
 import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
@@ -27,7 +27,7 @@ import {
   DEFAULT_REST_CONFIRM,
   DEFAULT_REST_WINDOW,
   DEFAULT_SKIP_COUNT_REMINDER,
-  getConfig,
+  getAppConfig,
   IDLE_PAUSE_THRESHOLD_KEY,
   IDLE_PAUSE_THRESHOLD_STEP,
   MAX_BREAK_SKIP_MAX,
@@ -40,16 +40,16 @@ import {
   PAUSE_ON_IDLE_KEY,
   REST_CONFIRM_KEY,
   REST_WINDOW_KEY,
-  setConfig,
+  setAppConfig,
   SKIP_COUNT_REMINDER_KEY,
   toYesNo,
   YES_NO,
-} from '@src/shared/config';
+} from '@src/shared/appConfig';
 import { restWindowOptions } from '@src/shared/settingOption';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-interface RestConfig {
+interface AppRestConfig {
   restWindow: RestWindow;
   restConfirm: RestConfirm;
   skipCountReminder: SkipCountReminder;
@@ -58,7 +58,7 @@ interface RestConfig {
   idlePauseThreshold: IdlePauseThreshold;
 }
 
-const DEFAULT_REST_CONFIG: RestConfig = {
+const DEFAULT_APP_REST_CONFIG: AppRestConfig = {
   restWindow: DEFAULT_REST_WINDOW,
   restConfirm: DEFAULT_REST_CONFIRM,
   skipCountReminder: DEFAULT_SKIP_COUNT_REMINDER,
@@ -69,19 +69,19 @@ const DEFAULT_REST_CONFIG: RestConfig = {
 
 function RestPage() {
   const { t } = useTranslation();
-  const [saved, setSaved] = useState<RestConfig>(DEFAULT_REST_CONFIG);
-  const [draft, setDraft] = useState<RestConfig>(DEFAULT_REST_CONFIG);
+  const [saved, setSaved] = useState<AppRestConfig>(DEFAULT_APP_REST_CONFIG);
+  const [draft, setDraft] = useState<AppRestConfig>(DEFAULT_APP_REST_CONFIG);
 
   useEffect(() => {
     Promise.all([
-      getConfig(REST_WINDOW_KEY),
-      getConfig(REST_CONFIRM_KEY),
-      getConfig(SKIP_COUNT_REMINDER_KEY),
-      getConfig(BREAK_SKIP_MAX_KEY),
-      getConfig(PAUSE_ON_IDLE_KEY),
-      getConfig(IDLE_PAUSE_THRESHOLD_KEY),
+      getAppConfig(REST_WINDOW_KEY),
+      getAppConfig(REST_CONFIRM_KEY),
+      getAppConfig(SKIP_COUNT_REMINDER_KEY),
+      getAppConfig(BREAK_SKIP_MAX_KEY),
+      getAppConfig(PAUSE_ON_IDLE_KEY),
+      getAppConfig(IDLE_PAUSE_THRESHOLD_KEY),
     ]).then(([window, confirm, skipCountReminder, bsm, poi, ipt]) => {
-      const next: RestConfig = {
+      const next: AppRestConfig = {
         restWindow:
           window === 'tray' || window === 'topRight' || window === 'fullscreen'
             ? window
@@ -97,7 +97,7 @@ function RestPage() {
     });
   }, []);
 
-  const update = <K extends keyof RestConfig>(key: K, value: RestConfig[K]) => {
+  const update = <K extends keyof AppRestConfig>(key: K, value: AppRestConfig[K]) => {
     setDraft(prev => ({ ...prev, [key]: value }));
   };
 
@@ -109,17 +109,17 @@ function RestPage() {
       || saved.pauseOnIdle !== draft.pauseOnIdle
       || saved.idlePauseThreshold !== draft.idlePauseThreshold;
 
-  const handleReset = () => setDraft(DEFAULT_REST_CONFIG);
+  const handleReset = () => setDraft(DEFAULT_APP_REST_CONFIG);
   const handleCancel = () => setDraft(saved);
 
   const handleSave = async () => {
     await Promise.all([
-      setConfig(REST_WINDOW_KEY, draft.restWindow),
-      setConfig(REST_CONFIRM_KEY, draft.restConfirm),
-      setConfig(SKIP_COUNT_REMINDER_KEY, String(draft.skipCountReminder)),
-      setConfig(BREAK_SKIP_MAX_KEY, String(draft.breakSkipMax)),
-      setConfig(PAUSE_ON_IDLE_KEY, draft.pauseOnIdle),
-      setConfig(IDLE_PAUSE_THRESHOLD_KEY, String(draft.idlePauseThreshold)),
+      setAppConfig(REST_WINDOW_KEY, draft.restWindow),
+      setAppConfig(REST_CONFIRM_KEY, draft.restConfirm),
+      setAppConfig(SKIP_COUNT_REMINDER_KEY, String(draft.skipCountReminder)),
+      setAppConfig(BREAK_SKIP_MAX_KEY, String(draft.breakSkipMax)),
+      setAppConfig(PAUSE_ON_IDLE_KEY, draft.pauseOnIdle),
+      setAppConfig(IDLE_PAUSE_THRESHOLD_KEY, String(draft.idlePauseThreshold)),
     ]);
     setSaved(draft);
   };

@@ -14,14 +14,14 @@ fn exit_app(app: tauri::AppHandle) {
 // run()（注册 invoke handler）与 bin/export_bindings.rs（生成 TS 绑定）共用此函数，
 // 保证命令清单单一来源，避免两份注册表漂移。
 pub fn build_specta_builder() -> Builder<tauri::Wry> {
-    use crate::shared::types::{ConfigChangedPayload, YesNo};
+    use crate::shared::types::{AppConfigChangedPayload, YesNo};
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             exit_app,
             windows::settings::show_settings_window,
             windows::panel::fit_panel,
-            shared::config::get_config,
-            shared::config::set_config,
+            shared::app_config::get_app_config,
+            shared::app_config::set_app_config,
             timer::get_timer_state,
             timer::start_work,
             timer::confirm_break,
@@ -31,9 +31,9 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
             timer::manual_break,
             timer::skip_break,
         ])
-        // ConfigChangedPayload 不出现在任何 command 签名中（仅 set_config 内部 emit），
+        // AppConfigChangedPayload 不出现在任何 command 签名中（仅 set_app_config 内部 emit），
         // 用 typ 显式注册，让 specta 把它导出到 bindings.ts 供前端 listen 复用。
-        .typ::<ConfigChangedPayload>()
+        .typ::<AppConfigChangedPayload>()
         // YesNo enum 同样不在 command 签名中（read_*_enabled 内部 parse 消费），
         // 注册以让前端 bindings.ts 拿到字面量联合类型 "Y" | "N"。
         .typ::<YesNo>()
@@ -79,9 +79,9 @@ pub fn run() {
             };
             app.handle().plugin(log_plugin)?;
 
-            // config 先于 panel::setup：panel 构建托盘菜单时需读 ConfigState 解析语言偏好，
+            // app_config 先于 panel::setup：panel 构建托盘菜单时需读 AppConfigState 解析语言偏好，
             // 否则首次启动会 fallback 到系统语言而忽略用户存的 language 偏好。
-            shared::config::init(app)?;
+            shared::app_config::init(app)?;
             windows::panel::setup(app)?;
             timer::init(app)?;
 

@@ -57,7 +57,7 @@ pub struct TimerStatePayload {
     /// 达到 break_skip_max 配置门槛才真正跳过。进入 breaking 时清零。
     pub break_skip_count: u32,
     /// 今日累计「真正跳过休息」的次数（break_skip_count 达到 break_skip_max 才计一次）。
-    /// 持久化到 config 表 today_skip_count（{date,count} JSON），跨天自动归零。
+    /// 持久化到 app_config 表 today_skip_count（{date,count} JSON），跨天自动归零。
     /// 与 break_skip_count（单次休息防误触、进休息清零、不持久化）严格区分。
     /// AlertingView 据此 + skip_count_reminder 阈值决定是否显示「今日多次跳过休息」警示横幅。
     pub today_skip_count: u32,
@@ -73,15 +73,15 @@ pub struct TimerStatePayload {
 }
 
 // ============================================================
-// ConfigChangedPayload：config-changed 事件
+// AppConfigChangedPayload：app-config-changed 事件
 // ============================================================
 
-/// set_config 命令成功后通过 `config-changed` 事件广播给所有窗口的载荷。
+/// set_app_config 命令成功后通过 `app-config-changed` 事件广播给所有窗口的载荷。
 /// 订阅方（AppThemeProvider / AppI18nProvider）据此响应配置变化。
 #[derive(Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct ConfigChangedPayload {
-    /// 变更的配置 key（与 src/shared/config.ts 中的 *_KEY 常量对齐）。
+pub struct AppConfigChangedPayload {
+    /// 变更的配置 key（与 src/shared/appConfig.ts 中的 *_KEY 常量对齐）。
     pub key: String,
     /// 新值（配置统一以字符串形式存储，订阅方按 key 自行 decode）。
     pub value: String,
@@ -94,7 +94,7 @@ pub struct ConfigChangedPayload {
 /// Y/N 布尔约定的 SSOT。
 ///
 /// serde rename 决定 DB 存储格式（"Y"/"N"）+ 前端 bindings.ts 字面量联合类型。
-/// 前端 src/shared/config.ts 的 YES_NO 运行时对象受此类型约束
+/// 前端 src/shared/appConfig.ts 的 YES_NO 运行时对象受此类型约束
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, Type)]
 pub enum YesNo {
     #[serde(rename = "Y")]

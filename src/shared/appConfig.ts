@@ -62,7 +62,7 @@ export const MIN_IDLE_PAUSE_THRESHOLD = 30;
 export const MAX_IDLE_PAUSE_THRESHOLD = 300;
 export const IDLE_PAUSE_THRESHOLD_STEP = 30;
 
-// 模块级 decode：稳定引用，供 useConfigValue / PlanPage 订阅与初始化。
+// 模块级 decode：稳定引用，供 useAppConfigValue / PlanPage 订阅与初始化。
 // clamp 到 [MIN,MAX]，非有限数 / 缺失回落默认（与 decodeSkipCountReminder 同构）。
 export function decodeIdlePauseThreshold(v: string | null): IdlePauseThreshold {
   const n = Number(v);
@@ -104,7 +104,7 @@ export const DEFAULT_SKIP_COUNT_REMINDER: SkipCountReminder = 3;
 export const MIN_SKIP_COUNT_REMINDER = 0;
 export const MAX_SKIP_COUNT_REMINDER = 20;
 
-// 模块级 decode：稳定引用，供 useConfigValue 订阅（避免每次渲染重订阅）。
+// 模块级 decode：稳定引用，供 useAppConfigValue 订阅（避免每次渲染重订阅）。
 // clamp 到 [MIN,MAX]，非有限数 / 缺失回落默认（与 decodeBreakSkipMax 同构，但范围不同）。
 export function decodeSkipCountReminder(v: string | null): SkipCountReminder {
   const n = Number(v);
@@ -179,26 +179,26 @@ export function decodeQuietHours(value: string | null): QuietHours {
 export type HealthReminders = string[];
 export type WhisperReminders = string[];
 
-export interface RemindersConfig {
+export interface AppRemindersConfig {
   health: HealthReminders;
   whisper: WhisperReminders;
 }
 
 export const REMINDERS_KEY = 'reminders';
 
-export const EMPTY_REMINDERS_CONFIG: RemindersConfig = { health: [], whisper: [] };
+export const EMPTY_APP_REMINDERS_CONFIG: AppRemindersConfig = { health: [], whisper: [] };
 
 function filterStrings(arr: unknown): string[] {
   return Array.isArray(arr) ? arr.filter((s): s is string => typeof s === 'string') : [];
 }
 
-export function encodeRemindersConfig(config: RemindersConfig): string {
+export function encodeAppRemindersConfig(config: AppRemindersConfig): string {
   return JSON.stringify(config);
 }
 
-export function decodeRemindersConfig(value: string | null): RemindersConfig {
+export function decodeAppRemindersConfig(value: string | null): AppRemindersConfig {
   if (!value) {
-    return { ...EMPTY_REMINDERS_CONFIG };
+    return { ...EMPTY_APP_REMINDERS_CONFIG };
   }
   try {
     // 值约定为 { health, whisper } 对象；filterStrings 对非数组/缺失字段兜底为 []。
@@ -208,16 +208,16 @@ export function decodeRemindersConfig(value: string | null): RemindersConfig {
       whisper: filterStrings(obj?.whisper),
     };
   } catch {
-    return { ...EMPTY_REMINDERS_CONFIG };
+    return { ...EMPTY_APP_REMINDERS_CONFIG };
   }
 }
 
 // commands.xxx() 返回 tauri-specta 的 typedError 包装。unwrap 展开为 throw 风格，
-// 保持 getConfig/setConfig 的对外 API 不变（错误时 throw）。
-export async function getConfig(key: string): Promise<string | null> {
-  return unwrap(commands.getConfig(key));
+// 保持 getAppConfig/setAppConfig 的对外 API 不变（错误时 throw）。
+export async function getAppConfig(key: string): Promise<string | null> {
+  return unwrap(commands.getAppConfig(key));
 }
 
-export async function setConfig(key: string, value: string): Promise<void> {
-  await unwrap(commands.setConfig(key, value));
+export async function setAppConfig(key: string, value: string): Promise<void> {
+  await unwrap(commands.setAppConfig(key, value));
 }
