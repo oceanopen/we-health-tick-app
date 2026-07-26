@@ -1,0 +1,42 @@
+# PR / push 检查：守住 Rust→TS 类型绑定不漂移。
+#
+# 为何需要：src/shared/bindings.ts 由 gen:bindings 从 #[tauri::command] 签名 + types.rs 生成并提交进 git，
+# 构建期不再自动重新生成（见 package.json 的 web:dev/web:build）。故类型改动后必须手动 pnpm gen:bindings
+# 同步本文件，否则前后端类型会静默漂移。本 workflow 跑 verify:bindings（重新生成并断言 git diff 为空）
+# 作为兜底，把漂移拦在 PR 阶段。
+#
+# 运行环境用 macos-latest 而非更便宜的 ubuntu-latest：gen:bindings 会编译 we_health_tick_lib，
+# 其依赖的 tauri/wry 在 Linux 需 webkit2gtk-4.1 等系统库（stock ubuntu 未预装，build.rs 会硬报错）；
+# macos 上 tauri 依赖的系统框架天然可用，无需额外装包，且与 release-assets 构建同 OS。
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  verify-bindings:
+    name: Verify Rust→TS bindings in sync
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # 必须在 setup-node 之前：setup-node 的 pnpm cache 需先读到 pnpm 版本
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install app dependencies
+        run: pnpm install
+
+      - name: Verify bindings in sync
+        run: pnpm verify:bindings
