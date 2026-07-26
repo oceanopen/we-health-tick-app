@@ -1,10 +1,8 @@
 {
+  "title": "系统设置",
   "menu": {
-    "settings": "系统设置",
+    "appConfig": "应用设置",
     "about": "关于"
-  },
-  "page": {
-    "title": "系统设置"
   },
   "row": {
     "language": "语言",

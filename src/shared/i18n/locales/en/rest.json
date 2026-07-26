@@ -2,9 +2,6 @@
   "menu": {
     "rest": "Break"
   },
-  "page": {
-    "title": "Break"
-  },
   "row": {
     "restWindow": "Break Window",
     "restConfirm": "Confirm Before Break",

@@ -2,9 +2,6 @@
   "menu": {
     "plan": "Plan"
   },
-  "page": {
-    "title": "Plan"
-  },
   "card": {
     "timer": "Timer",
     "schedule": "Schedule"

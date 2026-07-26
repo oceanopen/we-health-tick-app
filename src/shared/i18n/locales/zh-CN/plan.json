@@ -2,9 +2,6 @@
   "menu": {
     "plan": "计划"
   },
-  "page": {
-    "title": "计划"
-  },
   "card": {
     "timer": "计时器",
     "schedule": "时段"

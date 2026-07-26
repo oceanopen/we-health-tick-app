@@ -18,23 +18,23 @@ import appIcon from '@src/assets/app-icon.svg';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AboutPage from './components/AboutPage';
+import AppConfigPage from './components/AppConfigPage';
 import PlanPage from './components/PlanPage';
 import RemindersPage from './components/RemindersPage';
 import RestPage from './components/RestPage';
-import SettingsPage from './components/SettingsPage';
 
-type MenuKey = 'settings' | 'plan' | 'rest' | 'reminders' | 'about';
+type MenuKey = 'appConfig' | 'plan' | 'rest' | 'reminders' | 'about';
 
 // 顶部栏高度：左侧标题栏与右侧顶部导航栏共用，保证两者等高、底部分隔线水平对齐。
 const TOP_BAR_HEIGHT = 56;
 
 function SettingsApp() {
   const { t } = useTranslation();
-  const [activeMenu, setActiveMenu] = useState<MenuKey>('settings');
+  const [activeMenu, setActiveMenu] = useState<MenuKey>('appConfig');
   const theme = useTheme();
 
   const menuItems: { key: MenuKey; label: string; icon: React.ReactNode }[] = [
-    { key: 'settings', label: t('settings:menu.settings'), icon: <SettingsOutlinedIcon /> },
+    { key: 'appConfig', label: t('settings:menu.appConfig'), icon: <SettingsOutlinedIcon /> },
     { key: 'plan', label: t('plan:menu.plan'), icon: <ScheduleOutlinedIcon /> },
     { key: 'rest', label: t('rest:menu.rest'), icon: <WeekendOutlinedIcon /> },
     { key: 'reminders', label: t('reminders:menu.reminders'), icon: <NotificationsOutlinedIcon /> },
@@ -81,7 +81,7 @@ function SettingsApp() {
             />
           </Box>
           <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }} color="text.secondary">
-            {t('settings:menu.settings')}
+            {t('settings:title')}
           </Typography>
         </Box>
         <List sx={{ px: 1 }}>
@@ -150,7 +150,7 @@ function SettingsApp() {
         </Box>
         {/* 页面内容区：各页面自带 header 原样保留。 */}
         <Box sx={{ flex: 1, overflow: 'hidden' }}>
-          {activeMenu === 'settings' && <SettingsPage />}
+          {activeMenu === 'appConfig' && <AppConfigPage />}
           {activeMenu === 'plan' && <PlanPage />}
           {activeMenu === 'rest' && <RestPage />}
           {activeMenu === 'reminders' && <RemindersPage />}

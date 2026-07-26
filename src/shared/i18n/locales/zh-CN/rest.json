@@ -2,9 +2,6 @@
   "menu": {
     "rest": "休息"
   },
-  "page": {
-    "title": "休息"
-  },
   "row": {
     "restWindow": "休息窗口",
     "restConfirm": "休息前确认",
