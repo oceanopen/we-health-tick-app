@@ -123,6 +123,18 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+## macOS 故障排查
+
+### 打开应用时提示「已损坏，无法打开」或「无法验证开发者」
+
+这是 macOS 对从网络下载（如 DMG/CI 产物）的应用添加了隔离属性（quarantine）导致的。运行以下命令清除隔离属性后即可正常打开：
+
+```bash
+xattr -cr "/Applications/We Health Tick.app"
+```
+
+> 说明：`xattr` 是 macOS 自带的扩展属性工具，`-c` 清除所有属性，`-r` 递归处理 `.app` 包内的所有文件。
+
 ## 项目结构
 
 ```
