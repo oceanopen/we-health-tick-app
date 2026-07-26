@@ -1,7 +1,7 @@
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::shared::screen::{
-    find_monitor_for_tray, ratio_size, work_area_center, DEFAULT_SIZE, SETTINGS_RATIO,
+    DEFAULT_SIZE, SETTINGS_RATIO, find_monitor_for_tray, ratio_size, work_area_center,
 };
 use crate::shared::types::Phase;
 
@@ -24,17 +24,24 @@ pub async fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
             w
         }
         None => {
-            let product = app.config().product_name.as_deref().unwrap_or("We Health Tick");
-            let win =
-                WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
-                    .title(format!("{product} - 系统设置"))
-                    .inner_size(width, height)
-                    // 默认在主屏居中；下方 set_position 修正到 tray 所在屏，探测失败保持主屏。
-                    .center()
-                    // 窗口不进任务栏与 Alt+Tab（Windows/Linux），macOS 上为 no-op（Dock 由 ActivationPolicy 控制）。
-                    .skip_taskbar(true)
-                    .build()
-                    .map_err(|e| e.to_string())?;
+            let product = app
+                .config()
+                .product_name
+                .as_deref()
+                .unwrap_or("We Health Tick");
+            let win = WebviewWindowBuilder::new(
+                &app,
+                "settings",
+                WebviewUrl::App("settings.html".into()),
+            )
+            .title(format!("{product} - 系统设置"))
+            .inner_size(width, height)
+            // 默认在主屏居中；下方 set_position 修正到 tray 所在屏，探测失败保持主屏。
+            .center()
+            // 窗口不进任务栏与 Alt+Tab（Windows/Linux），macOS 上为 no-op（Dock 由 ActivationPolicy 控制）。
+            .skip_taskbar(true)
+            .build()
+            .map_err(|e| e.to_string())?;
 
             let w = win.clone();
             win.on_window_event(move |event| {

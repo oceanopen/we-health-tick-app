@@ -7,11 +7,9 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
-use crate::shared::app_config::{read_app_config_raw, AppConfigState, LANGUAGE_KEY};
-use crate::shared::i18n::{menu_text, resolve, ResolvedLanguage};
-use crate::shared::screen::{
-    detect_taskbar_edge, find_monitor_for_rect, MonitorInfo, TaskbarEdge,
-};
+use crate::shared::app_config::{AppConfigState, LANGUAGE_KEY, read_app_config_raw};
+use crate::shared::i18n::{ResolvedLanguage, menu_text, resolve};
+use crate::shared::screen::{MonitorInfo, TaskbarEdge, detect_taskbar_edge, find_monitor_for_rect};
 use crate::shared::types::{Phase, TimerStatePayload};
 
 const PANEL_WIDTH: f64 = 240.0;
@@ -44,7 +42,9 @@ pub fn refresh_menu_texts(app: &AppHandle) {
         return;
     };
     let lang = current_language(app);
-    let _ = items.settings.set_text(menu_text(lang, "settings"));
+    let _ = items
+        .settings
+        .set_text(menu_text(lang, "settings"));
     let _ = items.restart.set_text(menu_text(lang, "restart"));
     let _ = items.exit.set_text(menu_text(lang, "exit"));
 }
@@ -97,19 +97,38 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     // 右键菜单：系统设置 / 重启 / 退出。文案随当前语言偏好（app_config language，三态）。
     let lang = current_language(app.handle());
-    let settings_item =
-        MenuItem::with_id(app, "settings", menu_text(lang, "settings"), true, None::<&str>)?;
-    let restart_item =
-        MenuItem::with_id(app, "restart", menu_text(lang, "restart"), true, None::<&str>)?;
-    let exit_item =
-        MenuItem::with_id(app, "exit", menu_text(lang, "exit"), true, None::<&str>)?;
+    let settings_item = MenuItem::with_id(
+        app,
+        "settings",
+        menu_text(lang, "settings"),
+        true,
+        None::<&str>,
+    )?;
+    let restart_item = MenuItem::with_id(
+        app,
+        "restart",
+        menu_text(lang, "restart"),
+        true,
+        None::<&str>,
+    )?;
+    let exit_item = MenuItem::with_id(
+        app,
+        "exit",
+        menu_text(lang, "exit"),
+        true,
+        None::<&str>,
+    )?;
     let menu = MenuBuilder::new(app)
         .items(&[&settings_item, &restart_item, &exit_item])
         .build()?;
 
     // tooltip 从配置文件 productName 读取：dev 构建（tauri.dev.conf.json）为 "We Health Tick [DEV]"，
     // release 构建（tauri.conf.json）为 "We Health Tick"，肉眼即可区分 dev/prod 产物。
-    let tooltip = app.config().product_name.as_deref().unwrap_or("We Health Tick");
+    let tooltip = app
+        .config()
+        .product_name
+        .as_deref()
+        .unwrap_or("We Health Tick");
 
     TrayIconBuilder::with_id("tray")
         .icon(icon)
@@ -182,32 +201,37 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // 订阅 phase-changed：phase 切换时同步切换托盘图标（G2），
     // 并在进入非 Working 阶段时主动唤起 panel 窗口（常驻提醒）。
     // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
-    app.handle()
-        .listen(crate::shared::events::EVENT_PHASE_CHANGED, move |event| {
-        let phase = serde_json::from_str::<TimerStatePayload>(event.payload())
-            .ok()
-            .map(|p| p.phase);
-        match phase {
-            Some(phase) => {
-                set_tray_icon_by_phase(&app_handle, phase);
-                if phase != Phase::Working {
-                    show_panel(&app_handle);
+    app.handle().listen(
+        crate::shared::events::EVENT_PHASE_CHANGED,
+        move |event| {
+            let phase = serde_json::from_str::<TimerStatePayload>(event.payload())
+                .ok()
+                .map(|p| p.phase);
+            match phase {
+                Some(phase) => {
+                    set_tray_icon_by_phase(&app_handle, phase);
+                    if phase != Phase::Working {
+                        show_panel(&app_handle);
+                    }
                 }
+                None => log::warn!("phase-changed payload parse failed, skip tray icon update"),
             }
-            None => log::warn!("phase-changed payload parse failed, skip tray icon update"),
-        }
-    });
+        },
+    );
 
     // 监听 app-config-changed：语言偏好变化时刷新托盘菜单文案（运行时切换，无需重启）。
     let lang_handle = app.handle().clone();
-    app.listen(crate::shared::events::EVENT_APP_CONFIG_CHANGED, move |event| {
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) else {
-            return;
-        };
-        if value.get("key").and_then(|v| v.as_str()) == Some(LANGUAGE_KEY) {
-            refresh_menu_texts(&lang_handle);
-        }
-    });
+    app.listen(
+        crate::shared::events::EVENT_APP_CONFIG_CHANGED,
+        move |event| {
+            let Ok(value) = serde_json::from_str::<serde_json::Value>(event.payload()) else {
+                return;
+            };
+            if value.get("key").and_then(|v| v.as_str()) == Some(LANGUAGE_KEY) {
+                refresh_menu_texts(&lang_handle);
+            }
+        },
+    );
 
     Ok(())
 }
@@ -218,16 +242,32 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(debug_assertions)]
 fn phase_icon_bytes(phase: Phase) -> &'static [u8] {
     match phase {
-        Phase::Working => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/working-dev.png")),
-        Phase::Alerting | Phase::Breaking | Phase::Waiting | Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/nonworking-dev.png")),
+        Phase::Working => include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/icons/tray/working-dev.png"
+        )),
+        Phase::Alerting | Phase::Breaking | Phase::Waiting | Phase::Paused => {
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/icons/tray/nonworking-dev.png"
+            ))
+        }
     }
 }
 
 #[cfg(not(debug_assertions))]
 fn phase_icon_bytes(phase: Phase) -> &'static [u8] {
     match phase {
-        Phase::Working => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/working.png")),
-        Phase::Alerting | Phase::Breaking | Phase::Waiting | Phase::Paused => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray/nonworking.png")),
+        Phase::Working => include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/icons/tray/working.png"
+        )),
+        Phase::Alerting | Phase::Breaking | Phase::Waiting | Phase::Paused => {
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/icons/tray/nonworking.png"
+            ))
+        }
     }
 }
 
@@ -244,7 +284,10 @@ pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
         }
     };
     let Some(tray) = app.tray_by_id("tray") else {
-        log::warn!("tray not found when set_tray_icon_by_phase({:?})", phase);
+        log::warn!(
+            "tray not found when set_tray_icon_by_phase({:?})",
+            phase
+        );
         return;
     };
     if let Err(e) = tray.set_icon(Some(icon)) {
@@ -284,7 +327,14 @@ fn position_panel(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
             .unwrap_or(DEFAULT_PANEL_HEIGHT);
 
         let (x, y) = if let Some(m) = &monitor {
-            compute_panel_position(m, pos.x, pos.y, size.width, size.height, panel_height)
+            compute_panel_position(
+                m,
+                pos.x,
+                pos.y,
+                size.width,
+                size.height,
+                panel_height,
+            )
         } else {
             (pos.x, pos.y + size.height)
         };
@@ -308,8 +358,14 @@ fn compute_panel_position(
         TaskbarEdge::Right => (icon_x - PANEL_WIDTH, icon_y),
     };
 
-    let x = x.clamp(monitor.wa_x, monitor.wa_x + monitor.wa_width - PANEL_WIDTH);
-    let y = y.clamp(monitor.wa_y, monitor.wa_y + monitor.wa_height - panel_height);
+    let x = x.clamp(
+        monitor.wa_x,
+        monitor.wa_x + monitor.wa_width - PANEL_WIDTH,
+    );
+    let y = y.clamp(
+        monitor.wa_y,
+        monitor.wa_y + monitor.wa_height - panel_height,
+    );
 
     (x, y)
 }
@@ -317,7 +373,9 @@ fn compute_panel_position(
 #[tauri::command]
 #[specta::specta]
 pub fn fit_panel(app: tauri::AppHandle, height: f64) -> Result<(), String> {
-    let panel = app.get_webview_window("panel").ok_or("panel not found")?;
+    let panel = app
+        .get_webview_window("panel")
+        .ok_or("panel not found")?;
     let tray = app.tray_by_id("tray").ok_or("tray not found")?;
 
     let _ = panel.set_size(LogicalSize::new(PANEL_WIDTH, height));

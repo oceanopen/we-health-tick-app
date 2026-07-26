@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
-use crate::shared::app_config::{read_app_config_conn, write_app_config_conn, AppConfigState};
+use crate::shared::app_config::{AppConfigState, read_app_config_conn, write_app_config_conn};
 use crate::shared::time::{now_epoch, now_hhmm, today_string};
 use crate::shared::types::{Phase, TimerStatePayload, YesNo};
 
@@ -191,7 +191,11 @@ fn read_long_break_enabled(conn: &Connection) -> bool {
     read_app_config_conn(conn, KEY_LONG_BREAK_ENABLED)
         .ok()
         .flatten()
-        .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(false))
+        .map(|s| {
+            s.parse::<YesNo>()
+                .map(|y| y.is_yes())
+                .unwrap_or(false)
+        })
         .unwrap_or(DEFAULT_LONG_BREAK_ENABLED)
 }
 
@@ -255,7 +259,10 @@ fn read_today_skip_count(conn: &Connection) -> u32 {
 // 用 write_app_config_conn（conn 级，不 emit app-config-changed）——内部统计非用户配置变更，
 // 不应触发 on_app_config_changed handler 或广播给前端窗口（前端经 payload 获取最新值）。
 fn write_today_skip_count(conn: &Connection, count: u32) {
-    let record = TodaySkipRecord { date: today_string(), count };
+    let record = TodaySkipRecord {
+        date: today_string(),
+        count,
+    };
     match serde_json::to_string(&record) {
         Ok(value) => {
             if let Err(e) = write_app_config_conn(conn, KEY_TODAY_SKIP_COUNT, &value) {
@@ -272,7 +279,11 @@ fn read_rest_confirm(conn: &Connection) -> bool {
     read_app_config_conn(conn, KEY_REST_CONFIRM)
         .ok()
         .flatten()
-        .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(false))
+        .map(|s| {
+            s.parse::<YesNo>()
+                .map(|y| y.is_yes())
+                .unwrap_or(false)
+        })
         .unwrap_or(DEFAULT_REST_CONFIRM)
 }
 
@@ -282,7 +293,11 @@ fn read_pause_on_idle(conn: &Connection) -> bool {
     read_app_config_conn(conn, KEY_PAUSE_ON_IDLE)
         .ok()
         .flatten()
-        .map(|s| s.parse::<YesNo>().map(|y| y.is_yes()).unwrap_or(DEFAULT_PAUSE_ON_IDLE))
+        .map(|s| {
+            s.parse::<YesNo>()
+                .map(|y| y.is_yes())
+                .unwrap_or(DEFAULT_PAUSE_ON_IDLE)
+        })
         .unwrap_or(DEFAULT_PAUSE_ON_IDLE)
 }
 
@@ -309,12 +324,16 @@ fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
         start: String,
         end: String,
     }
-    let raw = read_app_config_conn(conn, KEY_QUIET_HOURS).ok().flatten();
+    let raw = read_app_config_conn(conn, KEY_QUIET_HOURS)
+        .ok()
+        .flatten();
     let json = raw.as_deref().unwrap_or(DEFAULT_QUIET_HOURS_JSON);
-    let fallback: Vec<Period> =
-        serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
+    let fallback: Vec<Period> = serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
     let periods: Vec<Period> = serde_json::from_str(json).unwrap_or(fallback);
-    periods.into_iter().map(|p| (p.start, p.end)).collect()
+    periods
+        .into_iter()
+        .map(|p| (p.start, p.end))
+        .collect()
 }
 
 // 判断某 HH:mm 时刻是否落在任一静音时段内。
@@ -558,7 +577,10 @@ fn emit_timer_tick(app: &AppHandle, payload: TimerStatePayload) {
 // emit "phase-changed"：phase 切换时推送（带 prev_phase），前端 PanelApp（M4/M5）用于切换 UI 分支。
 // panel.rs 同步监听此事件：进入非 Working 阶段时主动唤起 panel 窗口（常驻提醒）。
 fn emit_phase_changed(app: &AppHandle, payload: TimerStatePayload) {
-    if let Err(e) = app.emit(crate::shared::events::EVENT_PHASE_CHANGED, payload) {
+    if let Err(e) = app.emit(
+        crate::shared::events::EVENT_PHASE_CHANGED,
+        payload,
+    ) {
         log::warn!("emit phase-changed failed: {e}");
     }
 }
@@ -688,14 +710,17 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                                     let break_min = read_break_duration_minutes(&conn);
                                     let lb_enabled = read_long_break_enabled(&conn);
                                     let lb_interval = read_long_break_interval(&conn);
-                                    let lb_duration_min =
-                                        read_long_break_duration_minutes(&conn);
+                                    let lb_duration_min = read_long_break_duration_minutes(&conn);
                                     let is_long = check_is_long_break(
                                         lb_enabled,
                                         lb_interval,
                                         state.completed_cycles,
                                     );
-                                    let total_min = if is_long { lb_duration_min } else { break_min };
+                                    let total_min = if is_long {
+                                        lb_duration_min
+                                    } else {
+                                        break_min
+                                    };
                                     apply_start_break(
                                         &mut state,
                                         (total_min as i64) * 60,
@@ -706,7 +731,9 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                                 // Alerting 与 Breaking 都属于非 Working，panel.rs 监听 phase-changed 时唤起窗口
                                 phase_change_payload = Some(build_payload(&state, Some(prev)));
                             }
-                            Err(e) => log::warn!("app_config lock poisoned, skip on_work_done: {e}"),
+                            Err(e) => {
+                                log::warn!("app_config lock poisoned, skip on_work_done: {e}")
+                            }
                         }
                     }
                 }
@@ -715,8 +742,14 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                     // idle < 3s 视为「在用电脑」→ 软暂停（不递减 remaining，不切 phase）。
                     // 启动 4s / 跳过 3s 宽限期避免按钮点击余波误判。
                     let idle_secs = crate::shared::idle::get_idle_seconds();
-                    let grace_start = state.break_start_epoch.map(|s| now - s < 4).unwrap_or(false);
-                    let grace_skip = state.last_skip_epoch.map(|s| now - s < 3).unwrap_or(false);
+                    let grace_start = state
+                        .break_start_epoch
+                        .map(|s| now - s < 4)
+                        .unwrap_or(false);
+                    let grace_skip = state
+                        .last_skip_epoch
+                        .map(|s| now - s < 3)
+                        .unwrap_or(false);
                     let active = idle_secs < 3.0
                         && state.remaining_seconds > 0
                         && !grace_start
@@ -761,7 +794,11 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
 fn on_app_config_changed(app: AppHandle, inner: Arc<Mutex<TimerInner>>, event: tauri::Event) {
     let key = serde_json::from_str::<serde_json::Value>(event.payload())
         .ok()
-        .and_then(|v| v.get("key").and_then(|k| k.as_str()).map(|s| s.to_string()));
+        .and_then(|v| {
+            v.get("key")
+                .and_then(|k| k.as_str())
+                .map(|s| s.to_string())
+        });
 
     let Some(key) = key else {
         return;
@@ -818,7 +855,10 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // 重启即重新计时：直接 fresh_working，不读历史状态
     let inner_state = {
         let app_config_state = app.state::<AppConfigState>();
-        let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+        let conn = app_config_state
+            .0
+            .lock()
+            .map_err(|e| e.to_string())?;
         fresh_working(&conn)
     };
 
@@ -835,10 +875,16 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     let app_handle_listen = app.handle().clone();
     let inner_listen = inner.clone();
-    app.handle()
-        .listen(crate::shared::events::EVENT_APP_CONFIG_CHANGED, move |event| {
-            on_app_config_changed(app_handle_listen.clone(), inner_listen.clone(), event);
-        });
+    app.handle().listen(
+        crate::shared::events::EVENT_APP_CONFIG_CHANGED,
+        move |event| {
+            on_app_config_changed(
+                app_handle_listen.clone(),
+                inner_listen.clone(),
+                event,
+            );
+        },
+    );
 
     Ok(())
 }
@@ -885,7 +931,10 @@ pub fn start_work(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
         let now = now_epoch();
         let work_min = {
             let app_config_state = app.state::<AppConfigState>();
-            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+            let conn = app_config_state
+                .0
+                .lock()
+                .map_err(|e| e.to_string())?;
             read_work_duration_minutes(&conn)
         };
         apply_start_work(&mut inner, (work_min as i64) * 60, now);
@@ -908,14 +957,20 @@ pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(),
         let prev = inner.phase;
         let (total_secs, is_long) = {
             let app_config_state = app.state::<AppConfigState>();
-            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+            let conn = app_config_state
+                .0
+                .lock()
+                .map_err(|e| e.to_string())?;
             let break_min = read_break_duration_minutes(&conn);
             let lb_enabled = read_long_break_enabled(&conn);
             let lb_interval = read_long_break_interval(&conn);
             let lb_duration_min = read_long_break_duration_minutes(&conn);
-            let is_long =
-                check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
-            let total_min = if is_long { lb_duration_min } else { break_min };
+            let is_long = check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
+            let total_min = if is_long {
+                lb_duration_min
+            } else {
+                break_min
+            };
             ((total_min as i64) * 60, is_long)
         };
         apply_start_break(&mut inner, total_secs, is_long, now_epoch());
@@ -938,7 +993,10 @@ pub fn confirm_return(app: AppHandle, state: State<'_, TimerState>) -> Result<()
         let now = now_epoch();
         let work_min = {
             let app_config_state = app.state::<AppConfigState>();
-            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+            let conn = app_config_state
+                .0
+                .lock()
+                .map_err(|e| e.to_string())?;
             read_work_duration_minutes(&conn)
         };
         apply_start_work(&mut inner, (work_min as i64) * 60, now);
@@ -984,7 +1042,10 @@ pub fn reset(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String>
         let prev = inner.phase;
         let work_min = {
             let app_config_state = app.state::<AppConfigState>();
-            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+            let conn = app_config_state
+                .0
+                .lock()
+                .map_err(|e| e.to_string())?;
             read_work_duration_minutes(&conn)
         };
         apply_start_work(&mut inner, (work_min as i64) * 60, now_epoch());
@@ -1008,17 +1069,28 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
         let prev = inner.phase;
         let (total_secs, is_long, whisper_reminder, health_reminder) = {
             let app_config_state = app.state::<AppConfigState>();
-            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+            let conn = app_config_state
+                .0
+                .lock()
+                .map_err(|e| e.to_string())?;
             let break_min = read_break_duration_minutes(&conn);
             let lb_enabled = read_long_break_enabled(&conn);
             let lb_interval = read_long_break_interval(&conn);
             let lb_duration_min = read_long_break_duration_minutes(&conn);
-            let is_long =
-                check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
-            let total_min = if is_long { lb_duration_min } else { break_min };
+            let is_long = check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
+            let total_min = if is_long {
+                lb_duration_min
+            } else {
+                break_min
+            };
             // 与 on_work_done 对齐：手动触发也抽取 reminder，BreakingView 底部显示提醒文案
             let (whisper_reminder, health_reminder) = pick_random_reminders(&conn);
-            ((total_min as i64) * 60, is_long, whisper_reminder, health_reminder)
+            (
+                (total_min as i64) * 60,
+                is_long,
+                whisper_reminder,
+                health_reminder,
+            )
         };
         inner.current_whisper_reminder = whisper_reminder;
         inner.current_health_reminder = health_reminder;
@@ -1046,7 +1118,10 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
         }
         let break_skip_max = {
             let app_config_state = app.state::<AppConfigState>();
-            let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+            let conn = app_config_state
+                .0
+                .lock()
+                .map_err(|e| e.to_string())?;
             read_break_skip_max(&conn)
         };
         if inner.break_skip_count < break_skip_max {
@@ -1055,7 +1130,10 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
             let prev = inner.phase;
             let work_min = {
                 let app_config_state = app.state::<AppConfigState>();
-                let conn = app_config_state.0.lock().map_err(|e| e.to_string())?;
+                let conn = app_config_state
+                    .0
+                    .lock()
+                    .map_err(|e| e.to_string())?;
                 // 真正跳过：今日累计跳过次数 +1 并持久化（与 work_min 共用同一 AppConfigState 锁，
                 // 保持 inner→app_config 加锁顺序）。apply_start_work 不触碰 today_skip_count，
                 // 故增量保留至 build_payload。

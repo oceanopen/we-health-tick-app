@@ -2,7 +2,7 @@ mod shared;
 mod timer;
 mod windows;
 
-use tauri_specta::{collect_commands, Builder};
+use tauri_specta::{Builder, collect_commands};
 
 #[tauri::command]
 #[specta::specta]
@@ -71,7 +71,9 @@ pub fn run() {
             } else {
                 tauri_plugin_log::Builder::default()
                     .level(log::LevelFilter::Warn)
-                    .targets([Target::new(TargetKind::LogDir { file_name: None })])
+                    .targets([Target::new(TargetKind::LogDir {
+                        file_name: None,
+                    })])
                     // 1 MiB/文件，保留最近 1 份（旧的重命名带日期），总量 ~1 MiB 有界
                     .max_file_size(1_048_576)
                     .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(1))
