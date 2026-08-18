@@ -7,8 +7,8 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
-use crate::shared::app_config::{AppConfigState, LANGUAGE_KEY, read_app_config_raw};
-use crate::shared::i18n::{ResolvedLanguage, menu_text, resolve};
+use crate::shared::app_config::LANGUAGE_KEY;
+use crate::shared::i18n::{current_language, menu_text};
 use crate::shared::screen::{MonitorInfo, TaskbarEdge, detect_taskbar_edge, find_monitor_for_rect};
 use crate::shared::types::{Phase, TimerStatePayload};
 
@@ -20,16 +20,6 @@ struct TrayMenuItems {
     settings: MenuItem<tauri::Wry>,
     restart: MenuItem<tauri::Wry>,
     exit: MenuItem<tauri::Wry>,
-}
-
-// 读取当前语言偏好（app_config 的 language key）并解析为具体语言。
-// 三态：zh-CN/en 直接映射，缺失或 "system" 走系统 locale 探测（默认英文）。
-fn current_language(app: &AppHandle) -> ResolvedLanguage {
-    let Some(state) = app.try_state::<AppConfigState>() else {
-        return resolve(None);
-    };
-    let raw = read_app_config_raw(state.inner(), LANGUAGE_KEY).unwrap_or(None);
-    resolve(raw.as_deref())
 }
 
 // 语言切换时原地刷新托盘菜单文案，无需重建菜单或重启应用。
@@ -143,7 +133,9 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 // show_settings_window 是 async（Windows 上同步调用会触发 wry#583 死锁），
                 // 在同步的 menu event 闭包里用 async_runtime::spawn 调度。
                 tauri::async_runtime::spawn(async move {
-                    if let Err(e) = crate::windows::settings::show_settings_window(app).await {
+                    // 托盘是通用入口：不传分区，保留用户上次所在分区（窗口 hide 不销毁，hash 存活）。
+                    if let Err(e) = crate::windows::settings::show_settings_window(app, None).await
+                    {
                         log::warn!("show_settings_window from tray menu failed: {e}");
                     }
                 });

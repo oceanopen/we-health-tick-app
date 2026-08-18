@@ -8,7 +8,7 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	exitApp: () => __TAURI_INVOKE<void>("exit_app"),
-	showSettingsWindow: () => typedError<null, string>(__TAURI_INVOKE("show_settings_window")),
+	showSettingsWindow: (navigateTo: string | null) => typedError<null, string>(__TAURI_INVOKE("show_settings_window", { navigateTo })),
 	fitPanel: (height: number | null) => typedError<null, string>(__TAURI_INVOKE("fit_panel", { height })),
 	getAppConfig: (key: string) => typedError<string | null, string>(__TAURI_INVOKE("get_app_config", { key })),
 	setAppConfig: (key: string, value: string) => typedError<null, string>(__TAURI_INVOKE("set_app_config", { key, value })),

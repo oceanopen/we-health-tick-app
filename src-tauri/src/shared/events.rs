@@ -9,3 +9,7 @@ pub const EVENT_PHASE_CHANGED: &str = "phase-changed";
 
 /// 配置项变更时广播（AppConfigChangedPayload）。订阅方据此响应配置变化。
 pub const EVENT_APP_CONFIG_CHANGED: &str = "app-config-changed";
+
+/// settings 窗口导航请求（payload = 分区 MenuKey 字符串）。窗口已存在（二次唤起）时由
+/// show_settings_window 在 show 后 emit_to；首开深链走初始 URL，不走此事件（前端 listen 未注册）。
+pub const EVENT_SETTINGS_NAVIGATE: &str = "settings:navigate";

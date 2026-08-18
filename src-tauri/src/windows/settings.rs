@@ -1,5 +1,7 @@
-use tauri::{LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
 
+use crate::shared::events::EVENT_SETTINGS_NAVIGATE;
+use crate::shared::i18n::{current_language, menu_text};
 use crate::shared::screen::{
     DEFAULT_SIZE, SETTINGS_RATIO, find_monitor_for_tray, ratio_size, work_area_center,
 };
@@ -9,7 +11,10 @@ use crate::shared::types::Phase;
 // 死锁（白屏 + 主线程卡死）；改 async 让 IPC 线程不阻塞消息泵。macOS 无此问题（WKWebView 无 COM 模型）。
 #[tauri::command]
 #[specta::specta]
-pub async fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn show_settings_window(
+    app: tauri::AppHandle,
+    navigate_to: Option<String>,
+) -> Result<(), String> {
     // 按 tray.rect() 所在屏算尺寸；探测失败用 DEFAULT_SIZE 兜底，后续 set_position 也跳过。
     let monitor = find_monitor_for_tray(&app, "tray");
     let (width, height) = monitor
@@ -17,11 +22,14 @@ pub async fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         .map(|m| ratio_size(m, SETTINGS_RATIO))
         .unwrap_or(DEFAULT_SIZE);
 
-    let settings_win = match app.get_webview_window("settings") {
+    // match 一次性产出 (窗口, 是否已存在)。is_existing 决定深链通道：
+    // 已存在（webview 已就绪、前端 listen 已注册）→ show 后 emit_to 事件导航；
+    // 首开 → 初始 URL 拼 hash（build() 返回时前端 listen 尚未注册，emit 必丢）。
+    let (settings_win, settings_win_is_existing) = match app.get_webview_window("settings") {
         Some(w) => {
-            // 二次唤起：显式重置尺寸，避免窗口实例首次建好后跨分辨率屏固化。
+            // 二次唤起：显式重设尺寸，避免窗口实例首次建好后跨分辨率屏固化。
             let _ = w.set_size(LogicalSize::new(width, height));
-            w
+            (w, true)
         }
         None => {
             let product = app
@@ -29,19 +37,23 @@ pub async fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
                 .product_name
                 .as_deref()
                 .unwrap_or("We Health Tick");
-            let win = WebviewWindowBuilder::new(
-                &app,
-                "settings",
-                WebviewUrl::App("settings.html".into()),
-            )
-            .title(format!("{product} - 系统设置"))
-            .inner_size(width, height)
-            // 默认在主屏居中；下方 set_position 修正到 tray 所在屏，探测失败保持主屏。
-            .center()
-            // 窗口不进任务栏与 Alt+Tab（Windows/Linux），macOS 上为 no-op（Dock 由 ActivationPolicy 控制）。
-            .skip_taskbar(true)
-            .build()
-            .map_err(|e| e.to_string())?;
+            // 首开深链：分区直接拼进初始 URL 的 hash，由前端 HashRouter 解析。
+            let url = match &navigate_to {
+                Some(section) => format!("settings.html#/{section}").into(),
+                None => "settings.html".into(),
+            };
+            let win = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url))
+                .title(format!(
+                    "{product} - {}",
+                    menu_text(current_language(&app), "settings")
+                ))
+                .inner_size(width, height)
+                // 默认在主屏居中；下方 set_position 修正到 tray 所在屏，探测失败保持主屏。
+                .center()
+                // 窗口不进任务栏与 Alt+Tab（Windows/Linux），macOS 上为 no-op（Dock 由 ActivationPolicy 控制）。
+                .skip_taskbar(true)
+                .build()
+                .map_err(|e| e.to_string())?;
 
             let w = win.clone();
             win.on_window_event(move |event| {
@@ -56,7 +68,7 @@ pub async fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
                 }
             });
 
-            win
+            (win, false)
         }
     };
 
@@ -73,6 +85,12 @@ pub async fn show_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     let _ = settings_win.show();
     let _ = settings_win.unminimize();
     let _ = settings_win.set_focus();
+
+    // 二次唤起深链：show 之后 emit，前端 goMenu 完成导航。无参不 emit——窗口 hide 不销毁，
+    // hash 天然存活，保留用户上次所在分区。非法值由前端 isMenuKey 守卫回落默认分区。
+    if let (true, Some(section)) = (settings_win_is_existing, navigate_to) {
+        let _ = app.emit_to("settings", EVENT_SETTINGS_NAVIGATE, section);
+    }
 
     Ok(())
 }

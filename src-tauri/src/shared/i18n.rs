@@ -1,3 +1,7 @@
+use tauri::{AppHandle, Manager};
+
+use crate::shared::app_config::{AppConfigState, LANGUAGE_KEY, read_app_config_raw};
+
 use sys_locale::get_locale;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -23,7 +27,18 @@ pub fn resolve(raw: Option<&str>) -> ResolvedLanguage {
     }
 }
 
-/// 后端文案仅覆盖托盘菜单（业务文案在前端 react-i18next）。
+// 读取当前语言偏好（app_config 的 language key）并解析为具体语言。
+// 三态：zh-CN/en 直接映射，缺失或 "system" 走系统 locale 探测（默认英文）。
+// 消费方：托盘菜单文案刷新（refresh_menu_texts）、settings 窗口 title。
+pub fn current_language(app: &AppHandle) -> ResolvedLanguage {
+    let Some(state) = app.try_state::<AppConfigState>() else {
+        return resolve(None);
+    };
+    let raw = read_app_config_raw(state.inner(), LANGUAGE_KEY).unwrap_or(None);
+    resolve(raw.as_deref())
+}
+
+/// 后端文案覆盖托盘菜单与 settings 窗口 title（业务文案在前端 react-i18next）。
 /// 加 key 时同步 refresh_menu_texts 与 setup 的菜单构建。
 pub fn menu_text(lang: ResolvedLanguage, key: &str) -> &'static str {
     match (lang, key) {

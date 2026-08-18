@@ -4,12 +4,15 @@ import { commands } from '@src/shared/bindings';
 import { logOnError } from '@src/shared/commands';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useRef } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AlertingView } from './components/AlertingView';
 import { BreakingView } from './components/BreakingView';
 import { PausedView } from './components/PausedView';
 import { WaitingView } from './components/WaitingView';
 import { WorkingView } from './components/WorkingView';
+import { usePhaseRoute } from './hooks/usePhaseRoute';
 import { useTimerState } from './hooks/useTimerState';
+import { PHASE_PATHS, phaseToPath } from './routes';
 
 export default function PanelApp() {
   const {
@@ -35,6 +38,9 @@ export default function PanelApp() {
     quietTriggered,
     remainingSeconds,
   } = useTimerState();
+  // 镜像层：phase → URL 单向同步（replace-only，见 hook 头注释）。useTimerState 留在本组件
+  // 顶层且不进 Routes——路由元素以 props 内联接收，phase 切换不重挂 hook、不闪 INITIAL_STATE。
+  usePhaseRoute(phase);
   const phaseRef = useRef<Phase>('working');
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -102,8 +108,14 @@ export default function PanelApp() {
         borderColor: 'divider',
       })}
     >
-      {phase === 'working'
-        ? (
+      {/* 声明式路由：path 是后端 Phase 状态机的单向镜像（usePhaseRoute 纠偏）。
+          root Box（ResizeObserver 挂载体）保持在 Routes 外部且永不卸载，高度自适应链路不受路由影响。
+          '/' 与未知路径 replace 归一到当前 phase（Phase 为闭集，无额外兜底分支需求）。 */}
+      <Routes>
+        <Route path="/" element={<Navigate to={phaseToPath(phase)} replace />} />
+        <Route
+          path={PHASE_PATHS.working}
+          element={(
             <WorkingView
               displayTime={displayTime}
               progress={progress}
@@ -112,51 +124,52 @@ export default function PanelApp() {
               onReset={reset}
               onManualBreak={manualBreak}
             />
-          )
-        : phase === 'alerting'
-          ? (
-              <AlertingView
-                whisperReminder={currentWhisperReminder}
-                breakSkipCount={breakSkipCount}
-                breakSkipMax={breakSkipMax}
-                todaySkipCount={todaySkipCount}
-                skipCountReminder={skipCountReminder}
-                onStartBreak={confirmBreak}
-                onSkip={skipBreak}
-              />
-            )
-          : phase === 'breaking'
-            ? (
-                <BreakingView
-                  displayTime={displayTime}
-                  progress={progress}
-                  whisperReminder={currentWhisperReminder}
-                  healthReminder={currentHealthReminder}
-                  isLongBreak={isLongBreak}
-                  breakSkipCount={breakSkipCount}
-                  breakSkipMax={breakSkipMax}
-                  breakPaused={breakPaused}
-                  onSkip={skipBreak}
-                />
-              )
-            : phase === 'waiting'
-              ? (
-                  <WaitingView onReturn={confirmReturn} />
-                )
-              : phase === 'paused'
-                ? (
-                    <PausedView
-                      remainingSeconds={remainingSeconds}
-                      quietTriggered={quietTriggered}
-                      quietHours={quietHours}
-                      onResume={togglePause}
-                    />
-                  )
-                : (
-                    <Box sx={{ py: 4, color: 'error.main', fontSize: 14 }}>
-                      未识别状态: {phase}
-                    </Box>
-                  )}
+          )}
+        />
+        <Route
+          path={PHASE_PATHS.alerting}
+          element={(
+            <AlertingView
+              whisperReminder={currentWhisperReminder}
+              breakSkipCount={breakSkipCount}
+              breakSkipMax={breakSkipMax}
+              todaySkipCount={todaySkipCount}
+              skipCountReminder={skipCountReminder}
+              onStartBreak={confirmBreak}
+              onSkip={skipBreak}
+            />
+          )}
+        />
+        <Route
+          path={PHASE_PATHS.breaking}
+          element={(
+            <BreakingView
+              displayTime={displayTime}
+              progress={progress}
+              whisperReminder={currentWhisperReminder}
+              healthReminder={currentHealthReminder}
+              isLongBreak={isLongBreak}
+              breakSkipCount={breakSkipCount}
+              breakSkipMax={breakSkipMax}
+              breakPaused={breakPaused}
+              onSkip={skipBreak}
+            />
+          )}
+        />
+        <Route path={PHASE_PATHS.waiting} element={<WaitingView onReturn={confirmReturn} />} />
+        <Route
+          path={PHASE_PATHS.paused}
+          element={(
+            <PausedView
+              remainingSeconds={remainingSeconds}
+              quietTriggered={quietTriggered}
+              quietHours={quietHours}
+              onResume={togglePause}
+            />
+          )}
+        />
+        <Route path="*" element={<Navigate to={phaseToPath(phase)} replace />} />
+      </Routes>
     </Box>
   );
 }
