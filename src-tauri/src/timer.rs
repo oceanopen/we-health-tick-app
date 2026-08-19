@@ -55,7 +55,9 @@ struct TimerInner {
     /// 当前随机抽取的健康提醒文案（来自 reminders 配置的 health 池）。
     /// breaking 阶段在 BreakingView 以绿色横幅展示；alerting 已抽取但不展示；其他阶段为空字符串。
     current_health_reminder: String,
-    /// 本次休息是否为长休息。M3 的 start_break 中判定；前端 breaking UI 据此切换标签。
+    /// 本次休息是否为长休息。on_work_done（归零时刻，Alerting 提前写入）与 manual_break 判定，
+    /// apply_start_break 接收传入值；从 Alerting 提醒到 Waiting 的整条链路均携带本值：
+    /// 前端 AlertingView/WaitingView 据此切换标题，panel.rs 据此分派窗口形态。进 Working 前清零。
     is_long_break: bool,
     /// 当前状态对应的日期（yyyy-MM-dd，本地时区）。
     /// 运行时跨天判断：tick 中若 save_date != today，触发 fresh_working 开始新一轮。
@@ -215,6 +217,28 @@ fn read_long_break_duration_minutes(conn: &Connection) -> u32 {
         .flatten()
         .and_then(|s| s.parse::<u32>().ok())
         .unwrap_or(DEFAULT_LONG_BREAK_DURATION_MIN)
+}
+
+// 按休息类型读对应时长并转秒（长休息 → long_break_duration，正常 → break_duration）。
+// confirm_break（is_long 已由 on_work_done 提前写入，只补时长）等只需时长的调用点使用。
+fn read_break_total_secs(conn: &Connection, is_long: bool) -> i64 {
+    let minutes = if is_long {
+        read_long_break_duration_minutes(conn)
+    } else {
+        read_break_duration_minutes(conn)
+    };
+    (minutes as i64) * 60
+}
+
+// 长休息判定 + 对应时长总秒数，一次性完成（run_timer_loop 归零分支与 manual_break 共用）。
+// completed_cycles 传递增前的值（与 check_is_long_break 约定一致）。
+fn read_break_plan(conn: &Connection, completed_cycles: u32) -> (bool, i64) {
+    let is_long = check_is_long_break(
+        read_long_break_enabled(conn),
+        read_long_break_interval(conn),
+        completed_cycles,
+    );
+    (is_long, read_break_total_secs(conn, is_long))
 }
 
 // 读 break_skip_max（休息跳过防误触门槛）。容错：非数字/超范围 → clamp 到 [MIN,MAX]；无值 → 回退默认。
@@ -449,15 +473,20 @@ fn apply_start_work(inner: &mut TimerInner, work_total_secs: i64, now: i64) {
 
 // 工作倒计时归零：抽取 reminder + 按 rest_confirm 分流。
 // rest_confirm=true → 进 Alerting（等用户确认）；=false → 调用方继续 apply_start_break。
+// is_long / break_total_secs 由调用方按 check_is_long_break 判定后传入（用递增前的 completed_cycles）；
+// 此处提前写入 is_long_break，使 Alerting（休息前提醒）阶段的 payload 即携带本轮休息类型——
+// panel.rs 据此分派提醒窗口形态，前端 AlertingView 据此显示「该长休息啦」。
 // 返回进入的下一个 phase，调用方据此决定是否继续 breaking 流程。
 fn apply_on_work_done(
     inner: &mut TimerInner,
     whisper_reminder: String,
     health_reminder: String,
     rest_confirm: bool,
+    is_long: bool,
 ) -> Phase {
     inner.current_whisper_reminder = whisper_reminder;
     inner.current_health_reminder = health_reminder;
+    inner.is_long_break = is_long;
     if rest_confirm {
         inner.phase = Phase::Alerting;
         inner.remaining_seconds = 0;
@@ -470,7 +499,9 @@ fn apply_on_work_done(
 }
 
 // 进入 Breaking 阶段：清 break_skip_count + 设剩余/总秒数。
-// is_long 由调用方按 check_is_long_break 判定后传入（用递增前的 completed_cycles）。
+// is_long 由调用方判定/传递（on_work_done / manual_break 经 read_break_plan 判定；
+// confirm_break 读 on_work_done 提前写入的 inner.is_long_break）。on_work_done 已提前写入同值，
+// 此处再赋一次保证 manual_break（不经 on_work_done）路径也正确。
 fn apply_start_break(inner: &mut TimerInner, break_total_secs: i64, is_long: bool, now: i64) {
     inner.phase = Phase::Breaking;
     inner.target_epoch = 0; // breaking 不用 target_epoch（递减模式）
@@ -486,7 +517,7 @@ fn apply_start_break(inner: &mut TimerInner, break_total_secs: i64, is_long: boo
 }
 
 // 休息正常结束（on_break_done）：后置递增 completed_cycles + 进 Waiting。
-// 关键：completedCycles 后置递增 → 下次 start_break 判定时读到递增后的值。
+// 关键：completedCycles 后置递增 → 下次 on_work_done 长休息判定时读到递增后的值。
 fn apply_on_break_done(inner: &mut TimerInner) {
     inner.completed_cycles += 1;
     inner.phase = Phase::Waiting;
@@ -698,35 +729,21 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                                 let (whisper_reminder, health_reminder) =
                                     pick_random_reminders(&conn);
                                 let rest_confirm = read_rest_confirm(&conn);
+                                // 长休息判定统一在归零时刻完成一次（Alerting 与直接 Breaking 共用），
+                                // on_work_done 提前写入 is_long_break，Alerting payload 即携带休息类型。
+                                let (is_long, total_secs) =
+                                    read_break_plan(&conn, state.completed_cycles);
                                 let next = apply_on_work_done(
                                     &mut state,
                                     whisper_reminder,
                                     health_reminder,
                                     rest_confirm,
+                                    is_long,
                                 );
 
                                 if next == Phase::Breaking {
                                     // rest_confirm=N：直接进 Breaking
-                                    let break_min = read_break_duration_minutes(&conn);
-                                    let lb_enabled = read_long_break_enabled(&conn);
-                                    let lb_interval = read_long_break_interval(&conn);
-                                    let lb_duration_min = read_long_break_duration_minutes(&conn);
-                                    let is_long = check_is_long_break(
-                                        lb_enabled,
-                                        lb_interval,
-                                        state.completed_cycles,
-                                    );
-                                    let total_min = if is_long {
-                                        lb_duration_min
-                                    } else {
-                                        break_min
-                                    };
-                                    apply_start_break(
-                                        &mut state,
-                                        (total_min as i64) * 60,
-                                        is_long,
-                                        now,
-                                    );
+                                    apply_start_break(&mut state, total_secs, is_long, now);
                                 }
                                 // Alerting 与 Breaking 都属于非 Working，panel.rs 监听 phase-changed 时唤起窗口
                                 phase_change_payload = Some(build_payload(&state, Some(prev)));
@@ -946,6 +963,8 @@ pub fn start_work(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
 }
 
 // Alerting → Breaking：用户在 alerting UI 点「开始休息」。
+// is_long 不在此处重算——on_work_done 归零时刻已提前写入 inner.is_long_break（Alerting 提醒
+// 展示的休息类型即实际类型，用户在提醒期间改配置也不会二者不一致），此处只按类型读对应时长。
 #[tauri::command]
 #[specta::specta]
 pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
@@ -955,24 +974,15 @@ pub fn confirm_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(),
             return Err("confirm_break only valid in Alerting phase".into());
         }
         let prev = inner.phase;
-        let (total_secs, is_long) = {
+        let total_secs = {
             let app_config_state = app.state::<AppConfigState>();
             let conn = app_config_state
                 .0
                 .lock()
                 .map_err(|e| e.to_string())?;
-            let break_min = read_break_duration_minutes(&conn);
-            let lb_enabled = read_long_break_enabled(&conn);
-            let lb_interval = read_long_break_interval(&conn);
-            let lb_duration_min = read_long_break_duration_minutes(&conn);
-            let is_long = check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
-            let total_min = if is_long {
-                lb_duration_min
-            } else {
-                break_min
-            };
-            ((total_min as i64) * 60, is_long)
+            read_break_total_secs(&conn, inner.is_long_break)
         };
+        let is_long = inner.is_long_break;
         apply_start_break(&mut inner, total_secs, is_long, now_epoch());
         build_payload(&inner, Some(prev))
     };
@@ -1073,20 +1083,11 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
                 .0
                 .lock()
                 .map_err(|e| e.to_string())?;
-            let break_min = read_break_duration_minutes(&conn);
-            let lb_enabled = read_long_break_enabled(&conn);
-            let lb_interval = read_long_break_interval(&conn);
-            let lb_duration_min = read_long_break_duration_minutes(&conn);
-            let is_long = check_is_long_break(lb_enabled, lb_interval, inner.completed_cycles);
-            let total_min = if is_long {
-                lb_duration_min
-            } else {
-                break_min
-            };
+            let (is_long, total_secs) = read_break_plan(&conn, inner.completed_cycles);
             // 与 on_work_done 对齐：手动触发也抽取 reminder，BreakingView 底部显示提醒文案
             let (whisper_reminder, health_reminder) = pick_random_reminders(&conn);
             (
-                (total_min as i64) * 60,
+                total_secs,
                 is_long,
                 whisper_reminder,
                 health_reminder,

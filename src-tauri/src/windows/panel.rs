@@ -7,13 +7,94 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
-use crate::shared::app_config::{LANGUAGE_KEY, LONG_BREAK_WINDOW_KEY, LONG_BREAK_WINDOW_TRAY};
+use crate::shared::app_config::{
+    AppConfigState, LANGUAGE_KEY, LONG_BREAK_WINDOW_FULLSCREEN, LONG_BREAK_WINDOW_KEY,
+    LONG_BREAK_WINDOW_TOP_RIGHT, LONG_BREAK_WINDOW_TRAY, REST_WINDOW_FULLSCREEN, REST_WINDOW_KEY,
+    REST_WINDOW_TOP_RIGHT, REST_WINDOW_TRAY, read_app_config_raw,
+};
 use crate::shared::i18n::{current_language, menu_text};
-use crate::shared::screen::{MonitorInfo, TaskbarEdge, detect_taskbar_edge, find_monitor_for_rect};
+use crate::shared::screen::{
+    MonitorInfo, TaskbarEdge, detect_taskbar_edge, find_monitor_for_rect, find_monitor_for_tray,
+};
 use crate::shared::types::{Phase, TimerStatePayload};
 
 const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
+
+/// 右上角形态与屏幕 work_area 边缘的间距（逻辑像素），避免窗口紧贴屏幕边缘。
+const PANEL_TOP_RIGHT_MARGIN: f64 = 12.0;
+
+/// panel 窗口当前形态（贴托盘 vs 屏幕右上角）。
+/// 受管状态（app.manage）：phase-changed 监听器按 rest_window / long_break_window 配置写入，
+/// show_panel / fit_panel / create_panel / settings 恢复等所有定位路径统一读取，
+/// 保证高度自适应、窗口恢复后不跳回托盘位。
+#[derive(Clone, Copy)]
+enum PanelForm {
+    /// 贴托盘图标旁（现有默认形态）。
+    Tray,
+    /// 托盘所在屏 work_area 右上角。
+    TopRight,
+}
+
+struct PanelFormState(pub Mutex<PanelForm>);
+
+// 读当前形态；锁 poisoned 时保守回退 Tray（贴托盘是历史默认行为）。
+fn current_panel_form(app: &AppHandle) -> PanelForm {
+    app.try_state::<PanelFormState>()
+        .and_then(|s| s.0.lock().map(|f| *f).ok())
+        .unwrap_or(PanelForm::Tray)
+}
+
+// 写当前形态；锁 poisoned 时丢弃（下次 phase 切换会重写）。
+fn set_panel_form(app: &AppHandle, form: PanelForm) {
+    if let Some(state) = app.try_state::<PanelFormState>() {
+        if let Ok(mut f) = state.0.lock() {
+            *f = form;
+        }
+    }
+}
+
+// 按休息类型读对应窗口形态配置并映射为 PanelForm。
+// 现读 DB（无缓存，保存后下一次休息即生效）。三个取值显式分派：
+//   - tray / topRight：已实现形态（topRight 叠加在 tray 之上，仅定位不同）。
+//   - fullscreen：尚未实现，warn 后回退 tray 兜底（UI 中该选项禁用，仅 DB 残留/外部写入
+//     会命中；待形态落地后在此替换分派实现）。
+//   - DB 无值 / 非法值：回退 tray。
+fn panel_form_by_window_config(app: &AppHandle, is_long_break: bool) -> PanelForm {
+    let (key, tray, top_right, fullscreen) = if is_long_break {
+        (
+            LONG_BREAK_WINDOW_KEY,
+            LONG_BREAK_WINDOW_TRAY,
+            LONG_BREAK_WINDOW_TOP_RIGHT,
+            LONG_BREAK_WINDOW_FULLSCREEN,
+        )
+    } else {
+        (
+            REST_WINDOW_KEY,
+            REST_WINDOW_TRAY,
+            REST_WINDOW_TOP_RIGHT,
+            REST_WINDOW_FULLSCREEN,
+        )
+    };
+    let window = app
+        .try_state::<AppConfigState>()
+        .and_then(|state| read_app_config_raw(&state, key).ok().flatten())
+        .unwrap_or_else(|| tray.to_string());
+    match window.as_str() {
+        v if v == tray => PanelForm::Tray,
+        v if v == top_right => PanelForm::TopRight,
+        v if v == fullscreen => {
+            // warn 而非 info：release 构建日志级别为 Warn，info 会被过滤导致生产排障不可见。
+            log::warn!(
+                "{}={} not implemented yet, fallback to tray panel",
+                key,
+                window
+            );
+            PanelForm::Tray
+        }
+        _ => PanelForm::Tray,
+    }
+}
 
 // 已构建的托盘菜单项引用，用于语言切换时动态更新文案（MenuItem::set_text）。
 struct TrayMenuItems {
@@ -186,16 +267,21 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         exit: exit_item,
     }));
 
+    // panel 窗口形态受管状态（初始贴托盘；启动即 Working，首次休息时监听器按配置写入）。
+    app.manage(PanelFormState(Mutex::new(PanelForm::Tray)));
+
     let app_handle = app.handle().clone();
     // 启动即 fresh_working（L1），初始恒为 Working；显式设置一次避免启动瞬间显示默认 32x32.png（G3）。
     set_tray_icon_by_phase(&app_handle, Phase::Working);
 
     // 订阅 phase-changed：phase 切换时同步切换托盘图标（G2），
     // 并在进入非 Working 阶段时主动唤起 panel 窗口（常驻提醒）。
-    // 长休息（Breaking && is_long_break）按 long_break_window 配置分派窗口形态：
-    // topRight/fullscreen 形态尚未实现，记录后回退 tray 行为（与 rest_window 现状一致）。
-    // 仅在 Breaking 判定：Alerting 阶段的 is_long_break 是上一轮残留值（本轮长休息判定
-    // 在 confirm_break 后才写入），此时读配置会误用脏数据。
+    // 窗口形态按休息类型分派（is_long_break 由 timer.rs 在 on_work_done 归零时刻提前写入，
+    // Alerting 休息前提醒阶段即为本轮真实类型，非上轮残留）：
+    //   - Alerting / Breaking：读对应配置（长休息 → long_break_window，正常 → rest_window），
+    //     topRight → 屏幕右上角，tray / fullscreen（未实现）/ 非法值 → 贴托盘。
+    //   - Waiting / Paused：沿用当前形态（位置不跳变，休息结束确认/暂停期间停在原地）。
+    //   - Working：重置贴托盘（左键 toggle 查看工作倒计时回到托盘位）。
     // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
     app.handle().listen(
         crate::shared::events::EVENT_PHASE_CHANGED,
@@ -205,13 +291,31 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             match phase {
                 Some(phase) => {
                     set_tray_icon_by_phase(&app_handle, phase);
-                    if phase != Phase::Working {
-                        if phase == Phase::Breaking
-                            && payload.as_ref().is_some_and(|p| p.is_long_break)
-                        {
-                            show_panel_by_long_break_window(&app_handle);
-                        } else {
+                    match phase {
+                        Phase::Alerting | Phase::Breaking => {
+                            let is_long = payload.as_ref().is_some_and(|p| p.is_long_break);
+                            set_panel_form(
+                                &app_handle,
+                                panel_form_by_window_config(&app_handle, is_long),
+                            );
                             show_panel(&app_handle);
+                        }
+                        Phase::Waiting | Phase::Paused => {
+                            // 沿用当前形态
+                            show_panel(&app_handle);
+                        }
+                        Phase::Working => {
+                            set_panel_form(&app_handle, PanelForm::Tray);
+                            // 跳过休息 / 确认返回等入口进入 Working 时窗口可能可见（如 topRight
+                            // 形态下刚点完按钮），形态重置后原地重定位回托盘位，避免滞留右上角。
+                            // 不 show / 不 set_focus：隐藏状态下保持隐藏（衔接失焦自动隐藏机制）。
+                            if let Some(panel) = app_handle.get_webview_window("panel") {
+                                if panel.is_visible().unwrap_or(false) {
+                                    if let Some(tray) = app_handle.tray_by_id("tray") {
+                                        position_panel(&tray, &panel);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -298,13 +402,14 @@ pub fn set_tray_icon_by_phase(app: &AppHandle, phase: Phase) {
 
 // 强制显示 panel（H4）：panel 不存在 → create；存在 → position + show + set_focus。
 // phase-changed 监听器在进入非 Working 阶段时调用此函数唤起窗口。
+// 定位按当前 PanelForm 分派（Tray 贴托盘 / TopRight 屏幕右上角）。
 pub fn show_panel(app: &AppHandle) {
     let Some(tray) = app.tray_by_id("tray") else {
         log::warn!("tray not found when show_panel");
         return;
     };
     if let Some(panel) = app.get_webview_window("panel") {
-        position_panel(&tray, &panel);
+        position_panel_by_form(&tray, &panel);
         let _ = panel.show();
         let _ = panel.set_focus();
     } else {
@@ -312,30 +417,27 @@ pub fn show_panel(app: &AppHandle) {
     }
 }
 
-// 长休息唤起：按 long_break_window 配置分派窗口形态（前端镜像见 shared/app_config.rs 注释）。
-// 现读 DB（无缓存，保存后下一次长休息即生效）；DB 无值 / 非法值回退 tray。
-// topRight / fullscreen 形态尚未实现：记录意图后回退 show_panel（tray 行为），
-// 待形态落地后在此替换分派实现。
-fn show_panel_by_long_break_window(app: &AppHandle) {
-    let window = app
-        .try_state::<crate::shared::app_config::AppConfigState>()
-        .and_then(|state| {
-            crate::shared::app_config::read_app_config_raw(&state, LONG_BREAK_WINDOW_KEY)
-                .ok()
-                .flatten()
-        })
-        .unwrap_or_else(|| LONG_BREAK_WINDOW_TRAY.to_string());
-    match window.as_str() {
-        "topRight" | "fullscreen" => {
-            // warn 而非 info：release 构建日志级别为 Warn，info 会被过滤导致生产排障不可见。
-            log::warn!(
-                "long_break_window={} not implemented yet, fallback to tray panel",
-                window
-            );
-            show_panel(app);
-        }
-        _ => show_panel(app),
+// 按当前形态分派定位入口（fit_panel / show_panel / create_panel 共用）。
+fn position_panel_by_form(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
+    match current_panel_form(tray.app_handle()) {
+        PanelForm::TopRight => position_panel_top_right(tray, panel),
+        PanelForm::Tray => position_panel(tray, panel),
     }
+}
+
+// 右上角形态定位：panel 放到托盘所在屏 work_area 右上角（与托盘形态同屏，多屏行为可预期），
+// 距边缘留 PANEL_TOP_RIGHT_MARGIN。锚点为右上角，窗口高度不参与定位计算
+// （高度自适应由 fit_panel 重设尺寸后再次调用本函数完成）。
+// 显示器探测失败（tray rect 缺失 / 不在任何屏内）回退贴托盘定位。
+fn position_panel_top_right(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
+    let Some(monitor) = find_monitor_for_tray(tray.app_handle(), "tray") else {
+        log::warn!("monitor not found for topRight panel, fallback to tray position");
+        position_panel(tray, panel);
+        return;
+    };
+    let x = monitor.wa_x + monitor.wa_width - PANEL_WIDTH - PANEL_TOP_RIGHT_MARGIN;
+    let y = monitor.wa_y + PANEL_TOP_RIGHT_MARGIN;
+    let _ = panel.set_position(LogicalPosition::new(x, y));
 }
 
 fn position_panel(tray: &tauri::tray::TrayIcon, panel: &tauri::WebviewWindow) {
@@ -406,7 +508,7 @@ pub fn fit_panel(app: tauri::AppHandle, height: f64) -> Result<(), String> {
     let tray = app.tray_by_id("tray").ok_or("tray not found")?;
 
     let _ = panel.set_size(LogicalSize::new(PANEL_WIDTH, height));
-    position_panel(&tray, &panel);
+    position_panel_by_form(&tray, &panel);
 
     Ok(())
 }
@@ -420,10 +522,10 @@ fn create_panel(app: &tauri::AppHandle, tray: &tauri::tray::TrayIcon) {
         // 窗口不进任务栏与 Alt+Tab（Windows/Linux），macOS 上为 no-op（Dock 由 ActivationPolicy 控制）。
         .skip_taskbar(true)
         .focused(true)
-        .inner_size(240.0, DEFAULT_PANEL_HEIGHT);
+        .inner_size(PANEL_WIDTH, DEFAULT_PANEL_HEIGHT);
 
     if let Ok(w) = panel.build() {
-        position_panel(tray, &w);
+        position_panel_by_form(tray, &w);
         let _ = w.show();
         let _ = w.set_focus();
     }

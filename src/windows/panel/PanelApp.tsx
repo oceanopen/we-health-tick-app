@@ -131,6 +131,7 @@ export default function PanelApp() {
           element={(
             <AlertingView
               whisperReminder={currentWhisperReminder}
+              isLongBreak={isLongBreak}
               breakSkipCount={breakSkipCount}
               breakSkipMax={breakSkipMax}
               todaySkipCount={todaySkipCount}
@@ -156,7 +157,15 @@ export default function PanelApp() {
             />
           )}
         />
-        <Route path={PHASE_PATHS.waiting} element={<WaitingView onReturn={confirmReturn} />} />
+        <Route
+          path={PHASE_PATHS.waiting}
+          element={(
+            <WaitingView
+              isLongBreak={isLongBreak}
+              onReturn={confirmReturn}
+            />
+          )}
+        />
         <Route
           path={PHASE_PATHS.paused}
           element={(

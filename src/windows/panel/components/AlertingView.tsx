@@ -7,6 +7,7 @@ import { PHASE_RING_COLORS } from '../phaseColors';
 
 interface AlertingViewProps {
   whisperReminder: string;
+  isLongBreak: boolean;
   breakSkipCount: number;
   breakSkipMax: number;
   todaySkipCount: number;
@@ -15,12 +16,14 @@ interface AlertingViewProps {
   onSkip: () => void;
 }
 
-export function AlertingView({ whisperReminder, breakSkipCount, breakSkipMax, todaySkipCount, skipCountReminder, onStartBreak, onSkip }: AlertingViewProps) {
+export function AlertingView({ whisperReminder, isLongBreak, breakSkipCount, breakSkipMax, todaySkipCount, skipCountReminder, onStartBreak, onSkip }: AlertingViewProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const alertingColor
     = theme.palette.mode === 'light' ? PHASE_RING_COLORS.alerting.light : PHASE_RING_COLORS.alerting.dark;
   const skipLabel = `${t('panel:action.skipBreak')} (${breakSkipCount}/${breakSkipMax})`;
+  // 即将进入的休息类型（on_work_done 提前写入）区分标题，确认前用户即知休息类型。
+  const alertTitle = isLongBreak ? t('panel:alertLongTitle') : t('panel:alertTitle');
   // 今日累计「真正跳过休息」≥ 阈值且阈值 > 0（未关闭）时显示警示横幅；阈值 0 = 关闭提醒。
   const showSkipWarning = skipCountReminder > 0 && todaySkipCount >= skipCountReminder;
 
@@ -37,7 +40,7 @@ export function AlertingView({ whisperReminder, breakSkipCount, breakSkipMax, to
     >
       <NotificationsActiveIcon sx={{ fontSize: 120, color: alertingColor }} />
       <Typography variant="subtitle1">
-        {t('panel:alertTitle')}
+        {alertTitle}
       </Typography>
       <Typography variant="caption" align="center" color="text.secondary" sx={{ px: 1 }}>
         {whisperReminder}

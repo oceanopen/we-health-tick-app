@@ -45,6 +45,6 @@ export interface RestWindowOption {
 
 export const restWindowOptions: RestWindowOption[] = [
   { value: 'tray', labelKey: 'rest:option.tray' },
-  { value: 'topRight', labelKey: 'rest:option.topRight', disabled: true },
+  { value: 'topRight', labelKey: 'rest:option.topRight' },
   { value: 'fullscreen', labelKey: 'rest:option.fullscreen', disabled: true },
 ];
