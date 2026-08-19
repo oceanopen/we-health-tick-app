@@ -398,6 +398,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         move |event| {
             let payload = serde_json::from_str::<TimerStatePayload>(event.payload()).ok();
             let phase = payload.as_ref().map(|p| p.phase);
+            let prev_phase = payload.as_ref().and_then(|p| p.prev_phase);
             match phase {
                 Some(phase) => {
                     set_tray_icon_by_phase(&app_handle, phase);
@@ -415,19 +416,26 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                             show_panel(&app_handle);
                         }
                         Phase::Working => {
-                            // 跳过休息 / 确认返回等入口进入 Working 时窗口可能可见（如 topRight
-                            // 形态下刚点完按钮）。sync 到 Tray 统一处理：Fullscreen 时退出全屏
-                            // 并显式恢复小窗尺寸（exit 内部含贴托盘定位）；小窗形态时此处原地
-                            // 重定位回托盘位，避免滞留右上角。幂等：已是 Tray 时零副作用。
-                            // 不 show / 不 set_focus：隐藏状态下保持隐藏（衔接失焦自动隐藏机制）。
-                            let was_fullscreen =
-                                current_panel_form(&app_handle) == PanelForm::Fullscreen;
+                            // sync 到 Tray 统一处理：Fullscreen 时退出全屏并显式恢复小窗尺寸
+                            // （exit 内部含贴托盘定位）。幂等：已是 Tray 时零副作用。
                             sync_panel_form(&app_handle, PanelForm::Tray);
-                            if !was_fullscreen {
-                                if let Some(panel) = app_handle.get_webview_window("panel") {
-                                    if panel.is_visible().unwrap_or(false) {
-                                        if let Some(tray) = app_handle.tray_by_id("tray") {
-                                            position_panel(&tray, &panel);
+                            match prev_phase {
+                                // 从休息侧进入 Working（跳过 / 我回来了 / 休息窗口重置）：
+                                // 收起窗口回归工作流，需要时点托盘唤起。
+                                Some(Phase::Breaking) | Some(Phase::Waiting) | Some(Phase::Alerting) => {
+                                    if let Some(panel) = app_handle.get_webview_window("panel") {
+                                        let _ = panel.hide();
+                                    }
+                                }
+                                // Working 自身重置 / Paused 恢复 / 启动初始化：保持原可见状态。
+                                // 可见时原地重定位回托盘位（如 topRight 点完按钮滞留右上角），
+                                // 隐藏则保持隐藏（衔接失焦自动隐藏机制）。不 show / 不 set_focus。
+                                _ => {
+                                    if let Some(panel) = app_handle.get_webview_window("panel") {
+                                        if panel.is_visible().unwrap_or(false) {
+                                            if let Some(tray) = app_handle.tray_by_id("tray") {
+                                                position_panel(&tray, &panel);
+                                            }
                                         }
                                     }
                                 }
