@@ -47,8 +47,10 @@ export type PanelForm =
 /**  托盘所在屏 work_area 右上角。 */
 "topRight" | 
 /**
- *  macOS 原生全屏（独立 Space，隐藏菜单栏/Dock）。Alerting 起接管，
- *  Working（跳过 / 我回来了 / 重置）时退出并恢复小窗。
+ *  伪全屏：窗口铺满托盘所在屏 work_area（盖住菜单栏下方全部可用区域，置顶无装饰）。
+ *  Alerting 起接管，Working（跳过 / 我回来了 / 重置）时退出并恢复小窗。
+ *  不用原生 set_fullscreen：对 borderless+transparent 窗口会补装标题栏装饰且
+ *  异步时序与 show/set_focus 竞争出「带标题栏的 maximized」污染形态（实测）。
  */
 "fullscreen";
 
