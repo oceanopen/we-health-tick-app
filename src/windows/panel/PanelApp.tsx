@@ -39,6 +39,7 @@ export default function PanelApp() {
     nextBreakIsLong,
     breakSkipCount,
     breakSkipMax,
+    skipBreakAllowed,
     skipCountReminder,
     todaySkipCount,
     breakPaused,
@@ -184,6 +185,7 @@ export default function PanelApp() {
                 breakSkipMax={breakSkipMax}
                 todaySkipCount={todaySkipCount}
                 skipCountReminder={skipCountReminder}
+                skipAllowed={skipBreakAllowed}
                 onStartBreak={confirmBreak}
                 onSkip={skipBreak}
               />
@@ -201,6 +203,7 @@ export default function PanelApp() {
                 breakSkipCount={breakSkipCount}
                 breakSkipMax={breakSkipMax}
                 breakPaused={breakPaused}
+                skipAllowed={skipBreakAllowed}
                 onSkip={skipBreak}
               />
             )}

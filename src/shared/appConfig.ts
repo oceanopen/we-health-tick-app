@@ -102,6 +102,13 @@ export const DEFAULT_BREAK_SKIP_MAX = 1;
 export const MIN_BREAK_SKIP_MAX = 1;
 export const MAX_BREAK_SKIP_MAX = 3;
 
+// 是否允许跳过休息：No 时 Breaking/Alerting 视图的跳过按钮全部禁用。
+// 纯前端消费（后端 skip_break 不设守卫）；YesNo 配置，经 app-config-changed 实时热更新。
+export type SkipBreakAllowed = YesNo;
+
+export const SKIP_BREAK_ALLOWED_KEY = 'skip_break_allowed';
+export const DEFAULT_SKIP_BREAK_ALLOWED: SkipBreakAllowed = YES_NO.YES;
+
 // 跳过次数提醒阈值：今日累计「真正跳过休息」≥ 该值时，休息提醒弹窗（AlertingView）显示警示横幅。
 // 纯 UI 配置：后端不读取（与 appearance / rest_window 同类），仅前端 AlertingView 判断显隐。
 // 0 = 关闭提醒。与 BREAK_SKIP_MAX（单次休息防误触点击门槛）语义不同，勿混用。

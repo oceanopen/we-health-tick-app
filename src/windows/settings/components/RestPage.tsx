@@ -1,5 +1,6 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { IdlePauseThreshold, PauseOnIdle, RestConfirm, RestWindow, SkipCountReminder } from '@src/shared/appConfig';
+import type { IdlePauseThreshold, PauseOnIdle, RestConfirm, RestWindow, SkipBreakAllowed, SkipCountReminder } from '@src/shared/appConfig';
+import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
 import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined';
 import SelfImprovementOutlinedIcon from '@mui/icons-material/SelfImprovementOutlined';
@@ -28,6 +29,7 @@ import {
   DEFAULT_PAUSE_ON_IDLE,
   DEFAULT_REST_CONFIRM,
   DEFAULT_REST_WINDOW,
+  DEFAULT_SKIP_BREAK_ALLOWED,
   DEFAULT_SKIP_COUNT_REMINDER,
   getAppConfig,
   IDLE_PAUSE_THRESHOLD_KEY,
@@ -44,6 +46,7 @@ import {
   REST_CONFIRM_KEY,
   REST_WINDOW_KEY,
   setAppConfig,
+  SKIP_BREAK_ALLOWED_KEY,
   SKIP_COUNT_REMINDER_KEY,
   toYesNo,
   YES_NO,
@@ -56,6 +59,7 @@ interface AppRestConfig {
   restWindow: RestWindow;
   longBreakWindow: RestWindow;
   restConfirm: RestConfirm;
+  skipBreakAllowed: SkipBreakAllowed;
   skipCountReminder: SkipCountReminder;
   breakSkipMax: number;
   pauseOnIdle: PauseOnIdle;
@@ -70,6 +74,7 @@ const DEFAULT_APP_REST_CONFIG: AppRestConfig = {
   restWindow: DEFAULT_REST_WINDOW,
   longBreakWindow: DEFAULT_LONG_BREAK_WINDOW,
   restConfirm: DEFAULT_REST_CONFIRM,
+  skipBreakAllowed: DEFAULT_SKIP_BREAK_ALLOWED,
   skipCountReminder: DEFAULT_SKIP_COUNT_REMINDER,
   breakSkipMax: DEFAULT_BREAK_SKIP_MAX,
   pauseOnIdle: DEFAULT_PAUSE_ON_IDLE,
@@ -86,17 +91,19 @@ function RestPage() {
       getAppConfig(REST_WINDOW_KEY),
       getAppConfig(LONG_BREAK_WINDOW_KEY),
       getAppConfig(REST_CONFIRM_KEY),
+      getAppConfig(SKIP_BREAK_ALLOWED_KEY),
       getAppConfig(SKIP_COUNT_REMINDER_KEY),
       getAppConfig(BREAK_SKIP_MAX_KEY),
       getAppConfig(PAUSE_ON_IDLE_KEY),
       getAppConfig(IDLE_PAUSE_THRESHOLD_KEY),
-    ]).then(([window, longBreakWindow, confirm, skipCountReminder, bsm, poi, ipt]) => {
+    ]).then(([window, longBreakWindow, confirm, sba, skipCountReminder, bsm, poi, ipt]) => {
       const next: AppRestConfig = {
         restWindow: isRestWindow(window) ? window : DEFAULT_REST_WINDOW,
         longBreakWindow: isRestWindow(longBreakWindow)
           ? longBreakWindow
           : DEFAULT_LONG_BREAK_WINDOW,
         restConfirm: parseYesNo(confirm, DEFAULT_REST_CONFIRM),
+        skipBreakAllowed: parseYesNo(sba, DEFAULT_SKIP_BREAK_ALLOWED),
         skipCountReminder: decodeSkipCountReminder(skipCountReminder),
         breakSkipMax: bsm ? Number(bsm) : DEFAULT_BREAK_SKIP_MAX,
         pauseOnIdle: parseYesNo(poi, DEFAULT_PAUSE_ON_IDLE),
@@ -115,6 +122,7 @@ function RestPage() {
     = saved.restWindow !== draft.restWindow
       || saved.longBreakWindow !== draft.longBreakWindow
       || saved.restConfirm !== draft.restConfirm
+      || saved.skipBreakAllowed !== draft.skipBreakAllowed
       || saved.skipCountReminder !== draft.skipCountReminder
       || saved.breakSkipMax !== draft.breakSkipMax
       || saved.pauseOnIdle !== draft.pauseOnIdle
@@ -128,6 +136,7 @@ function RestPage() {
       setAppConfig(REST_WINDOW_KEY, draft.restWindow),
       setAppConfig(LONG_BREAK_WINDOW_KEY, draft.longBreakWindow),
       setAppConfig(REST_CONFIRM_KEY, draft.restConfirm),
+      setAppConfig(SKIP_BREAK_ALLOWED_KEY, draft.skipBreakAllowed),
       setAppConfig(SKIP_COUNT_REMINDER_KEY, String(draft.skipCountReminder)),
       setAppConfig(BREAK_SKIP_MAX_KEY, String(draft.breakSkipMax)),
       setAppConfig(PAUSE_ON_IDLE_KEY, draft.pauseOnIdle),
@@ -226,6 +235,28 @@ function RestPage() {
             <Switch
               checked={draft.restConfirm === YES_NO.YES}
               onChange={e => update('restConfirm', toYesNo(e.target.checked))}
+            />
+          </Box>
+
+          <Divider />
+
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 1.5,
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <BlockOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              <Typography>{t('rest:row.skipBreakAllowed')}</Typography>
+            </Box>
+            <Switch
+              checked={draft.skipBreakAllowed === YES_NO.YES}
+              onChange={e => update('skipBreakAllowed', toYesNo(e.target.checked))}
             />
           </Box>
 

@@ -12,11 +12,12 @@ interface AlertingViewProps {
   breakSkipMax: number;
   todaySkipCount: number;
   skipCountReminder: number;
+  skipAllowed: boolean;
   onStartBreak: () => void;
   onSkip: () => void;
 }
 
-export function AlertingView({ whisperReminder, isLongBreak, breakSkipCount, breakSkipMax, todaySkipCount, skipCountReminder, onStartBreak, onSkip }: AlertingViewProps) {
+export function AlertingView({ whisperReminder, isLongBreak, breakSkipCount, breakSkipMax, todaySkipCount, skipCountReminder, skipAllowed, onStartBreak, onSkip }: AlertingViewProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const alertingColor
@@ -75,6 +76,7 @@ export function AlertingView({ whisperReminder, isLongBreak, breakSkipCount, bre
           onClick={onSkip}
           size="small"
           color="secondary"
+          disabled={!skipAllowed}
           sx={{ 'opacity': 0.5, 'transition': 'opacity 0.2s', '&:hover': { opacity: 0.8 } }}
         >
           <SkipNextIcon />

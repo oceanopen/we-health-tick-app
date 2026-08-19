@@ -14,6 +14,7 @@ interface BreakingViewProps {
   breakSkipCount: number;
   breakSkipMax: number;
   breakPaused: boolean;
+  skipAllowed: boolean;
   onSkip: () => void;
 }
 
@@ -26,6 +27,7 @@ export function BreakingView({
   breakSkipCount,
   breakSkipMax,
   breakPaused,
+  skipAllowed,
   onSkip,
 }: BreakingViewProps) {
   const { t } = useTranslation();
@@ -101,6 +103,7 @@ export function BreakingView({
           onClick={onSkip}
           size="small"
           color="secondary"
+          disabled={!skipAllowed}
           sx={{ 'opacity': 0.5, 'transition': 'opacity 0.2s', '&:hover': { opacity: 0.8 } }}
         >
           <SkipNextIcon />

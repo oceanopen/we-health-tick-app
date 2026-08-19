@@ -7,6 +7,7 @@ import {
   DEFAULT_LONG_BREAK_ENABLED,
   DEFAULT_LONG_BREAK_INTERVAL,
   DEFAULT_QUIET_HOURS,
+  DEFAULT_SKIP_BREAK_ALLOWED,
   DEFAULT_SKIP_COUNT_REMINDER,
   LONG_BREAK_ENABLED_KEY,
   LONG_BREAK_INTERVAL_KEY,
@@ -14,7 +15,9 @@ import {
   MIN_BREAK_SKIP_MAX,
   parseYesNo,
   QUIET_HOURS_KEY,
+  SKIP_BREAK_ALLOWED_KEY,
   SKIP_COUNT_REMINDER_KEY,
+  YES_NO,
 } from '@src/shared/appConfig';
 import { commands } from '@src/shared/bindings';
 import { logOnError } from '@src/shared/commands';
@@ -70,6 +73,12 @@ function decodeLongBreakEnabled(v: string | null): boolean {
   return parseYesNo(v, DEFAULT_LONG_BREAK_ENABLED) === DEFAULT_LONG_BREAK_ENABLED;
 }
 
+// 是否允许跳过休息（YesNo）。非法值 / 缺失回落默认允许（与 DEFAULT_SKIP_BREAK_ALLOWED 一致）。
+// No 时 Breaking/Alerting 视图的跳过按钮禁用（纯前端消费，后端 skip_break 不设守卫）。
+function decodeSkipBreakAllowed(v: string | null): boolean {
+  return parseYesNo(v, DEFAULT_SKIP_BREAK_ALLOWED) === YES_NO.YES;
+}
+
 // 下一次休息是否为长休息的预判（WorkingView「休息」按钮文案依据）。
 // 与后端 check_is_long_break 同公式同输入（递增前的 completed_cycles），
 // 手动休息（manual_break）与自动到点的下一次判定均基于此值，预判天然一致。
@@ -90,6 +99,8 @@ export function useTimerState() {
   // 长休息开关与间隔（「休息」按钮长休息文案预判输入；与 breakSkipMax 同订阅模式）。
   const longBreakEnabled = useAppConfigValue(LONG_BREAK_ENABLED_KEY, decodeLongBreakEnabled, true);
   const longBreakInterval = useAppConfigValue(LONG_BREAK_INTERVAL_KEY, decodeLongBreakInterval, DEFAULT_LONG_BREAK_INTERVAL);
+  // 是否允许跳过（跳过按钮禁用输入；保存后经 app-config-changed 实时生效）。
+  const skipBreakAllowed = useAppConfigValue(SKIP_BREAK_ALLOWED_KEY, decodeSkipBreakAllowed, true);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,6 +161,7 @@ export function useTimerState() {
     todaySkipCount: state.todaySkipCount,
     breakPaused: state.breakPaused,
     breakSkipMax,
+    skipBreakAllowed,
     skipCountReminder,
     quietHours,
     completedCycles: state.completedCycles,
