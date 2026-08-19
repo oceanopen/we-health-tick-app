@@ -351,7 +351,14 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 let app = tray.app_handle();
                 match app.get_webview_window("panel") {
                     Some(panel) if panel.is_visible().unwrap_or(false) => {
-                        let _ = panel.hide();
+                        // 非 Working（提醒/休息/等待/暂停）窗口常驻，不允许托盘点击隐藏
+                        // （与 settings.rs 关闭恢复、前端失焦自动隐藏的 Working 守卫语义对齐）；
+                        // 改走 show_panel 置顶唤起，窗口被遮挡时点托盘可找回。
+                        if crate::timer::current_phase(app) == Phase::Working {
+                            let _ = panel.hide();
+                        } else {
+                            show_panel(app);
+                        }
                     }
                     _ => show_panel(app),
                 }
