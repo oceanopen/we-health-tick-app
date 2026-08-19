@@ -102,6 +102,7 @@ pub struct TimerState {
 //   KEY_LONG_BREAK_INTERVAL    ↔ LONG_BREAK_INTERVAL_KEY   / DEFAULT_LONG_BREAK_INTERVAL
 //   KEY_LONG_BREAK_DURATION    ↔ LONG_BREAK_DURATION_KEY   / DEFAULT_LONG_BREAK_DURATION
 //   KEY_REST_CONFIRM           ↔ REST_CONFIRM_KEY          / DEFAULT_REST_CONFIRM
+//   KEY_REST_END_CONFIRM       ↔ REST_END_CONFIRM_KEY      / DEFAULT_REST_END_CONFIRM
 //   KEY_PAUSE_ON_IDLE          ↔ PAUSE_ON_IDLE_KEY         / DEFAULT_PAUSE_ON_IDLE
 //   KEY_IDLE_PAUSE_THRESHOLD   ↔ IDLE_PAUSE_THRESHOLD_KEY  / DEFAULT_IDLE_PAUSE_THRESHOLD (MIN/MAX)
 //   KEY_QUIET_HOURS            ↔ QUIET_HOURS_KEY           / DEFAULT_QUIET_HOURS (DEFAULT_QUIET_HOURS_JSON)
@@ -125,6 +126,13 @@ const DEFAULT_LONG_BREAK_DURATION_MIN: u32 = 5;
 
 const KEY_REST_CONFIRM: &str = "rest_confirm";
 const DEFAULT_REST_CONFIRM: bool = true;
+
+// 休息后确认：true 休息结束进 Waiting 等用户点「我回来了」；false 休息结束自动进入
+// Working（跳过 Waiting）。与前端 REST_END_CONFIRM_KEY / DEFAULT_REST_END_CONFIRM 对齐。
+// 场景：run_timer_loop Breaking 归零时刻现读分流。静音时段优先：quiet 检查在 phase 推进前，
+// Breaking 被强制切 Paused 不会走到归零分支，故无需在读取处再做静音判断。
+const KEY_REST_END_CONFIRM: &str = "rest_end_confirm";
+const DEFAULT_REST_END_CONFIRM: bool = true;
 
 const KEY_PAUSE_ON_IDLE: &str = "pause_on_idle";
 // 离开（锁屏/休眠/AFK）时冻结工作倒计时。与前端 DEFAULT_PAUSE_ON_IDLE 对齐。
@@ -309,6 +317,20 @@ fn read_rest_confirm(conn: &Connection) -> bool {
                 .unwrap_or(false)
         })
         .unwrap_or(DEFAULT_REST_CONFIRM)
+}
+
+// 读 rest_end_confirm（YesNo），容错回退默认。
+// Yes：休息结束进 Waiting 等用户确认；No：休息结束自动进入 Working。
+fn read_rest_end_confirm(conn: &Connection) -> bool {
+    read_app_config_conn(conn, KEY_REST_END_CONFIRM)
+        .ok()
+        .flatten()
+        .map(|s| {
+            s.parse::<YesNo>()
+                .map(|y| y.is_yes())
+                .unwrap_or(false)
+        })
+        .unwrap_or(DEFAULT_REST_END_CONFIRM)
 }
 
 // 读 pause_on_idle（YesNo），容错回退默认（DB 无值/非法 → 默认开启）。
@@ -778,7 +800,23 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                         }
                         if state.remaining_seconds == 0 {
                             let prev = state.phase;
-                            apply_on_break_done(&mut state);
+                            // rest_end_confirm=N：跳过 Waiting，直接自动进入 Working
+                            // （completed_cycles 后置递增保留轮次语义；emit prev_phase=Breaking，
+                            // panel.rs 从休息侧进 Working 自动收起窗口）。
+                            let rest_end_confirm = {
+                                let app_config_state = app.state::<AppConfigState>();
+                                app_config_state
+                                    .0
+                                    .lock()
+                                    .map(|conn| read_rest_end_confirm(&conn))
+                                    .unwrap_or(DEFAULT_REST_END_CONFIRM)
+                            };
+                            if rest_end_confirm {
+                                apply_on_break_done(&mut state);
+                            } else {
+                                state.completed_cycles += 1;
+                                apply_start_work(&mut state, (work_min as i64) * 60, now);
+                            }
                             phase_change_payload = Some(build_payload(&state, Some(prev)));
                         }
                     }

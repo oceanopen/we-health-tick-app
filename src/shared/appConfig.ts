@@ -53,6 +53,13 @@ export type RestConfirm = YesNo;
 export const REST_CONFIRM_KEY = 'rest_confirm';
 export const DEFAULT_REST_CONFIRM: RestConfirm = YES_NO.YES;
 
+// 休息后确认：Yes 休息结束进 Waiting 等用户点「我回来了」；No 休息结束自动进入 Working
+// （跳过 Waiting）。后端 timer.rs 在 Breaking 归零时刻现读分流；静音时段优先（不会自动进 Working）。
+export type RestEndConfirm = YesNo;
+
+export const REST_END_CONFIRM_KEY = 'rest_end_confirm';
+export const DEFAULT_REST_END_CONFIRM: RestEndConfirm = YES_NO.YES;
+
 // 离开暂停：锁屏 / 休眠 / 长时间无操作时冻结工作倒计时（idle 检测，复用 idle.rs）。
 // YesNo 配置，后端 timer.rs 每秒现读（同 quiet_hours），改设置 ≤1s 生效。
 export type PauseOnIdle = YesNo;
