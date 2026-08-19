@@ -10,6 +10,7 @@ interface WorkingViewProps {
   displayTime: string;
   progress: number;
   isPaused: boolean;
+  nextBreakIsLong: boolean;
   onToggle: () => void;
   onReset: () => void;
   onManualBreak: () => void;
@@ -19,12 +20,15 @@ export function WorkingView({
   displayTime,
   progress,
   isPaused,
+  nextBreakIsLong,
   onToggle,
   onReset,
   onManualBreak,
 }: WorkingViewProps) {
   const { t } = useTranslation();
   const toggleLabel = isPaused ? t('panel:action.resume') : t('panel:action.pause');
+  // 下一次休息（手动点按钮或自动到点）是否为长休息的预判，切换按钮文案。
+  const manualBreakLabel = nextBreakIsLong ? t('panel:action.manualLongBreak') : t('panel:action.manualBreak');
 
   return (
     <Box
@@ -75,11 +79,11 @@ export function WorkingView({
         <Divider orientation="vertical" flexItem />
 
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <IconButton aria-label={t('panel:action.manualBreak')} onClick={onManualBreak} size="small" color="secondary">
+          <IconButton aria-label={manualBreakLabel} onClick={onManualBreak} size="small" color="secondary">
             <LocalCafeOutlinedIcon />
           </IconButton>
           <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
-            {t('panel:action.manualBreak')}
+            {manualBreakLabel}
           </Typography>
         </Box>
       </Box>

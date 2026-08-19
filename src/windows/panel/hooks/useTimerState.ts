@@ -4,10 +4,15 @@ import {
   decodeQuietHours,
   decodeSkipCountReminder,
   DEFAULT_BREAK_SKIP_MAX,
+  DEFAULT_LONG_BREAK_ENABLED,
+  DEFAULT_LONG_BREAK_INTERVAL,
   DEFAULT_QUIET_HOURS,
   DEFAULT_SKIP_COUNT_REMINDER,
+  LONG_BREAK_ENABLED_KEY,
+  LONG_BREAK_INTERVAL_KEY,
   MAX_BREAK_SKIP_MAX,
   MIN_BREAK_SKIP_MAX,
+  parseYesNo,
   QUIET_HOURS_KEY,
   SKIP_COUNT_REMINDER_KEY,
 } from '@src/shared/appConfig';
@@ -53,6 +58,25 @@ function decodeBreakSkipMax(v: string | null): number {
     : DEFAULT_BREAK_SKIP_MAX;
 }
 
+// 长休息间隔（轮）。非法值回落默认 2（与后端 read_long_break_interval 容错一致；
+// 后端不设上限，此处同样不 clamp 上限）。
+function decodeLongBreakInterval(v: string | null): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : DEFAULT_LONG_BREAK_INTERVAL;
+}
+
+// 长休息开关（YesNo）。非法值 / 缺失回落默认开启（与后端 read_long_break_enabled 容错一致）。
+function decodeLongBreakEnabled(v: string | null): boolean {
+  return parseYesNo(v, DEFAULT_LONG_BREAK_ENABLED) === DEFAULT_LONG_BREAK_ENABLED;
+}
+
+// 下一次休息是否为长休息的预判（WorkingView「休息」按钮文案依据）。
+// 与后端 check_is_long_break 同公式同输入（递增前的 completed_cycles），
+// 手动休息（manual_break）与自动到点的下一次判定均基于此值，预判天然一致。
+function checkNextBreakIsLong(enabled: boolean, interval: number, completedCycles: number): boolean {
+  return enabled && interval > 0 && completedCycles > 0 && completedCycles % interval === 0;
+}
+
 export function useTimerState() {
   const [state, setState] = useState<TimerStatePayload>(INITIAL_STATE);
 
@@ -63,6 +87,9 @@ export function useTimerState() {
   const quietHours = useAppConfigValue(QUIET_HOURS_KEY, decodeQuietHours, DEFAULT_QUIET_HOURS);
   // 跳过次数提醒阈值（纯 UI 配置）：AlertingView 据此 + state.todaySkipCount 判断是否显示警示横幅。
   const skipCountReminder = useAppConfigValue(SKIP_COUNT_REMINDER_KEY, decodeSkipCountReminder, DEFAULT_SKIP_COUNT_REMINDER);
+  // 长休息开关与间隔（「休息」按钮长休息文案预判输入；与 breakSkipMax 同订阅模式）。
+  const longBreakEnabled = useAppConfigValue(LONG_BREAK_ENABLED_KEY, decodeLongBreakEnabled, true);
+  const longBreakInterval = useAppConfigValue(LONG_BREAK_INTERVAL_KEY, decodeLongBreakInterval, DEFAULT_LONG_BREAK_INTERVAL);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +135,8 @@ export function useTimerState() {
   const displayTime = formatDisplayTime(remainingSeconds);
   const progress = totalSeconds > 0 ? (remainingSeconds / totalSeconds) * 100 : 0;
   const isPaused = phase === 'paused';
+  // 预判下一次休息类型：与后端判定同公式（递增前 completed_cycles），供按钮文案展示。
+  const nextBreakIsLong = checkNextBreakIsLong(longBreakEnabled, longBreakInterval, state.completedCycles);
 
   return {
     phase,
@@ -116,6 +145,7 @@ export function useTimerState() {
     currentWhisperReminder: state.currentWhisperReminder,
     currentHealthReminder: state.currentHealthReminder,
     isLongBreak: state.isLongBreak,
+    nextBreakIsLong,
     breakSkipCount: state.breakSkipCount,
     todaySkipCount: state.todaySkipCount,
     breakPaused: state.breakPaused,

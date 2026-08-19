@@ -23,6 +23,7 @@ export default function PanelApp() {
     currentWhisperReminder,
     currentHealthReminder,
     isLongBreak,
+    nextBreakIsLong,
     breakSkipCount,
     breakSkipMax,
     skipCountReminder,
@@ -120,6 +121,7 @@ export default function PanelApp() {
               displayTime={displayTime}
               progress={progress}
               isPaused={isPaused}
+              nextBreakIsLong={nextBreakIsLong}
               onToggle={togglePause}
               onReset={reset}
               onManualBreak={manualBreak}

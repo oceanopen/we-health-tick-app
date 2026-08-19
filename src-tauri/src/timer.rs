@@ -39,7 +39,7 @@ struct TimerInner {
     paused_by_quiet: bool,
     /// 已完成的工作-休息轮数。M3 长休息判定输入：
     /// `completed_cycles > 0 && completed_cycles % long_break_interval == 0`。
-    /// 仅正常完成 on_break_done 才递增；跳过休息不计入。
+    /// 正常完成 on_break_done 与真正跳过休息（skip_break）均递增——跳过也占用一轮休息名额。
     completed_cycles: u32,
     /// 跳过休息的累计点击次数。M2 skip_break 中递增，达到 break_skip_max 次才真正跳过；
     /// 每次 start_break 进入 breaking 时清零。前端按钮显示「跳过 (n/max)」。
@@ -1067,7 +1067,8 @@ pub fn reset(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String>
     Ok(())
 }
 
-// 立即休息：Working → Breaking（用户主动「立即休息」按钮；不计 completed_cycles）。
+// 立即休息：Working → Breaking（用户主动「休息」按钮；completed_cycles 判定输入，
+// 轮次是否 +1 取决于本次休息是否正常走完 / 被跳过）。
 #[tauri::command]
 #[specta::specta]
 pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
@@ -1104,7 +1105,7 @@ pub fn manual_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), 
 
 // 跳过休息（Alerting/Breaking 阶段）：连点 break_skip_max 次才跳过（防误触；由 break_skip_max 配置控制）。
 // - < max：break_skip_count += 1，emit timer-tick 让 UI 显示「跳过 (n/max)」
-// - >= max：跳过本次休息（不计入 completed_cycles），直接 start_work
+// - >= max：跳过本次休息，completed_cycles 同步递增（跳过也计入休息轮次），直接 start_work
 #[tauri::command]
 #[specta::specta]
 pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), String> {
@@ -1142,6 +1143,10 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
                 write_today_skip_count(&conn, inner.today_skip_count);
                 read_work_duration_minutes(&conn)
             };
+            // 跳过也计入休息轮次（与 on_break_done 后置递增同语义）：apply_start_work 不重置
+            // completed_cycles，此处递增后，下次休息判定即读到新值——interval=2 时完成 1 次
+            // + 跳过 1 次，下次即长休息。
+            inner.completed_cycles = inner.completed_cycles.saturating_add(1);
             apply_start_work(&mut inner, (work_min as i64) * 60, now_epoch());
             (None, Some(build_payload(&inner, Some(prev))))
         }

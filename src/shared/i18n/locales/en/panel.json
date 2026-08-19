@@ -4,6 +4,7 @@
     "pause": "Pause",
     "reset": "Reset",
     "manualBreak": "Break",
+    "manualLongBreak": "Long Break",
     "startBreak": "Start Break",
     "skipBreak": "Skip",
     "imBack": "I'm Back"
