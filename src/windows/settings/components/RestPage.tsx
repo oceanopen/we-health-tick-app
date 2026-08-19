@@ -2,6 +2,7 @@ import type { SelectChangeEvent } from '@mui/material/Select';
 import type { IdlePauseThreshold, PauseOnIdle, RestConfirm, RestWindow, SkipCountReminder } from '@src/shared/appConfig';
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
 import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined';
+import SelfImprovementOutlinedIcon from '@mui/icons-material/SelfImprovementOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import WeekendOutlinedIcon from '@mui/icons-material/WeekendOutlined';
@@ -23,6 +24,7 @@ import {
   decodeSkipCountReminder,
   DEFAULT_BREAK_SKIP_MAX,
   DEFAULT_IDLE_PAUSE_THRESHOLD,
+  DEFAULT_LONG_BREAK_WINDOW,
   DEFAULT_PAUSE_ON_IDLE,
   DEFAULT_REST_CONFIRM,
   DEFAULT_REST_WINDOW,
@@ -30,6 +32,7 @@ import {
   getAppConfig,
   IDLE_PAUSE_THRESHOLD_KEY,
   IDLE_PAUSE_THRESHOLD_STEP,
+  LONG_BREAK_WINDOW_KEY,
   MAX_BREAK_SKIP_MAX,
   MAX_IDLE_PAUSE_THRESHOLD,
   MAX_SKIP_COUNT_REMINDER,
@@ -51,6 +54,7 @@ import { useTranslation } from 'react-i18next';
 
 interface AppRestConfig {
   restWindow: RestWindow;
+  longBreakWindow: RestWindow;
   restConfirm: RestConfirm;
   skipCountReminder: SkipCountReminder;
   breakSkipMax: number;
@@ -58,8 +62,13 @@ interface AppRestConfig {
   idlePauseThreshold: IdlePauseThreshold;
 }
 
+function isRestWindow(value: string | null): value is RestWindow {
+  return value === 'tray' || value === 'topRight' || value === 'fullscreen';
+}
+
 const DEFAULT_APP_REST_CONFIG: AppRestConfig = {
   restWindow: DEFAULT_REST_WINDOW,
+  longBreakWindow: DEFAULT_LONG_BREAK_WINDOW,
   restConfirm: DEFAULT_REST_CONFIRM,
   skipCountReminder: DEFAULT_SKIP_COUNT_REMINDER,
   breakSkipMax: DEFAULT_BREAK_SKIP_MAX,
@@ -75,17 +84,18 @@ function RestPage() {
   useEffect(() => {
     Promise.all([
       getAppConfig(REST_WINDOW_KEY),
+      getAppConfig(LONG_BREAK_WINDOW_KEY),
       getAppConfig(REST_CONFIRM_KEY),
       getAppConfig(SKIP_COUNT_REMINDER_KEY),
       getAppConfig(BREAK_SKIP_MAX_KEY),
       getAppConfig(PAUSE_ON_IDLE_KEY),
       getAppConfig(IDLE_PAUSE_THRESHOLD_KEY),
-    ]).then(([window, confirm, skipCountReminder, bsm, poi, ipt]) => {
+    ]).then(([window, longBreakWindow, confirm, skipCountReminder, bsm, poi, ipt]) => {
       const next: AppRestConfig = {
-        restWindow:
-          window === 'tray' || window === 'topRight' || window === 'fullscreen'
-            ? window
-            : DEFAULT_REST_WINDOW,
+        restWindow: isRestWindow(window) ? window : DEFAULT_REST_WINDOW,
+        longBreakWindow: isRestWindow(longBreakWindow)
+          ? longBreakWindow
+          : DEFAULT_LONG_BREAK_WINDOW,
         restConfirm: parseYesNo(confirm, DEFAULT_REST_CONFIRM),
         skipCountReminder: decodeSkipCountReminder(skipCountReminder),
         breakSkipMax: bsm ? Number(bsm) : DEFAULT_BREAK_SKIP_MAX,
@@ -103,6 +113,7 @@ function RestPage() {
 
   const dirty
     = saved.restWindow !== draft.restWindow
+      || saved.longBreakWindow !== draft.longBreakWindow
       || saved.restConfirm !== draft.restConfirm
       || saved.skipCountReminder !== draft.skipCountReminder
       || saved.breakSkipMax !== draft.breakSkipMax
@@ -115,6 +126,7 @@ function RestPage() {
   const handleSave = async () => {
     await Promise.all([
       setAppConfig(REST_WINDOW_KEY, draft.restWindow),
+      setAppConfig(LONG_BREAK_WINDOW_KEY, draft.longBreakWindow),
       setAppConfig(REST_CONFIRM_KEY, draft.restConfirm),
       setAppConfig(SKIP_COUNT_REMINDER_KEY, String(draft.skipCountReminder)),
       setAppConfig(BREAK_SKIP_MAX_KEY, String(draft.breakSkipMax)),
@@ -154,6 +166,37 @@ function RestPage() {
                 value={draft.restWindow}
                 onChange={(e: SelectChangeEvent<RestWindow>) =>
                   update('restWindow', e.target.value as RestWindow)}
+              >
+                {restWindowOptions.map(opt => (
+                  <MenuItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+                    {t(opt.labelKey)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Divider />
+
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 1.5,
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <SelfImprovementOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              <Typography>{t('rest:row.longBreakWindow')}</Typography>
+            </Box>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <Select
+                value={draft.longBreakWindow}
+                onChange={(e: SelectChangeEvent<RestWindow>) =>
+                  update('longBreakWindow', e.target.value as RestWindow)}
               >
                 {restWindowOptions.map(opt => (
                   <MenuItem key={opt.value} value={opt.value} disabled={opt.disabled}>

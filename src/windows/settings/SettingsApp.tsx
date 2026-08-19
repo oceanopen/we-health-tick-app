@@ -1,3 +1,4 @@
+import type { MenuKey } from './routes';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
@@ -25,7 +26,7 @@ import AppConfigPage from './components/AppConfigPage';
 import PlanPage from './components/PlanPage';
 import RemindersPage from './components/RemindersPage';
 import RestPage from './components/RestPage';
-import { DEFAULT_MENU, isMenuKey, MENU_PATHS, menuToPath, pathToMenu, type MenuKey } from './routes';
+import { DEFAULT_MENU, isMenuKey, MENU_PATHS, menuToPath, pathToMenu } from './routes';
 
 // 顶部栏高度：左侧标题栏与右侧顶部导航栏共用，保证两者等高、底部分隔线水平对齐。
 const TOP_BAR_HEIGHT = 56;

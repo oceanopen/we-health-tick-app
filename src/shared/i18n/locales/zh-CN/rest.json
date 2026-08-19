@@ -4,6 +4,7 @@
   },
   "row": {
     "restWindow": "休息窗口",
+    "longBreakWindow": "长休息窗口",
     "restConfirm": "休息前确认",
     "breakSkipMax": "跳过确认次数",
     "breakSkipMaxHint": "连点几次「跳过」才真正跳过休息（防手滑误触）",

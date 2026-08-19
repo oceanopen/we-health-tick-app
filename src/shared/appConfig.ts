@@ -6,7 +6,9 @@ import { unwrap } from './commands';
 //
 // 后端 src-tauri/src/timer.rs 只对「计时逻辑需要读取」的 11 项建有对应常量副本
 // （work/break_duration、break_skip_max、long_break_*、rest_confirm、pause_on_idle、idle_pause_threshold、quiet_hours、reminders）；
-// appearance / rest_window / language / work_*_time 为纯 UI 配置，后端不读，仅前端使用。
+// appearance / rest_window / work_*_time 为纯 UI 配置，后端不读，仅前端使用；
+// language 由后端 i18n.rs（托盘菜单文案）读取，long_break_window 由后端 panel.rs（窗口唤起）读取，
+// 两者常量副本均在 shared/app_config.rs（timer.rs 11 项清单之外）。
 // 修改这 11 项中任一 *KEY / DEFAULT_* 时必须同步后端（对照表见 timer.rs 顶部）。
 
 // YES_NO 运行时常量：构造 / 比较 Y/N 字面量用。
@@ -39,6 +41,11 @@ export type RestWindow = 'tray' | 'topRight' | 'fullscreen';
 
 export const REST_WINDOW_KEY = 'rest_window';
 export const DEFAULT_REST_WINDOW: RestWindow = 'tray';
+
+// 长休息窗口形态：与 rest_window 同构（复用 RestWindow 类型与选项），
+// 后端 panel.rs 在长休息（Breaking && is_long_break）唤起窗口时读取（非 timer.rs 的 11 项）。
+export const LONG_BREAK_WINDOW_KEY = 'long_break_window';
+export const DEFAULT_LONG_BREAK_WINDOW: RestWindow = 'tray';
 
 export type RestConfirm = YesNo;
 

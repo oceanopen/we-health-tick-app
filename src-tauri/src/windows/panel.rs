@@ -7,7 +7,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
-use crate::shared::app_config::LANGUAGE_KEY;
+use crate::shared::app_config::{LANGUAGE_KEY, LONG_BREAK_WINDOW_KEY, LONG_BREAK_WINDOW_TRAY};
 use crate::shared::i18n::{current_language, menu_text};
 use crate::shared::screen::{MonitorInfo, TaskbarEdge, detect_taskbar_edge, find_monitor_for_rect};
 use crate::shared::types::{Phase, TimerStatePayload};
@@ -192,18 +192,27 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     // 订阅 phase-changed：phase 切换时同步切换托盘图标（G2），
     // 并在进入非 Working 阶段时主动唤起 panel 窗口（常驻提醒）。
+    // 长休息（Breaking && is_long_break）按 long_break_window 配置分派窗口形态：
+    // topRight/fullscreen 形态尚未实现，记录后回退 tray 行为（与 rest_window 现状一致）。
+    // 仅在 Breaking 判定：Alerting 阶段的 is_long_break 是上一轮残留值（本轮长休息判定
+    // 在 confirm_break 后才写入），此时读配置会误用脏数据。
     // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
     app.handle().listen(
         crate::shared::events::EVENT_PHASE_CHANGED,
         move |event| {
-            let phase = serde_json::from_str::<TimerStatePayload>(event.payload())
-                .ok()
-                .map(|p| p.phase);
+            let payload = serde_json::from_str::<TimerStatePayload>(event.payload()).ok();
+            let phase = payload.as_ref().map(|p| p.phase);
             match phase {
                 Some(phase) => {
                     set_tray_icon_by_phase(&app_handle, phase);
                     if phase != Phase::Working {
-                        show_panel(&app_handle);
+                        if phase == Phase::Breaking
+                            && payload.as_ref().is_some_and(|p| p.is_long_break)
+                        {
+                            show_panel_by_long_break_window(&app_handle);
+                        } else {
+                            show_panel(&app_handle);
+                        }
                     }
                 }
                 None => log::warn!("phase-changed payload parse failed, skip tray icon update"),
@@ -300,6 +309,32 @@ pub fn show_panel(app: &AppHandle) {
         let _ = panel.set_focus();
     } else {
         create_panel(app, &tray);
+    }
+}
+
+// 长休息唤起：按 long_break_window 配置分派窗口形态（前端镜像见 shared/app_config.rs 注释）。
+// 现读 DB（无缓存，保存后下一次长休息即生效）；DB 无值 / 非法值回退 tray。
+// topRight / fullscreen 形态尚未实现：记录意图后回退 show_panel（tray 行为），
+// 待形态落地后在此替换分派实现。
+fn show_panel_by_long_break_window(app: &AppHandle) {
+    let window = app
+        .try_state::<crate::shared::app_config::AppConfigState>()
+        .and_then(|state| {
+            crate::shared::app_config::read_app_config_raw(&state, LONG_BREAK_WINDOW_KEY)
+                .ok()
+                .flatten()
+        })
+        .unwrap_or_else(|| LONG_BREAK_WINDOW_TRAY.to_string());
+    match window.as_str() {
+        "topRight" | "fullscreen" => {
+            // warn 而非 info：release 构建日志级别为 Warn，info 会被过滤导致生产排障不可见。
+            log::warn!(
+                "long_break_window={} not implemented yet, fallback to tray panel",
+                window
+            );
+            show_panel(app);
+        }
+        _ => show_panel(app),
     }
 }
 

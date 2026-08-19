@@ -8,6 +8,12 @@ use crate::shared::types::AppConfigChangedPayload;
 /// 后端仅托盘菜单消费（current_language 读取），其余业务不读。
 pub const LANGUAGE_KEY: &str = "language";
 
+/// 长休息窗口形态 key（前端镜像 src/shared/appConfig.ts 的 LONG_BREAK_WINDOW_KEY，修改任一处需同步）。
+/// 取值同前端 RestWindow（"tray" | "topRight" | "fullscreen"），后端 panel.rs 在长休息
+/// 唤起窗口时读取分派。topRight/fullscreen 形态尚未实现，读取侧回退 tray 行为。
+pub const LONG_BREAK_WINDOW_KEY: &str = "long_break_window";
+pub const LONG_BREAK_WINDOW_TRAY: &str = "tray";
+
 pub struct AppConfigState(pub Mutex<Connection>);
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {

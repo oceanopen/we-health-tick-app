@@ -4,6 +4,7 @@
   },
   "row": {
     "restWindow": "Break Window",
+    "longBreakWindow": "Long Break Window",
     "restConfirm": "Confirm Before Break",
     "breakSkipMax": "Taps to Skip",
     "breakSkipMaxHint": "Number of times to tap Skip before actually skipping the break (prevents accidental taps)",
