@@ -11,3 +11,7 @@ export const EVENT_APP_CONFIG_CHANGED = 'app-config-changed';
 // emit_to("settings")；首开深链走初始 URL settings.html#/section，不走此事件。
 // Rust 侧 Option<String> 不校验，由前端 isMenuKey 守卫。
 export const EVENT_SETTINGS_NAVIGATE = 'settings:navigate';
+
+// panel 窗口形态变化（payload = PanelForm 联合类型，bindings.ts 导出）。
+// 后端 sync_panel_form 全屏进出副作用完成后 emit_to("panel")；usePanelForm 订阅切换布局。
+export const EVENT_PANEL_FORM_CHANGED = 'panel-form-changed';

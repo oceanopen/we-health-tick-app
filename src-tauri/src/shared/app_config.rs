@@ -10,15 +10,15 @@ pub const LANGUAGE_KEY: &str = "language";
 
 /// 长休息窗口形态 key（前端镜像 src/shared/appConfig.ts 的 LONG_BREAK_WINDOW_KEY，修改任一处需同步）。
 /// 取值同前端 RestWindow（"tray" | "topRight" | "fullscreen"），后端 panel.rs 在长休息
-/// （含其休息前提醒 Alerting）唤起窗口时读取分派。tray / topRight 为已实现形态，
-/// fullscreen 尚未实现，读取侧回退 tray 行为。
+/// （含其休息前提醒 Alerting）唤起窗口时读取分派。三形态均已实现：tray / topRight 为小窗定位，
+/// fullscreen 为伪全屏：窗口铺满 work_area（Alerting 起接管，Working 时退出并恢复小窗）。
 pub const LONG_BREAK_WINDOW_KEY: &str = "long_break_window";
 pub const LONG_BREAK_WINDOW_TRAY: &str = "tray";
 pub const LONG_BREAK_WINDOW_TOP_RIGHT: &str = "topRight";
 pub const LONG_BREAK_WINDOW_FULLSCREEN: &str = "fullscreen";
 
 /// 正常休息窗口形态 key（前端镜像 src/shared/appConfig.ts 的 REST_WINDOW_KEY，修改任一处需同步）。
-/// 取值与读取语义同上，后端 panel.rs 在正常休息（含其休息前提醒 Alerting）唤起窗口时读取分派。
+/// 取值与读取语义同上（三形态均已实现），后端 panel.rs 在正常休息（含其休息前提醒 Alerting）唤起窗口时读取分派。
 pub const REST_WINDOW_KEY: &str = "rest_window";
 pub const REST_WINDOW_TRAY: &str = "tray";
 pub const REST_WINDOW_TOP_RIGHT: &str = "topRight";

@@ -20,6 +20,7 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
             exit_app,
             windows::settings::show_settings_window,
             windows::panel::fit_panel,
+            windows::panel::get_panel_form,
             shared::app_config::get_app_config,
             shared::app_config::set_app_config,
             timer::get_timer_state,

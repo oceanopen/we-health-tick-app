@@ -10,6 +10,7 @@ export const commands = {
 	exitApp: () => __TAURI_INVOKE<void>("exit_app"),
 	showSettingsWindow: (navigateTo: string | null) => typedError<null, string>(__TAURI_INVOKE("show_settings_window", { navigateTo })),
 	fitPanel: (height: number | null) => typedError<null, string>(__TAURI_INVOKE("fit_panel", { height })),
+	getPanelForm: () => __TAURI_INVOKE<PanelForm>("get_panel_form"),
 	getAppConfig: (key: string) => typedError<string | null, string>(__TAURI_INVOKE("get_app_config", { key })),
 	setAppConfig: (key: string, value: string) => typedError<null, string>(__TAURI_INVOKE("set_app_config", { key, value })),
 	getTimerState: () => typedError<TimerStatePayload, string>(__TAURI_INVOKE("get_timer_state")),
@@ -33,6 +34,23 @@ export type AppConfigChangedPayload = {
 	/**  新值（配置统一以字符串形式存储，订阅方按 key 自行 decode）。 */
 	value: string,
 };
+
+/**
+ *  panel 窗口当前形态（贴托盘 / 屏幕右上角 / 全屏强制）。
+ *  受管状态（app.manage）：phase-changed 监听器按 rest_window / long_break_window 配置写入，
+ *  show_panel / fit_panel / create_panel / settings 恢复等所有定位路径统一读取，
+ *  保证高度自适应、窗口恢复后不跳回托盘位。
+ */
+export type PanelForm = 
+/**  贴托盘图标旁（现有默认形态）。 */
+"tray" | 
+/**  托盘所在屏 work_area 右上角。 */
+"topRight" | 
+/**
+ *  macOS 原生全屏（独立 Space，隐藏菜单栏/Dock）。Alerting 起接管，
+ *  Working（跳过 / 我回来了 / 重置）时退出并恢复小窗。
+ */
+"fullscreen";
 
 /**
  *  当前状态机阶段。前端 PanelApp 据此切换 5 种 UI 分支

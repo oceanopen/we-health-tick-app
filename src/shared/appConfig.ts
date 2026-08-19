@@ -44,6 +44,7 @@ export const DEFAULT_REST_WINDOW: RestWindow = 'tray';
 
 // 长休息窗口形态：与 rest_window 同构（复用 RestWindow 类型与选项），
 // 后端 panel.rs 在长休息（含其休息前提醒 Alerting）唤起窗口时读取（非 timer.rs 的 11 项）。
+// fullscreen 为伪全屏（窗口铺满 work_area）：Alerting 起接管屏幕，Working（跳过 / 确认返回 / 重置）时退出。
 export const LONG_BREAK_WINDOW_KEY = 'long_break_window';
 export const DEFAULT_LONG_BREAK_WINDOW: RestWindow = 'tray';
 

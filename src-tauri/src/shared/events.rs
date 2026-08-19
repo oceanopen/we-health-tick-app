@@ -13,3 +13,8 @@ pub const EVENT_APP_CONFIG_CHANGED: &str = "app-config-changed";
 /// settings 窗口导航请求（payload = 分区 MenuKey 字符串）。窗口已存在（二次唤起）时由
 /// show_settings_window 在 show 后 emit_to；首开深链走初始 URL，不走此事件（前端 listen 未注册）。
 pub const EVENT_SETTINGS_NAVIGATE: &str = "settings:navigate";
+
+/// panel 窗口形态变化（payload = PanelForm 枚举）。sync_panel_form 在全屏进出副作用完成后
+/// emit_to("panel")，前端 usePanelForm 订阅以切换全屏遮罩/小窗布局；
+/// webview 重载场景由 get_panel_form 命令拉取初值兜底。
+pub const EVENT_PANEL_FORM_CHANGED: &str = "panel-form-changed";
