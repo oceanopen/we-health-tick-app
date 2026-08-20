@@ -50,6 +50,8 @@ export const DEFAULT_PAUSE_ON_IDLE = true as const;
 
 export const DEFAULT_QUIET_HOURS = [{"end":"14:00","start":"12:00"},{"end":"18:30","start":"18:00"}] as const;
 
+export const DEFAULT_QUIET_WINDOW = "tray" as const;
+
 export const DEFAULT_REST_CONFIRM = true as const;
 
 export const DEFAULT_REST_END_CONFIRM = true as const;
@@ -94,6 +96,8 @@ export const PAUSE_ON_IDLE_KEY = "pause_on_idle" as const;
 
 export const QUIET_HOURS_KEY = "quiet_hours" as const;
 
+export const QUIET_WINDOW_KEY = "quiet_window" as const;
+
 export const REMINDERS_KEY = "reminders" as const;
 
 export const REST_CONFIRM_KEY = "rest_confirm" as const;
@@ -118,7 +122,7 @@ export type AppConfigChangedPayload = {
 
 /**
  *  panel 窗口当前形态（贴托盘 / 屏幕右上角 / 全屏强制）。
- *  受管状态（app.manage）：phase-changed 监听器按 rest_window / long_break_window 配置写入，
+ *  受管状态（app.manage）：phase-changed 监听器按 rest_window / long_break_window / quiet_window 配置写入，
  *  show_panel / fit_panel / create_panel / settings 恢复等所有定位路径统一读取，
  *  保证高度自适应、窗口恢复后不跳回托盘位。
  */

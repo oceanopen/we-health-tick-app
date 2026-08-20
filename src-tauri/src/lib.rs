@@ -82,6 +82,8 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
         .constant("DEFAULT_REST_WINDOW", ac::DEFAULT_REST_WINDOW)
         .constant("LONG_BREAK_WINDOW_KEY", ac::LONG_BREAK_WINDOW_KEY)
         .constant("DEFAULT_LONG_BREAK_WINDOW", ac::DEFAULT_LONG_BREAK_WINDOW)
+        .constant("QUIET_WINDOW_KEY", ac::QUIET_WINDOW_KEY)
+        .constant("DEFAULT_QUIET_WINDOW", ac::DEFAULT_QUIET_WINDOW)
         // —— 默认值 / 范围（数值型）——
         .constant("DEFAULT_WORK_DURATION", t::DEFAULT_WORK_DURATION_MIN)
         .constant("DEFAULT_BREAK_DURATION", t::DEFAULT_BREAK_DURATION_MIN)

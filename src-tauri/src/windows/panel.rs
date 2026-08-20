@@ -10,7 +10,8 @@ use tauri::{
 
 use crate::shared::app_config::{
     AppConfigState, LANGUAGE_KEY, LONG_BREAK_WINDOW_FULLSCREEN, LONG_BREAK_WINDOW_KEY,
-    LONG_BREAK_WINDOW_TOP_RIGHT, LONG_BREAK_WINDOW_TRAY, REST_WINDOW_FULLSCREEN, REST_WINDOW_KEY,
+    LONG_BREAK_WINDOW_TOP_RIGHT, LONG_BREAK_WINDOW_TRAY, QUIET_WINDOW_FULLSCREEN, QUIET_WINDOW_KEY,
+    QUIET_WINDOW_TOP_RIGHT, QUIET_WINDOW_TRAY, REST_WINDOW_FULLSCREEN, REST_WINDOW_KEY,
     REST_WINDOW_TOP_RIGHT, REST_WINDOW_TRAY, read_app_config_raw,
 };
 use crate::shared::events::EVENT_PANEL_FORM_CHANGED;
@@ -27,7 +28,7 @@ const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
 const PANEL_TOP_RIGHT_MARGIN: f64 = 12.0;
 
 /// panel 窗口当前形态（贴托盘 / 屏幕右上角 / 全屏强制）。
-/// 受管状态（app.manage）：phase-changed 监听器按 rest_window / long_break_window 配置写入，
+/// 受管状态（app.manage）：phase-changed 监听器按 rest_window / long_break_window / quiet_window 配置写入，
 /// show_panel / fit_panel / create_panel / settings 恢复等所有定位路径统一读取，
 /// 保证高度自适应、窗口恢复后不跳回托盘位。
 #[derive(Clone, Copy, PartialEq, Serialize, specta::Type)]
@@ -161,12 +162,32 @@ fn exit_panel_fullscreen(app: &AppHandle) {
     }
 }
 
-// 按休息类型读对应窗口形态配置并映射为 PanelForm。
-// 现读 DB（无缓存，保存后下一次休息即生效；Alerting 期间热改配置，Breaking 读到新值即热切换）。
+// 按 key + 三取值常量读窗口形态配置并映射为 PanelForm（rest_window / long_break_window / quiet_window 共用）。
+// 现读 DB（无缓存，保存后下一次唤起即生效；窗口接管期间热改配置，下次 phase-changed 读到新值即热切换）。
 // 三个取值显式分派：
 //   - tray / topRight：小窗形态（topRight 叠加在 tray 之上，仅定位不同）。
-//   - fullscreen：伪全屏（铺满 work_area，Alerting 起接管，Waiting 保持至确认返回，Working 退出）。
+//   - fullscreen：伪全屏（铺满 work_area，接管屏幕，Working 时退出）。
 //   - DB 无值 / 非法值：回退 tray。
+fn panel_form_from_key(
+    app: &AppHandle,
+    key: &str,
+    tray: &str,
+    top_right: &str,
+    fullscreen: &str,
+) -> PanelForm {
+    let window = app
+        .try_state::<AppConfigState>()
+        .and_then(|state| read_app_config_raw(&state, key).ok().flatten())
+        .unwrap_or_else(|| tray.to_string());
+    match window.as_str() {
+        v if v == tray => PanelForm::Tray,
+        v if v == top_right => PanelForm::TopRight,
+        v if v == fullscreen => PanelForm::Fullscreen,
+        _ => PanelForm::Tray,
+    }
+}
+
+// 按休息类型读对应窗口形态配置（正常休息 / 长休息共用入口）。
 fn panel_form_by_window_config(app: &AppHandle, is_long_break: bool) -> PanelForm {
     let (key, tray, top_right, fullscreen) = if is_long_break {
         (
@@ -183,16 +204,18 @@ fn panel_form_by_window_config(app: &AppHandle, is_long_break: bool) -> PanelFor
             REST_WINDOW_FULLSCREEN,
         )
     };
-    let window = app
-        .try_state::<AppConfigState>()
-        .and_then(|state| read_app_config_raw(&state, key).ok().flatten())
-        .unwrap_or_else(|| tray.to_string());
-    match window.as_str() {
-        v if v == tray => PanelForm::Tray,
-        v if v == top_right => PanelForm::TopRight,
-        v if v == fullscreen => PanelForm::Fullscreen,
-        _ => PanelForm::Tray,
-    }
+    panel_form_from_key(app, key, tray, top_right, fullscreen)
+}
+
+// 读静音窗口形态配置（quiet_hours 命中强制暂停时唤起窗口用）。
+fn panel_form_by_quiet_window_config(app: &AppHandle) -> PanelForm {
+    panel_form_from_key(
+        app,
+        QUIET_WINDOW_KEY,
+        QUIET_WINDOW_TRAY,
+        QUIET_WINDOW_TOP_RIGHT,
+        QUIET_WINDOW_FULLSCREEN,
+    )
 }
 
 // 已构建的托盘菜单项引用，用于语言切换时动态更新文案（MenuItem::set_text）。
@@ -390,7 +413,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     //   - Alerting / Breaking：读对应配置（长休息 → long_break_window，正常 → rest_window），
     //     topRight → 屏幕右上角，fullscreen → macOS 原生全屏（Alerting 起接管，
     //     期间热改配置 Breaking 读到新值即热切换），tray / 非法值 → 贴托盘。
-    //   - Waiting / Paused：沿用当前形态（全屏保持至确认返回；暂停期间停在原地不跳变）。
+    //   - Waiting：沿用当前形态（全屏保持至确认返回）。
+    //   - Paused：静音触发按 quiet_window 配置分派形态；手动暂停沿用当前形态不跳变。
     //   - Working：重置贴托盘（sync 内部触发退出全屏 + 恢复小窗尺寸与托盘定位）。
     // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
     app.handle().listen(
@@ -411,8 +435,21 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                             );
                             show_panel(&app_handle);
                         }
-                        Phase::Waiting | Phase::Paused => {
+                        Phase::Waiting => {
                             // 沿用当前形态（全屏形态下即保持全屏，至确认返回进 Working 才退出）
+                            show_panel(&app_handle);
+                        }
+                        Phase::Paused => {
+                            // 静音时段触发的暂停：按静音窗口配置分派形态；手动暂停沿用当前形态不跳变。
+                            if payload
+                                .as_ref()
+                                .is_some_and(|p| p.quiet_triggered)
+                            {
+                                sync_panel_form(
+                                    &app_handle,
+                                    panel_form_by_quiet_window_config(&app_handle),
+                                );
+                            }
                             show_panel(&app_handle);
                         }
                         Phase::Working => {
@@ -420,11 +457,15 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                             // （exit 内部含贴托盘定位）。幂等：已是 Tray 时零副作用。
                             sync_panel_form(&app_handle, PanelForm::Tray);
                             // 静音时段结束自动重开工作：不显示工作窗口，收起回归工作流。
-                            let resumed_from_quiet = payload.as_ref().is_some_and(|p| p.resumed_from_quiet);
+                            let resumed_from_quiet = payload
+                                .as_ref()
+                                .is_some_and(|p| p.resumed_from_quiet);
                             match prev_phase {
                                 // 从休息侧进入 Working（跳过 / 我回来了 / 休息窗口重置）：
                                 // 收起窗口回归工作流，需要时点托盘唤起。
-                                Some(Phase::Breaking) | Some(Phase::Waiting) | Some(Phase::Alerting) => {
+                                Some(Phase::Breaking)
+                                | Some(Phase::Waiting)
+                                | Some(Phase::Alerting) => {
                                     if let Some(panel) = app_handle.get_webview_window("panel") {
                                         let _ = panel.hide();
                                     }

@@ -43,6 +43,7 @@ const INITIAL_STATE: TimerStatePayload = {
   completedCycles: 0,
   quietTriggered: false,
   breakPaused: false,
+  resumedFromQuiet: false,
 };
 
 function formatDisplayTime(seconds: number): string {

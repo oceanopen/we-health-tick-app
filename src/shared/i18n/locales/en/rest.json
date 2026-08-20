@@ -5,6 +5,7 @@
   "row": {
     "restWindow": "Break Window",
     "longBreakWindow": "Long Break Window",
+    "quietWindow": "Quiet Window",
     "restConfirm": "Confirm Before Break",
     "restEndConfirm": "Confirm After Break",
     "skipBreakAllowed": "Allow Skipping Break",

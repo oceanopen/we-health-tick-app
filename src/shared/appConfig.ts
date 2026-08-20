@@ -20,7 +20,7 @@ import {
 // 配置 key 名、默认值、MIN/MAX 范围的唯一可信源已迁至 Rust 侧——
 //   - timer.rs 业务 11 项（work/break_duration、break_skip_max、long_break_*、
 //     rest_confirm、rest_end_confirm、pause_on_idle、idle_pause_threshold、quiet_hours、reminders）
-//   - shared/app_config.rs 3 项（language、rest_window、long_break_window）
+//   - shared/app_config.rs 4 项（language、rest_window、long_break_window、quiet_window）
 //   - shared/events.rs 事件名、shared/reminder_texts.rs 默认文案
 // 经 lib.rs build_specta_builder().constant() 自动导出到 ./bindings（as const），
 // 本文件 re-export 保持消费方 import 路径稳定。修改常量值：改 Rust → `pnpm gen:bindings`，
@@ -46,6 +46,7 @@ export {
   DEFAULT_LONG_BREAK_INTERVAL,
   DEFAULT_LONG_BREAK_WINDOW,
   DEFAULT_QUIET_HOURS,
+  DEFAULT_QUIET_WINDOW,
   DEFAULT_REST_WINDOW,
   DEFAULT_WORK_DURATION,
   IDLE_PAUSE_THRESHOLD_KEY,
@@ -60,6 +61,7 @@ export {
   MIN_IDLE_PAUSE_THRESHOLD,
   PAUSE_ON_IDLE_KEY,
   QUIET_HOURS_KEY,
+  QUIET_WINDOW_KEY,
   REMINDERS_KEY,
   REST_CONFIRM_KEY,
   REST_END_CONFIRM_KEY,

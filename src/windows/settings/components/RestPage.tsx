@@ -6,6 +6,7 @@ import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined';
 import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined';
 import SelfImprovementOutlinedIcon from '@mui/icons-material/SelfImprovementOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
+import VolumeOffOutlinedIcon from '@mui/icons-material/VolumeOffOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import WeekendOutlinedIcon from '@mui/icons-material/WeekendOutlined';
 import {
@@ -28,6 +29,7 @@ import {
   DEFAULT_IDLE_PAUSE_THRESHOLD,
   DEFAULT_LONG_BREAK_WINDOW,
   DEFAULT_PAUSE_ON_IDLE,
+  DEFAULT_QUIET_WINDOW,
   DEFAULT_REST_CONFIRM,
   DEFAULT_REST_END_CONFIRM,
   DEFAULT_REST_WINDOW,
@@ -45,6 +47,7 @@ import {
   MIN_SKIP_COUNT_REMINDER,
   parseYesNo,
   PAUSE_ON_IDLE_KEY,
+  QUIET_WINDOW_KEY,
   REST_CONFIRM_KEY,
   REST_END_CONFIRM_KEY,
   REST_WINDOW_KEY,
@@ -61,6 +64,7 @@ import { useTranslation } from 'react-i18next';
 interface AppRestConfig {
   restWindow: RestWindow;
   longBreakWindow: RestWindow;
+  quietWindow: RestWindow;
   restConfirm: RestConfirm;
   restEndConfirm: RestEndConfirm;
   skipBreakAllowed: SkipBreakAllowed;
@@ -77,6 +81,7 @@ function isRestWindow(value: string | null): value is RestWindow {
 const DEFAULT_APP_REST_CONFIG: AppRestConfig = {
   restWindow: DEFAULT_REST_WINDOW,
   longBreakWindow: DEFAULT_LONG_BREAK_WINDOW,
+  quietWindow: DEFAULT_QUIET_WINDOW,
   restConfirm: DEFAULT_REST_CONFIRM,
   restEndConfirm: DEFAULT_REST_END_CONFIRM,
   skipBreakAllowed: DEFAULT_SKIP_BREAK_ALLOWED,
@@ -95,6 +100,7 @@ function RestPage() {
     Promise.all([
       getAppConfig(REST_WINDOW_KEY),
       getAppConfig(LONG_BREAK_WINDOW_KEY),
+      getAppConfig(QUIET_WINDOW_KEY),
       getAppConfig(REST_CONFIRM_KEY),
       getAppConfig(REST_END_CONFIRM_KEY),
       getAppConfig(SKIP_BREAK_ALLOWED_KEY),
@@ -102,12 +108,13 @@ function RestPage() {
       getAppConfig(BREAK_SKIP_MAX_KEY),
       getAppConfig(PAUSE_ON_IDLE_KEY),
       getAppConfig(IDLE_PAUSE_THRESHOLD_KEY),
-    ]).then(([window, longBreakWindow, confirm, rec, sba, skipCountReminder, bsm, poi, ipt]) => {
+    ]).then(([window, longBreakWindow, quietWindow, confirm, rec, sba, skipCountReminder, bsm, poi, ipt]) => {
       const next: AppRestConfig = {
         restWindow: isRestWindow(window) ? window : DEFAULT_REST_WINDOW,
         longBreakWindow: isRestWindow(longBreakWindow)
           ? longBreakWindow
           : DEFAULT_LONG_BREAK_WINDOW,
+        quietWindow: isRestWindow(quietWindow) ? quietWindow : DEFAULT_QUIET_WINDOW,
         restConfirm: parseYesNo(confirm, DEFAULT_REST_CONFIRM),
         restEndConfirm: parseYesNo(rec, DEFAULT_REST_END_CONFIRM),
         skipBreakAllowed: parseYesNo(sba, DEFAULT_SKIP_BREAK_ALLOWED),
@@ -128,6 +135,7 @@ function RestPage() {
   const dirty
     = saved.restWindow !== draft.restWindow
       || saved.longBreakWindow !== draft.longBreakWindow
+      || saved.quietWindow !== draft.quietWindow
       || saved.restConfirm !== draft.restConfirm
       || saved.restEndConfirm !== draft.restEndConfirm
       || saved.skipBreakAllowed !== draft.skipBreakAllowed
@@ -143,6 +151,7 @@ function RestPage() {
     await Promise.all([
       setAppConfig(REST_WINDOW_KEY, draft.restWindow),
       setAppConfig(LONG_BREAK_WINDOW_KEY, draft.longBreakWindow),
+      setAppConfig(QUIET_WINDOW_KEY, draft.quietWindow),
       setAppConfig(REST_CONFIRM_KEY, draft.restConfirm),
       setAppConfig(REST_END_CONFIRM_KEY, draft.restEndConfirm),
       setAppConfig(SKIP_BREAK_ALLOWED_KEY, draft.skipBreakAllowed),
@@ -215,6 +224,37 @@ function RestPage() {
                 value={draft.longBreakWindow}
                 onChange={(e: SelectChangeEvent<RestWindow>) =>
                   update('longBreakWindow', e.target.value as RestWindow)}
+              >
+                {restWindowOptions.map(opt => (
+                  <MenuItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+                    {t(opt.labelKey)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Divider />
+
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 1.5,
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <VolumeOffOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              <Typography>{t('rest:row.quietWindow')}</Typography>
+            </Box>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <Select
+                value={draft.quietWindow}
+                onChange={(e: SelectChangeEvent<RestWindow>) =>
+                  update('quietWindow', e.target.value as RestWindow)}
               >
                 {restWindowOptions.map(opt => (
                   <MenuItem key={opt.value} value={opt.value} disabled={opt.disabled}>
