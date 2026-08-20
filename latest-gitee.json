@@ -1,0 +1,31 @@
+{
+  "version": "0.2.4",
+  "notes": "",
+  "pub_date": "2026-08-20T15:55:44.328Z",
+  "platforms": {
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYld1Tnc1Q25Ud25qT3lBdGM0THdJTXVVZmwrQzRkcDBxTHV1WjhGSUJFZTdQTjluOTgwdVBFTFIxMXVjdGV4c2xidzVXaWVBSnNudmoybjllUEh5am4yNjR6bVhuL1E4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MjQxMTM3CWZpbGU6V2UgSGVhbHRoIFRpY2suYXBwLnRhci5negpTREZUcUFTZGcxSFR4VGZ0bmZTbFFDaGJTZnVscXV1VUJpWXFieStVZCtJTTlObjdOQjJ3eFZ3Sm5UVkF1bzZIL2hvVDJWTTBtRCtWSjNiaGk1YU9Bdz09Cg==",
+      "url": "https://gitee.com/ocean-open/we-health-tick-app/releases/download/v0.2.4/We.Health.Tick_x64.app.tar.gz"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYld1Tnc1Q25Ud25qT3lBdGM0THdJTXVVZmwrQzRkcDBxTHV1WjhGSUJFZTdQTjluOTgwdVBFTFIxMXVjdGV4c2xidzVXaWVBSnNudmoybjllUEh5am4yNjR6bVhuL1E4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MjQxMTM3CWZpbGU6V2UgSGVhbHRoIFRpY2suYXBwLnRhci5negpTREZUcUFTZGcxSFR4VGZ0bmZTbFFDaGJTZnVscXV1VUJpWXFieStVZCtJTTlObjdOQjJ3eFZ3Sm5UVkF1bzZIL2hvVDJWTTBtRCtWSjNiaGk1YU9Bdz09Cg==",
+      "url": "https://gitee.com/ocean-open/we-health-tick-app/releases/download/v0.2.4/We.Health.Tick_x64.app.tar.gz"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYld1Tnc1Q25Ud3VoQXdEaXhicGdGblNpS1ZQU05ZVnppNGMzSW9xMndjR1hjaVVzWCsyN3J2TE9DZjN5bFBLd2VTWnN2cWNoS29LcGNJcnJCNndKZExETlVIek9rOWdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MjQxMTc5CWZpbGU6V2UgSGVhbHRoIFRpY2suYXBwLnRhci5negprSHRFOTNJWWk1MVU2SkxOOE1Qa3NKTFlrWFJDY0tKV3lIQmZnRy9Jb1ByV2JTM1NBQkk3K1hwNWtxTDRNTkx5MURKMHYvMjFwRW5JdDJsdW1ycUFBUT09Cg==",
+      "url": "https://gitee.com/ocean-open/we-health-tick-app/releases/download/v0.2.4/We.Health.Tick_aarch64.app.tar.gz"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYld1Tnc1Q25Ud3VoQXdEaXhicGdGblNpS1ZQU05ZVnppNGMzSW9xMndjR1hjaVVzWCsyN3J2TE9DZjN5bFBLd2VTWnN2cWNoS29LcGNJcnJCNndKZExETlVIek9rOWdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MjQxMTc5CWZpbGU6V2UgSGVhbHRoIFRpY2suYXBwLnRhci5negprSHRFOTNJWWk1MVU2SkxOOE1Qa3NKTFlrWFJDY0tKV3lIQmZnRy9Jb1ByV2JTM1NBQkk3K1hwNWtxTDRNTkx5MURKMHYvMjFwRW5JdDJsdW1ycUFBUT09Cg==",
+      "url": "https://gitee.com/ocean-open/we-health-tick-app/releases/download/v0.2.4/We.Health.Tick_aarch64.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYld1Tnc1Q25Ud3J1Z3lYOUY4eHJ6UTJXZVRTYnZjaEQ2c1F5Y05IdE4vVXRSU1g1Z1pDM3pDQzRaZkhGK1NsZW56aVhMRUZzODErb29ZZkFBc1psUTRObXNHMVVCN1FrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MjQxMzQxCWZpbGU6V2UgSGVhbHRoIFRpY2tfMC4yLjRfeDY0LXNldHVwLmV4ZQoyNmExY1RMUFcyNmswRnVEaGJSei9JWSsrcFR2dlJEWmQ3VmdDNFF1VFB5SFFvNlpIZGt5cFhVc2VEcWhWV202a0IyQm4yQ3p1WUpDMHdoRDRsQXVDZz09Cg==",
+      "url": "https://gitee.com/ocean-open/we-health-tick-app/releases/download/v0.2.4/We.Health.Tick_0.2.4_x64-setup.exe"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTYld1Tnc1Q25Ud3J1Z3lYOUY4eHJ6UTJXZVRTYnZjaEQ2c1F5Y05IdE4vVXRSU1g1Z1pDM3pDQzRaZkhGK1NsZW56aVhMRUZzODErb29ZZkFBc1psUTRObXNHMVVCN1FrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3MjQxMzQxCWZpbGU6V2UgSGVhbHRoIFRpY2tfMC4yLjRfeDY0LXNldHVwLmV4ZQoyNmExY1RMUFcyNmswRnVEaGJSei9JWSsrcFR2dlJEWmQ3VmdDNFF1VFB5SFFvNlpIZGt5cFhVc2VEcWhWV202a0IyQm4yQ3p1WUpDMHdoRDRsQXVDZz09Cg==",
+      "url": "https://gitee.com/ocean-open/we-health-tick-app/releases/download/v0.2.4/We.Health.Tick_0.2.4_x64-setup.exe"
+    }
+  }
+}
