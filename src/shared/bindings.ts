@@ -209,6 +209,12 @@ export type TimerStatePayload = {
 	 *  前端 BreakingView 据此显隐「检测到操作，倒计时已暂停」横幅。
 	 */
 	breakPaused: boolean,
+	/**
+	 *  本次 phase 切换是否由静音时段结束自动恢复触发（quiet pause → 自动 start_work 新一轮）。
+	 *  仅 phase-changed 事件中 Paused→Working 时有意义：panel.rs 据此决定收起而非显示工作窗口。
+	 *  timer-tick / get_timer_state 恒为 false。
+	 */
+	resumedFromQuiet: boolean,
 };
 
 /**

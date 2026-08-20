@@ -620,6 +620,7 @@ fn build_payload(inner: &TimerInner, prev_phase: Option<Phase>) -> TimerStatePay
         completed_cycles: inner.completed_cycles,
         quiet_triggered: inner.paused_by_quiet,
         break_paused: inner.break_paused,
+        resumed_from_quiet: false,
     }
 }
 
@@ -728,7 +729,10 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                 let prev = state.phase;
                 apply_start_work(&mut state, (work_min as i64) * 60, now);
                 state.save_date = today_string();
-                phase_change_payload = Some(build_payload(&state, Some(prev)));
+                // 标记「静音结束自动恢复」：panel.rs 据此收起窗口，不显示工作状态。
+                let mut payload = build_payload(&state, Some(prev));
+                payload.resumed_from_quiet = true;
+                phase_change_payload = Some(payload);
             }
 
             // phase 推进（若 quiet 切到了 Paused 或 Working，下方 match 会自然落到对应分支处理新 phase）

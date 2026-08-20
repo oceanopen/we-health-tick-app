@@ -419,6 +419,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                             // sync 到 Tray 统一处理：Fullscreen 时退出全屏并显式恢复小窗尺寸
                             // （exit 内部含贴托盘定位）。幂等：已是 Tray 时零副作用。
                             sync_panel_form(&app_handle, PanelForm::Tray);
+                            // 静音时段结束自动重开工作：不显示工作窗口，收起回归工作流。
+                            let resumed_from_quiet = payload.as_ref().is_some_and(|p| p.resumed_from_quiet);
                             match prev_phase {
                                 // 从休息侧进入 Working（跳过 / 我回来了 / 休息窗口重置）：
                                 // 收起窗口回归工作流，需要时点托盘唤起。
@@ -427,7 +429,13 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                                         let _ = panel.hide();
                                     }
                                 }
-                                // Working 自身重置 / Paused 恢复 / 启动初始化：保持原可见状态。
+                                // 静音结束自动恢复（Paused → Working）：同样收起窗口，不显示工作状态。
+                                Some(Phase::Paused) if resumed_from_quiet => {
+                                    if let Some(panel) = app_handle.get_webview_window("panel") {
+                                        let _ = panel.hide();
+                                    }
+                                }
+                                // Working 自身重置 / 手动 Paused 恢复 / 启动初始化：保持原可见状态。
                                 // 可见时原地重定位回托盘位（如 topRight 点完按钮滞留右上角），
                                 // 隐藏则保持隐藏（衔接失焦自动隐藏机制）。不 show / 不 set_focus。
                                 _ => {
