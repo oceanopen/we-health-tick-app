@@ -18,6 +18,10 @@ import {
   REMINDERS_KEY,
   setAppConfig,
 } from '@src/shared/appConfig';
+import {
+  DEFAULT_HEALTH_TEXTS,
+  DEFAULT_WHISPER_TEXTS,
+} from '@src/shared/bindings';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -40,30 +44,8 @@ function isInvalidReminder(text: string): boolean {
   return text.trim() === '' || text.length > MAX_REMINDER_LENGTH;
 }
 
-// 健康提醒默认文案
-const DEFAULT_HEALTH_TEXTS: string[] = [
-  '起来走走，活动一下身体',
-  '远眺窗外，放松眼睛',
-  '喝杯水，补充水分',
-  '做几个简单的拉伸动作',
-  '深呼吸，放松身心',
-  '活动手腕，预防鼠标手',
-  '闭眼休息，让大脑放松',
-  '伸展脊柱，改善坐姿',
-];
-
-// 随笔心语默认文案（文学摘抄，固定中文）。
-const DEFAULT_WHISPER_TEXTS: string[] = [
-  '成功只有一个 ———— 按照自己的方式，去度过人生。',
-  '世界上只有一种真正的英雄主义，那就是在认清生活的真相后依然热爱生活。',
-  '这个世界上有很多人，很多种选择，最低的是温饱，然后是利益，就是钱，超越钱的，是名望、权利，但是在超越这些所有东西之上还有一样东西，叫智慧。... 因为我知道我懂的越来越多，只有智慧和知识，内在强大，让你自己懂得很多，对这个世界你有充分的了解，你就不会有畏惧。',
-  '因为我要告诉你，所谓千秋霸业，万古流芳，以及一切的一切，只是粪土。先变成粪，再变成土。现在你不明白，将来你会明白，将来不明白，就再等将来，如果一辈子都不明白，也行。',
-  '长期的困难生活，最能磨炼一个人的意志。有很多人在遇到困难后，只能怨天尤人，得过且过，而另外一些人虽然也不得不在困难面前低头，但他们的心从未屈服，他们不断地努力，相信一定能够取得最后的胜利。',
-  '当你感到畏惧和痛苦，支撑不下去的时候，你应该同时意识到，决定你命运的时候到了。 因为畏惧并不是消极的，事实上，它是一个人真正强大的开始，也是成为英雄的起点。 不懂得畏惧的人不知道什么是困难，也无法战胜困难。 只有懂得畏惧的人，才能唤起自己的力量。 只有懂得畏惧的人，才有勇气去战胜畏惧。 懂得畏惧的可怕，还能超越它、征服它的人，就是英雄。',
-  '所谓道，是天下所有规律的总和，是最根本的法则，只要能够了解道，就可以明了世间所有的一切。',
-  '滚滚长江东逝水，浪花淘尽英雄。是非成败转头空，青山依旧在，几度夕阳红。 白发渔樵江渚上，惯看秋月春风。一壶浊酒喜相逢，古今多少事，都付笑谈中。',
-  '无论有多么伟大正直的理想，要实现它，还必须懂得两个字——变通。只有变通，只有切合实际的行动，才能适应这个变化万千的世界。',
-];
+// 默认文案常量从 bindings 导入（SSOT 为后端 shared/reminder_texts.rs，
+// 经 build_specta_builder().constant() 自动生成，类型为 readonly string[]）。
 
 function RemindersPage() {
   const { t } = useTranslation();
@@ -79,8 +61,9 @@ function RemindersPage() {
   }, []);
 
   // 把纯文案数组包装成带 id 的条目（持久化只存 text，id 仅作 React key）。
+  // 入参放宽为 readonly string[]：默认文案来自 bindings 的 as const 常量。
   const buildItems = useCallback(
-    (texts: string[]): ReminderItem[] =>
+    (texts: readonly string[]): ReminderItem[] =>
       texts.map(text => ({ id: allocateReminderId(), text })),
     [allocateReminderId],
   );
@@ -134,7 +117,9 @@ function RemindersPage() {
     = JSON.stringify(saved[activeTab]) !== JSON.stringify(draft[activeTab]);
 
   const handleReset = () => {
-    const texts = activeTab === 'health' ? DEFAULT_HEALTH_TEXTS : DEFAULT_WHISPER_TEXTS;
+    const texts: readonly string[] = activeTab === 'health'
+      ? DEFAULT_HEALTH_TEXTS
+      : DEFAULT_WHISPER_TEXTS;
     setDraft(prev => ({ ...prev, [activeTab]: buildItems(texts) }));
     setHasValidationAttempted(false);
   };

@@ -38,6 +38,11 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
         // YesNo enum 同样不在 command 签名中（read_*_enabled 内部 parse 消费），
         // 注册以让前端 bindings.ts 拿到字面量联合类型 "Y" | "N"。
         .typ::<YesNo>()
+        // 提醒文案默认值常量：tauri-specta rc.25 起原生支持 constant 导出（此前注释
+        // 「specta 不导出运行时 const」的认知已过时），生成 `export const ... as const`。
+        // SSOT 为 shared/reminder_texts.rs，timer.rs 空池兜底与前端设置页共用。
+        .constant("DEFAULT_HEALTH_TEXTS", shared::reminder_texts::DEFAULT_HEALTH_TEXTS)
+        .constant("DEFAULT_WHISPER_TEXTS", shared::reminder_texts::DEFAULT_WHISPER_TEXTS)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

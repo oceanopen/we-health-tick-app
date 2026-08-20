@@ -5,6 +5,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
 use crate::shared::app_config::{AppConfigState, read_app_config_conn, write_app_config_conn};
+use crate::shared::reminder_texts::{DEFAULT_HEALTH_TEXTS, DEFAULT_WHISPER_TEXTS};
 use crate::shared::time::{now_epoch, now_hhmm, today_string};
 use crate::shared::types::{Phase, TimerStatePayload, YesNo};
 
@@ -106,7 +107,7 @@ pub struct TimerState {
 //   KEY_PAUSE_ON_IDLE          ↔ PAUSE_ON_IDLE_KEY         / DEFAULT_PAUSE_ON_IDLE
 //   KEY_IDLE_PAUSE_THRESHOLD   ↔ IDLE_PAUSE_THRESHOLD_KEY  / DEFAULT_IDLE_PAUSE_THRESHOLD (MIN/MAX)
 //   KEY_QUIET_HOURS            ↔ QUIET_HOURS_KEY           / DEFAULT_QUIET_HOURS (DEFAULT_QUIET_HOURS_JSON)
-//   KEY_REMINDERS              ↔ REMINDERS_KEY             / （无默认，运行时 decode/pick）
+//   KEY_REMINDERS              ↔ REMINDERS_KEY             /（默认文案见 shared/reminder_texts.rs，空池兜底）
 //   KEY_BREAK_SKIP_MAX         ↔ BREAK_SKIP_MAX_KEY        / DEFAULT_BREAK_SKIP_MAX
 
 const KEY_WORK_DURATION: &str = "work_duration";
@@ -402,6 +403,9 @@ fn is_in_quiet_periods(periods: &[(String, String)], hhmm: &str) -> bool {
 // reminders 的 JSON 形态为对象 { health: string[], whisper: string[] }：
 //   - whisper 池 = 随笔心语（文学摘抄），写入 current_whisper_reminder，展示交互不变；
 //   - health 池 = 健康提醒（走动/喝水等），写入 current_health_reminder，BreakingView 绿色横幅展示。
+// 空池兜底（按池独立）：用户配置某池为空（DB 无值 / JSON 解析失败 / 池被清空）时，
+// 该池改从 shared/reminder_texts.rs 的默认常量池抽取，与前端设置页展示逻辑一致——
+// 避免「未在设置页保存过就弹窗无文案」。
 // 随机源：rand crate 的 ThreadRng（CSPRNG 种子 + 高质量 PRNG）。
 // 调用点：on_work_done（工作结束自动）与 manual_break（手动休息）。
 fn pick_random_reminders(conn: &Connection) -> (String, String) {
@@ -420,14 +424,19 @@ fn pick_random_reminders(conn: &Connection) -> (String, String) {
         health: Vec::new(),
         whisper: Vec::new(),
     });
-    let pick = |list: &[String]| -> String {
-        if list.is_empty() {
-            return String::new();
+    let pick = |user_list: &[String], default_list: &[&str]| -> String {
+        // 用户池空 → 默认池兜底（常量池非空，随机范围安全）。
+        if user_list.is_empty() {
+            let idx = rand::rng().random_range(0..default_list.len());
+            return default_list[idx].to_string();
         }
-        let idx = rand::rng().random_range(0..list.len());
-        list.get(idx).cloned().unwrap_or_default()
+        let idx = rand::rng().random_range(0..user_list.len());
+        user_list[idx].clone()
     };
-    (pick(&cfg.whisper), pick(&cfg.health))
+    (
+        pick(&cfg.whisper, DEFAULT_WHISPER_TEXTS),
+        pick(&cfg.health, DEFAULT_HEALTH_TEXTS),
+    )
 }
 
 // ============================================================

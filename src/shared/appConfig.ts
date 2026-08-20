@@ -13,7 +13,8 @@ import { unwrap } from './commands';
 
 // YES_NO 运行时常量：构造 / 比较 Y/N 字面量用。
 // 类型来源：YesNo（来自 ./bindings，SSOT 为后端 shared/types.rs 的 YesNo enum）。
-// specta 只导出类型不导出运行时 const，故字面量本地维护；satisfies 确保取值合法——
+// Builder.constant 可导出值常量但两键取值需 isYes/toYesNo 等工具函数配套，
+// 保持本地 satisfies 模式：字面量本地维护，satisfies 确保取值合法——
 // 改 'Y'/'N' 为非 YesNo 字符时 tsc 在此报错兜底。改字符必须同步后端 enum 并重跑 gen:bindings。
 export const YES_NO = {
   YES: 'Y',
