@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Listener, Manager, State};
 use crate::shared::app_config::{AppConfigState, read_app_config_conn, write_app_config_conn};
 use crate::shared::reminder_texts::{DEFAULT_HEALTH_TEXTS, DEFAULT_WHISPER_TEXTS};
 use crate::shared::time::{now_epoch, now_hhmm, today_string};
-use crate::shared::types::{Phase, TimerStatePayload, YesNo};
+use crate::shared::types::{Phase, QuietHourPeriod, TimerStatePayload, YesNo};
 
 // ============================================================
 // 内部状态
@@ -84,88 +84,83 @@ pub struct TimerState {
 }
 
 // ============================================================
-// 业务配置 key + 默认值
+// 业务配置 key + 默认值（SSOT：本文件）
 // ============================================================
 //
-// ⚠️ SSOT (Single Source of Truth)：src/shared/appConfig.ts
-//
-// 下方 key 与默认值与前端 appConfig.ts 一一对应（前端是可信源）。
-// 修改任一项时，必须同步另一侧；否则会出现「DB 无值时前后端兜底不一致」的 bug
-// （例：后端读 work_duration 默认 30，前端 UI 显示 25，用户首次进设置页看到错值）。
-//
-// 重复存在的根因：Tauri 跨语言边界（TS webview ↔ Rust native）不能共享内存常量，
-// IPC 只传字符串；两边都需要 key 名 + 兜底默认值。这是结构性重复，非设计失误。
-//
-// 配对清单（修改时按此核对）：
-//   KEY_WORK_DURATION          ↔ WORK_DURATION_KEY         / DEFAULT_WORK_DURATION
-//   KEY_BREAK_DURATION         ↔ BREAK_DURATION_KEY        / DEFAULT_BREAK_DURATION
-//   KEY_LONG_BREAK_ENABLED     ↔ LONG_BREAK_ENABLED_KEY    / DEFAULT_LONG_BREAK_ENABLED
-//   KEY_LONG_BREAK_INTERVAL    ↔ LONG_BREAK_INTERVAL_KEY   / DEFAULT_LONG_BREAK_INTERVAL
-//   KEY_LONG_BREAK_DURATION    ↔ LONG_BREAK_DURATION_KEY   / DEFAULT_LONG_BREAK_DURATION
-//   KEY_REST_CONFIRM           ↔ REST_CONFIRM_KEY          / DEFAULT_REST_CONFIRM
-//   KEY_REST_END_CONFIRM       ↔ REST_END_CONFIRM_KEY      / DEFAULT_REST_END_CONFIRM
-//   KEY_PAUSE_ON_IDLE          ↔ PAUSE_ON_IDLE_KEY         / DEFAULT_PAUSE_ON_IDLE
-//   KEY_IDLE_PAUSE_THRESHOLD   ↔ IDLE_PAUSE_THRESHOLD_KEY  / DEFAULT_IDLE_PAUSE_THRESHOLD (MIN/MAX)
-//   KEY_QUIET_HOURS            ↔ QUIET_HOURS_KEY           / DEFAULT_QUIET_HOURS (DEFAULT_QUIET_HOURS_JSON)
-//   KEY_REMINDERS              ↔ REMINDERS_KEY             /（默认文案见 shared/reminder_texts.rs，空池兜底）
-//   KEY_BREAK_SKIP_MAX         ↔ BREAK_SKIP_MAX_KEY        / DEFAULT_BREAK_SKIP_MAX
+// 下方 key / 默认值 / 范围常量是唯一可信源，经 lib.rs build_specta_builder().constant()
+// 自动导出到 src/shared/bindings.ts（`export const ... as const`），前端 appConfig.ts
+// 直接 re-export，两端永不漂移；修改本区常量后必须跑 `pnpm gen:bindings` 重新生成。
+// 历史包袱说明：常量名沿用前端 appConfig.ts 旧命名（不带 _MIN 后缀等），DB 已存量的
+// key 字符串不可变，重命名导出名需同步前端 re-export 层。
 
-const KEY_WORK_DURATION: &str = "work_duration";
-const DEFAULT_WORK_DURATION_MIN: u32 = 30;
+pub const KEY_WORK_DURATION: &str = "work_duration";
+pub const DEFAULT_WORK_DURATION_MIN: u32 = 30;
 
-const KEY_BREAK_DURATION: &str = "break_duration";
-const DEFAULT_BREAK_DURATION_MIN: u32 = 1;
+pub const KEY_BREAK_DURATION: &str = "break_duration";
+pub const DEFAULT_BREAK_DURATION_MIN: u32 = 1;
 
-const KEY_LONG_BREAK_ENABLED: &str = "long_break_enabled";
-const DEFAULT_LONG_BREAK_ENABLED: bool = true;
+pub const KEY_LONG_BREAK_ENABLED: &str = "long_break_enabled";
+pub const DEFAULT_LONG_BREAK_ENABLED: bool = true;
 
-const KEY_LONG_BREAK_INTERVAL: &str = "long_break_interval";
-const DEFAULT_LONG_BREAK_INTERVAL: u32 = 2;
+pub const KEY_LONG_BREAK_INTERVAL: &str = "long_break_interval";
+pub const DEFAULT_LONG_BREAK_INTERVAL: u32 = 2;
 
-const KEY_LONG_BREAK_DURATION: &str = "long_break_duration";
-const DEFAULT_LONG_BREAK_DURATION_MIN: u32 = 5;
+pub const KEY_LONG_BREAK_DURATION: &str = "long_break_duration";
+pub const DEFAULT_LONG_BREAK_DURATION_MIN: u32 = 5;
 
-const KEY_REST_CONFIRM: &str = "rest_confirm";
-const DEFAULT_REST_CONFIRM: bool = true;
+pub const KEY_REST_CONFIRM: &str = "rest_confirm";
+pub const DEFAULT_REST_CONFIRM: bool = true;
 
 // 休息后确认：true 休息结束进 Waiting 等用户点「我回来了」；false 休息结束自动进入
 // Working（跳过 Waiting）。与前端 REST_END_CONFIRM_KEY / DEFAULT_REST_END_CONFIRM 对齐。
 // 场景：run_timer_loop Breaking 归零时刻现读分流。静音时段优先：quiet 检查在 phase 推进前，
 // Breaking 被强制切 Paused 不会走到归零分支，故无需在读取处再做静音判断。
-const KEY_REST_END_CONFIRM: &str = "rest_end_confirm";
-const DEFAULT_REST_END_CONFIRM: bool = true;
+pub const KEY_REST_END_CONFIRM: &str = "rest_end_confirm";
+pub const DEFAULT_REST_END_CONFIRM: bool = true;
 
-const KEY_PAUSE_ON_IDLE: &str = "pause_on_idle";
+pub const KEY_PAUSE_ON_IDLE: &str = "pause_on_idle";
 // 离开（锁屏/休眠/AFK）时冻结工作倒计时。与前端 DEFAULT_PAUSE_ON_IDLE 对齐。
 // read_pause_on_idle 容错回退此项（DB 无值/非法 → 默认开启）。
-const DEFAULT_PAUSE_ON_IDLE: bool = true;
+pub const DEFAULT_PAUSE_ON_IDLE: bool = true;
 
 // 判定「用户离开」的空闲阈值（秒），用户可配（前端 Slider 30-300 step 30，默认 60）。
 // idle > 该值且处于 Working 且 pause_on_idle 开启 → 冻结工作倒计时。
 // 与前端 IDLE_PAUSE_THRESHOLD_KEY / DEFAULT / MIN / MAX 对齐；STEP 仅前端 UI 用，后端不校验。
-const KEY_IDLE_PAUSE_THRESHOLD: &str = "idle_pause_threshold";
-const DEFAULT_IDLE_PAUSE_THRESHOLD: f64 = 60.0;
+pub const KEY_IDLE_PAUSE_THRESHOLD: &str = "idle_pause_threshold";
+pub const DEFAULT_IDLE_PAUSE_THRESHOLD: f64 = 60.0;
 // 合法范围（闭区间，秒）。read_idle_pause_threshold 会 clamp，防 DB 被外部写入异常值。改范围同步前端。
-const MIN_IDLE_PAUSE_THRESHOLD: f64 = 30.0;
-const MAX_IDLE_PAUSE_THRESHOLD: f64 = 300.0;
+pub const MIN_IDLE_PAUSE_THRESHOLD: f64 = 30.0;
+pub const MAX_IDLE_PAUSE_THRESHOLD: f64 = 300.0;
 
-const KEY_BREAK_SKIP_MAX: &str = "break_skip_max";
+pub const KEY_BREAK_SKIP_MAX: &str = "break_skip_max";
 // 休息跳过防误触门槛（连点 N 次才真正跳过）。与前端 DEFAULT_BREAK_SKIP_MAX 对齐。
 // read_break_skip_max 会 clamp 到 [MIN, MAX]，防止 DB 被外部写入异常值。
-const DEFAULT_BREAK_SKIP_MAX: u32 = 1;
+pub const DEFAULT_BREAK_SKIP_MAX: u32 = 1;
 // 跳过次数的合法范围（闭区间）。前后端均引用，改范围时同步 src/shared/appConfig.ts。
-const MIN_BREAK_SKIP_MAX: u32 = 1;
-const MAX_BREAK_SKIP_MAX: u32 = 3;
+pub const MIN_BREAK_SKIP_MAX: u32 = 1;
+pub const MAX_BREAK_SKIP_MAX: u32 = 3;
 
-const KEY_REMINDERS: &str = "reminders";
+pub const KEY_REMINDERS: &str = "reminders";
 
-// quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 与前端
-// src/shared/appConfig.ts 的 QuietHourPeriod 一致；支持跨午夜（start > end）。
-const KEY_QUIET_HOURS: &str = "quiet_hours";
-// 默认静音时段（与前端 DEFAULT_QUIET_HOURS 一一对应）。
-// DB 无值 / 解析失败时回退此项，避免「前端显示 2 项但后端不静音」的兜底不一致。
-const DEFAULT_QUIET_HOURS_JSON: &str =
+// quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 见 shared/types.rs
+// QuietHourPeriod（derive Type，随 bindings 导出）；支持跨午夜（start > end）。
+pub const KEY_QUIET_HOURS: &str = "quiet_hours";
+// 默认静音时段。DB 无值 / 解析失败时回退此项，避免「前端显示 2 项但后端不静音」的兜底不一致。
+// 运行时读取（read_quiet_hours）仍走 JSON 字符串解析；前端常量导出见 DEFAULT_QUIET_HOURS。
+pub const DEFAULT_QUIET_HOURS_JSON: &str =
     "[{\"start\":\"12:00\",\"end\":\"14:00\"},{\"start\":\"18:00\",\"end\":\"18:30\"}]";
+// 结构化默认值：仅作 constant 导出源（read_quiet_hours 运行时用 _JSON 兜底）。
+// 与 DEFAULT_QUIET_HOURS_JSON 的一致性由 lib.rs 导出前的 debug_assert 守卫。
+pub const DEFAULT_QUIET_HOURS: &[QuietHourPeriod] = &[
+    QuietHourPeriod {
+        start: "12:00",
+        end: "14:00",
+    },
+    QuietHourPeriod {
+        start: "18:00",
+        end: "18:30",
+    },
+];
 
 // 拿 TimerInner 锁，poisoned 时自动恢复（避免线程 panic 级联导致整个状态机死锁）。
 // 场景：所有需要读写 TimerInner 的同步代码块入口。
@@ -265,6 +260,7 @@ fn read_break_skip_max(conn: &Connection) -> u32 {
 // 值为 JSON {"date":"yyyy-MM-dd","count":N}。date != today 或缺失/非法 → 视为 0（跨天自然归零）。
 // 与 KEY_BREAK_SKIP_MAX（用户可配的防误触门槛）完全独立——后者控制「点几次才真跳过」，
 // 本项统计「今日真正跳过了几次」。前端 skip_count_reminder 阈值是纯 UI 配置，后端不读。
+// 内部统计 key（非用户配置、无前端镜像），不参与 constant 导出。
 const KEY_TODAY_SKIP_COUNT: &str = "today_skip_count";
 
 // today_skip_count 的持久化结构。与前端无契约（前端经 TimerStatePayload.todaySkipCount 读缓存值，
@@ -361,9 +357,11 @@ fn read_idle_pause_threshold(conn: &Connection) -> f64 {
 
 // 读 quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 与前端一致。
 // 容错策略（与前端 decodeQuietHours 对齐，避免兜底不一致）：
-//   - DB 无值 / 锁失败 → 回退 DEFAULT_QUIET_HOURS_JSON（2 项默认时段）
-//   - JSON 解析失败 → 同样回退默认 JSON
+//   - DB 无值 / 锁失败 → 回退 DEFAULT_QUIET_HOURS（2 项默认时段）
+//   - JSON 解析失败 → 同样回退默认
 //   - 用户主动保存 "[]"（清空所有时段）→ 尊重用户选择，返回空 vec
+// 反序列化用局部 String 字段 struct：共享类型 QuietHourPeriod 的 &'static str 字段
+// 无法反序列化短生命周期 JSON（借用检查），schema 一致由 JSON 形态保证。
 // 每秒被 run_timer_loop 调用一次，开销可忽略（quiet_hours 通常 < 5 项）。
 fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
     #[derive(serde::Deserialize)]
@@ -375,7 +373,8 @@ fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
         .ok()
         .flatten();
     let json = raw.as_deref().unwrap_or(DEFAULT_QUIET_HOURS_JSON);
-    let fallback: Vec<Period> = serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
+    let fallback: Vec<Period> =
+        serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
     let periods: Vec<Period> = serde_json::from_str(json).unwrap_or(fallback);
     periods
         .into_iter()

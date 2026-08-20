@@ -88,6 +88,21 @@ pub struct AppConfigChangedPayload {
 }
 
 // ============================================================
+// QuietHourPeriod：静音时段（quiet_hours 配置 + 默认值共享）
+// ============================================================
+
+/// 静音时段单条 {start, end}（"HH:mm"，支持跨午夜 start > end）。
+/// quiet_hours 配置 JSON 的 schema + DEFAULT_QUIET_HOURS 常量导出共用；
+/// 前端 appConfig.ts 的 QuietHourPeriod / decodeQuietHours 与此对齐。
+/// 字段用 &'static str 而非 String：DEFAULT_QUIET_HOURS 是 const 表达式，
+/// String 分配不能出现在 const 上下文；serde/序列化行为等价。
+#[derive(Clone, Serialize, Deserialize, Type)]
+pub struct QuietHourPeriod {
+    pub start: &'static str,
+    pub end: &'static str,
+}
+
+// ============================================================
 // YesNo：Y/N 布尔约定（rest_confirm / long_break_enabled）
 // ============================================================
 

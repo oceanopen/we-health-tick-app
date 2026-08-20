@@ -10,11 +10,22 @@ fn exit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
-// 集中注册所有 IPC 命令到 tauri-specta Builder。
+// 集中注册所有 IPC 命令 + 跨语言共享常量到 tauri-specta Builder。
 // run()（注册 invoke handler）与 bin/export_bindings.rs（生成 TS 绑定）共用此函数，
-// 保证命令清单单一来源，避免两份注册表漂移。
+// 保证命令/常量清单单一来源，避免两份注册表漂移。
 pub fn build_specta_builder() -> Builder<tauri::Wry> {
-    use crate::shared::types::{AppConfigChangedPayload, YesNo};
+    use crate::shared::app_config as ac;
+    use crate::shared::events as ev;
+    use crate::shared::types::{AppConfigChangedPayload, QuietHourPeriod, YesNo};
+    use crate::timer as t;
+
+    // quiet_hours 双形态一致性守卫：结构化 DEFAULT_QUIET_HOURS 与 read_quiet_hours
+    // 运行时用的 DEFAULT_QUIET_HOURS_JSON 必须等值，漂移则启动即 panic（早暴露）。
+    debug_assert!(
+        serde_json::to_string(&t::DEFAULT_QUIET_HOURS).unwrap()
+            == t::DEFAULT_QUIET_HOURS_JSON
+    );
+
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             exit_app,
@@ -38,9 +49,56 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
         // YesNo enum 同样不在 command 签名中（read_*_enabled 内部 parse 消费），
         // 注册以让前端 bindings.ts 拿到字面量联合类型 "Y" | "N"。
         .typ::<YesNo>()
-        // 提醒文案默认值常量：tauri-specta rc.25 起原生支持 constant 导出（此前注释
-        // 「specta 不导出运行时 const」的认知已过时），生成 `export const ... as const`。
-        // SSOT 为 shared/reminder_texts.rs，timer.rs 空池兜底与前端设置页共用。
+        // QuietHourPeriod 结构体仅出现在下方常量导出中（read_quiet_hours 用局部反序列化），
+        // 显式注册让 bindings.ts 导出类型供 DEFAULT_QUIET_HOURS 常量引用。
+        .typ::<QuietHourPeriod>()
+        // ==================== 跨语言共享常量（SSOT：Rust）====================
+        // tauri-specta rc.25 起原生支持 constant 导出，生成 `export const ... as const`。
+        // 前端 appConfig.ts / events.ts 对应常量已降级为从此处 re-export。
+        // 导出名 = 前端旧命名（TS 消费方零改动）；修改值必须重跑 `pnpm gen:bindings`。
+        // —— 事件名（SSOT：shared/events.rs）——
+        .constant("EVENT_TIMER_TICK", ev::EVENT_TIMER_TICK)
+        .constant("EVENT_PHASE_CHANGED", ev::EVENT_PHASE_CHANGED)
+        .constant("EVENT_APP_CONFIG_CHANGED", ev::EVENT_APP_CONFIG_CHANGED)
+        .constant("EVENT_SETTINGS_NAVIGATE", ev::EVENT_SETTINGS_NAVIGATE)
+        .constant("EVENT_PANEL_FORM_CHANGED", ev::EVENT_PANEL_FORM_CHANGED)
+        // —— 配置 key：timer.rs 业务 11 项 ——
+        .constant("WORK_DURATION_KEY", t::KEY_WORK_DURATION)
+        .constant("BREAK_DURATION_KEY", t::KEY_BREAK_DURATION)
+        .constant("LONG_BREAK_ENABLED_KEY", t::KEY_LONG_BREAK_ENABLED)
+        .constant("LONG_BREAK_INTERVAL_KEY", t::KEY_LONG_BREAK_INTERVAL)
+        .constant("LONG_BREAK_DURATION_KEY", t::KEY_LONG_BREAK_DURATION)
+        .constant("REST_CONFIRM_KEY", t::KEY_REST_CONFIRM)
+        .constant("REST_END_CONFIRM_KEY", t::KEY_REST_END_CONFIRM)
+        .constant("PAUSE_ON_IDLE_KEY", t::KEY_PAUSE_ON_IDLE)
+        .constant("IDLE_PAUSE_THRESHOLD_KEY", t::KEY_IDLE_PAUSE_THRESHOLD)
+        .constant("QUIET_HOURS_KEY", t::KEY_QUIET_HOURS)
+        .constant("REMINDERS_KEY", t::KEY_REMINDERS)
+        .constant("BREAK_SKIP_MAX_KEY", t::KEY_BREAK_SKIP_MAX)
+        // —— 配置 key + 默认值：shared/app_config.rs（i18n / 窗口形态）——
+        .constant("LANGUAGE_KEY", ac::LANGUAGE_KEY)
+        .constant("DEFAULT_LANGUAGE", ac::DEFAULT_LANGUAGE)
+        .constant("REST_WINDOW_KEY", ac::REST_WINDOW_KEY)
+        .constant("DEFAULT_REST_WINDOW", ac::DEFAULT_REST_WINDOW)
+        .constant("LONG_BREAK_WINDOW_KEY", ac::LONG_BREAK_WINDOW_KEY)
+        .constant("DEFAULT_LONG_BREAK_WINDOW", ac::DEFAULT_LONG_BREAK_WINDOW)
+        // —— 默认值 / 范围（数值型）——
+        .constant("DEFAULT_WORK_DURATION", t::DEFAULT_WORK_DURATION_MIN)
+        .constant("DEFAULT_BREAK_DURATION", t::DEFAULT_BREAK_DURATION_MIN)
+        .constant("DEFAULT_LONG_BREAK_ENABLED", t::DEFAULT_LONG_BREAK_ENABLED)
+        .constant("DEFAULT_LONG_BREAK_INTERVAL", t::DEFAULT_LONG_BREAK_INTERVAL)
+        .constant("DEFAULT_LONG_BREAK_DURATION", t::DEFAULT_LONG_BREAK_DURATION_MIN)
+        .constant("DEFAULT_REST_CONFIRM", t::DEFAULT_REST_CONFIRM)
+        .constant("DEFAULT_REST_END_CONFIRM", t::DEFAULT_REST_END_CONFIRM)
+        .constant("DEFAULT_PAUSE_ON_IDLE", t::DEFAULT_PAUSE_ON_IDLE)
+        .constant("DEFAULT_IDLE_PAUSE_THRESHOLD", t::DEFAULT_IDLE_PAUSE_THRESHOLD)
+        .constant("MIN_IDLE_PAUSE_THRESHOLD", t::MIN_IDLE_PAUSE_THRESHOLD)
+        .constant("MAX_IDLE_PAUSE_THRESHOLD", t::MAX_IDLE_PAUSE_THRESHOLD)
+        .constant("DEFAULT_BREAK_SKIP_MAX", t::DEFAULT_BREAK_SKIP_MAX)
+        .constant("MIN_BREAK_SKIP_MAX", t::MIN_BREAK_SKIP_MAX)
+        .constant("MAX_BREAK_SKIP_MAX", t::MAX_BREAK_SKIP_MAX)
+        // —— 默认值：结构化（quiet_hours / 提醒文案）——
+        .constant("DEFAULT_QUIET_HOURS", t::DEFAULT_QUIET_HOURS)
         .constant("DEFAULT_HEALTH_TEXTS", shared::reminder_texts::DEFAULT_HEALTH_TEXTS)
         .constant("DEFAULT_WHISPER_TEXTS", shared::reminder_texts::DEFAULT_WHISPER_TEXTS)
 }

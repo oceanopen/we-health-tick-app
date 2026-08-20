@@ -4,22 +4,26 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::shared::types::AppConfigChangedPayload;
 
-/// 语言偏好 key（前端镜像 src/shared/appConfig.ts 的 LANGUAGE_KEY，修改任一处需同步）。
+/// 语言偏好 key（后端 SSOT，经 Builder.constant 导出；前端 appConfig.ts re-export）。
 /// 后端仅托盘菜单消费（current_language 读取），其余业务不读。
 pub const LANGUAGE_KEY: &str = "language";
+/// 语言默认值："system"（缺失/非法时回退，后端 resolve 走系统 locale 探测）。
+pub const DEFAULT_LANGUAGE: &str = "system";
 
-/// 长休息窗口形态 key（前端镜像 src/shared/appConfig.ts 的 LONG_BREAK_WINDOW_KEY，修改任一处需同步）。
+/// 长休息窗口形态 key + 默认值（后端 SSOT，经 Builder.constant 导出）。
 /// 取值同前端 RestWindow（"tray" | "topRight" | "fullscreen"），后端 panel.rs 在长休息
 /// （含其休息前提醒 Alerting）唤起窗口时读取分派。三形态均已实现：tray / topRight 为小窗定位，
 /// fullscreen 为伪全屏：窗口铺满 work_area（Alerting 起接管，Working 时退出并恢复小窗）。
 pub const LONG_BREAK_WINDOW_KEY: &str = "long_break_window";
+pub const DEFAULT_LONG_BREAK_WINDOW: &str = LONG_BREAK_WINDOW_TRAY;
 pub const LONG_BREAK_WINDOW_TRAY: &str = "tray";
 pub const LONG_BREAK_WINDOW_TOP_RIGHT: &str = "topRight";
 pub const LONG_BREAK_WINDOW_FULLSCREEN: &str = "fullscreen";
 
-/// 正常休息窗口形态 key（前端镜像 src/shared/appConfig.ts 的 REST_WINDOW_KEY，修改任一处需同步）。
+/// 正常休息窗口形态 key（后端 SSOT，经 Builder.constant 导出）。
 /// 取值与读取语义同上（三形态均已实现），后端 panel.rs 在正常休息（含其休息前提醒 Alerting）唤起窗口时读取分派。
 pub const REST_WINDOW_KEY: &str = "rest_window";
+pub const DEFAULT_REST_WINDOW: &str = REST_WINDOW_TRAY;
 pub const REST_WINDOW_TRAY: &str = "tray";
 pub const REST_WINDOW_TOP_RIGHT: &str = "topRight";
 pub const REST_WINDOW_FULLSCREEN: &str = "fullscreen";

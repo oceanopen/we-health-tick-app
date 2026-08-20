@@ -1,18 +1,13 @@
-// 所有 Tauri 事件名的 SSOT。修改时必须同步 src-tauri/src/shared/events.rs（后端镜像）。
-// 与后端 const EVENT_XXX 一一对应；tauri-specta rc.25 的 Builder.constant 仅支持
-// Serialize+Type 的值常量，事件名不在其列，仍走双份维护。
+// 所有 Tauri 事件名：SSOT 为后端 src-tauri/src/shared/events.rs，
+// 经 Builder.constant 自动导出到 ./bindings（`export const ... as const`），
+// 本文件仅作 re-export 桥接，保持消费方 import 路径稳定。
+// 新增事件：先在后端定义 const，再到 lib.rs build_specta_builder 注册 constant，
+// 最后跑 `pnpm gen:bindings`。
 
-export const EVENT_TIMER_TICK = 'timer-tick';
-
-export const EVENT_PHASE_CHANGED = 'phase-changed';
-
-export const EVENT_APP_CONFIG_CHANGED = 'app-config-changed';
-
-// settings 窗口导航请求（payload = 分区 MenuKey 字符串）。show_settings_window 在 show 后
-// emit_to("settings")；首开深链走初始 URL settings.html#/section，不走此事件。
-// Rust 侧 Option<String> 不校验，由前端 isMenuKey 守卫。
-export const EVENT_SETTINGS_NAVIGATE = 'settings:navigate';
-
-// panel 窗口形态变化（payload = PanelForm 联合类型，bindings.ts 导出）。
-// 后端 sync_panel_form 全屏进出副作用完成后 emit_to("panel")；usePanelForm 订阅切换布局。
-export const EVENT_PANEL_FORM_CHANGED = 'panel-form-changed';
+export {
+  EVENT_APP_CONFIG_CHANGED,
+  EVENT_PANEL_FORM_CHANGED,
+  EVENT_PHASE_CHANGED,
+  EVENT_SETTINGS_NAVIGATE,
+  EVENT_TIMER_TICK,
+} from './bindings';
