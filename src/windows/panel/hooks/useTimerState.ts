@@ -9,6 +9,7 @@ import {
   DEFAULT_QUIET_HOURS,
   DEFAULT_SKIP_BREAK_ALLOWED,
   DEFAULT_SKIP_COUNT_REMINDER,
+  DEFAULT_WORK_ACTION_BAR,
   LONG_BREAK_ENABLED_KEY,
   LONG_BREAK_INTERVAL_KEY,
   MAX_BREAK_SKIP_MAX,
@@ -17,6 +18,7 @@ import {
   QUIET_HOURS_KEY,
   SKIP_BREAK_ALLOWED_KEY,
   SKIP_COUNT_REMINDER_KEY,
+  WORK_ACTION_BAR_KEY,
   YES_NO,
 } from '@src/shared/appConfig';
 import { commands } from '@src/shared/bindings';
@@ -80,6 +82,12 @@ function decodeSkipBreakAllowed(v: string | null): boolean {
   return parseYesNo(v, DEFAULT_SKIP_BREAK_ALLOWED) === YES_NO.YES;
 }
 
+// 工作窗口操作栏显隐（YesNo）。非法值 / 缺失回落默认展示（与 DEFAULT_WORK_ACTION_BAR 一致）。
+// No 时 WorkingView 底部操作栏（含上方分隔线）不渲染（纯前端消费）。
+function decodeWorkActionBar(v: string | null): boolean {
+  return parseYesNo(v, DEFAULT_WORK_ACTION_BAR) === YES_NO.YES;
+}
+
 // 下一次休息是否为长休息的预判（WorkingView「休息」按钮文案依据）。
 // 与后端 check_is_long_break 同公式同输入（递增前的 completed_cycles），
 // 手动休息（manual_break）与自动到点的下一次判定均基于此值，预判天然一致。
@@ -102,6 +110,8 @@ export function useTimerState() {
   const longBreakInterval = useAppConfigValue(LONG_BREAK_INTERVAL_KEY, decodeLongBreakInterval, DEFAULT_LONG_BREAK_INTERVAL);
   // 是否允许跳过（跳过按钮禁用输入；保存后经 app-config-changed 实时生效）。
   const skipBreakAllowed = useAppConfigValue(SKIP_BREAK_ALLOWED_KEY, decodeSkipBreakAllowed, true);
+  // 工作窗口操作栏显隐（WorkingView 底部操作栏渲染输入；保存后实时生效）。
+  const workActionBarVisible = useAppConfigValue(WORK_ACTION_BAR_KEY, decodeWorkActionBar, true);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +173,7 @@ export function useTimerState() {
     breakPaused: state.breakPaused,
     breakSkipMax,
     skipBreakAllowed,
+    workActionBarVisible,
     skipCountReminder,
     quietHours,
     completedCycles: state.completedCycles,

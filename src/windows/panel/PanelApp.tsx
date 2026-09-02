@@ -40,6 +40,7 @@ export default function PanelApp() {
     breakSkipCount,
     breakSkipMax,
     skipBreakAllowed,
+    workActionBarVisible,
     skipCountReminder,
     todaySkipCount,
     breakPaused,
@@ -169,6 +170,7 @@ export default function PanelApp() {
                 progress={progress}
                 isPaused={isPaused}
                 nextBreakIsLong={nextBreakIsLong}
+                actionBarVisible={workActionBarVisible}
                 onToggle={togglePause}
                 onReset={reset}
                 onManualBreak={manualBreak}

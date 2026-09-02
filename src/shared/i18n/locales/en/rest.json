@@ -6,6 +6,8 @@
     "restWindow": "Break Window",
     "longBreakWindow": "Long Break Window",
     "quietWindow": "Quiet Window",
+    "workActionBar": "Work Window Action Bar",
+    "workActionBarHint": "When off, pause, reset, and manual break are unavailable during work",
     "restConfirm": "Confirm Before Break",
     "restEndConfirm": "Confirm After Break",
     "skipBreakAllowed": "Allow Skipping Break",

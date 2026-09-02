@@ -1,11 +1,12 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { IdlePauseThreshold, PauseOnIdle, RestConfirm, RestEndConfirm, RestWindow, SkipBreakAllowed, SkipCountReminder } from '@src/shared/appConfig';
+import type { IdlePauseThreshold, PauseOnIdle, RestConfirm, RestEndConfirm, RestWindow, SkipBreakAllowed, SkipCountReminder, WorkActionBar } from '@src/shared/appConfig';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
 import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined';
 import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined';
 import SelfImprovementOutlinedIcon from '@mui/icons-material/SelfImprovementOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
+import SmartButtonOutlinedIcon from '@mui/icons-material/SmartButtonOutlined';
 import VolumeOffOutlinedIcon from '@mui/icons-material/VolumeOffOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import WeekendOutlinedIcon from '@mui/icons-material/WeekendOutlined';
@@ -35,6 +36,7 @@ import {
   DEFAULT_REST_WINDOW,
   DEFAULT_SKIP_BREAK_ALLOWED,
   DEFAULT_SKIP_COUNT_REMINDER,
+  DEFAULT_WORK_ACTION_BAR,
   getAppConfig,
   IDLE_PAUSE_THRESHOLD_KEY,
   IDLE_PAUSE_THRESHOLD_STEP,
@@ -55,6 +57,7 @@ import {
   SKIP_BREAK_ALLOWED_KEY,
   SKIP_COUNT_REMINDER_KEY,
   toYesNo,
+  WORK_ACTION_BAR_KEY,
   YES_NO,
 } from '@src/shared/appConfig';
 import { restWindowOptions } from '@src/shared/settingOption';
@@ -65,6 +68,7 @@ interface AppRestConfig {
   restWindow: RestWindow;
   longBreakWindow: RestWindow;
   quietWindow: RestWindow;
+  workActionBar: WorkActionBar;
   restConfirm: RestConfirm;
   restEndConfirm: RestEndConfirm;
   skipBreakAllowed: SkipBreakAllowed;
@@ -82,6 +86,7 @@ const DEFAULT_APP_REST_CONFIG: AppRestConfig = {
   restWindow: DEFAULT_REST_WINDOW,
   longBreakWindow: DEFAULT_LONG_BREAK_WINDOW,
   quietWindow: DEFAULT_QUIET_WINDOW,
+  workActionBar: DEFAULT_WORK_ACTION_BAR,
   restConfirm: DEFAULT_REST_CONFIRM,
   restEndConfirm: DEFAULT_REST_END_CONFIRM,
   skipBreakAllowed: DEFAULT_SKIP_BREAK_ALLOWED,
@@ -101,6 +106,7 @@ function RestPage() {
       getAppConfig(REST_WINDOW_KEY),
       getAppConfig(LONG_BREAK_WINDOW_KEY),
       getAppConfig(QUIET_WINDOW_KEY),
+      getAppConfig(WORK_ACTION_BAR_KEY),
       getAppConfig(REST_CONFIRM_KEY),
       getAppConfig(REST_END_CONFIRM_KEY),
       getAppConfig(SKIP_BREAK_ALLOWED_KEY),
@@ -108,13 +114,14 @@ function RestPage() {
       getAppConfig(BREAK_SKIP_MAX_KEY),
       getAppConfig(PAUSE_ON_IDLE_KEY),
       getAppConfig(IDLE_PAUSE_THRESHOLD_KEY),
-    ]).then(([window, longBreakWindow, quietWindow, confirm, rec, sba, skipCountReminder, bsm, poi, ipt]) => {
+    ]).then(([window, longBreakWindow, quietWindow, wab, confirm, rec, sba, skipCountReminder, bsm, poi, ipt]) => {
       const next: AppRestConfig = {
         restWindow: isRestWindow(window) ? window : DEFAULT_REST_WINDOW,
         longBreakWindow: isRestWindow(longBreakWindow)
           ? longBreakWindow
           : DEFAULT_LONG_BREAK_WINDOW,
         quietWindow: isRestWindow(quietWindow) ? quietWindow : DEFAULT_QUIET_WINDOW,
+        workActionBar: parseYesNo(wab, DEFAULT_WORK_ACTION_BAR),
         restConfirm: parseYesNo(confirm, DEFAULT_REST_CONFIRM),
         restEndConfirm: parseYesNo(rec, DEFAULT_REST_END_CONFIRM),
         skipBreakAllowed: parseYesNo(sba, DEFAULT_SKIP_BREAK_ALLOWED),
@@ -136,6 +143,7 @@ function RestPage() {
     = saved.restWindow !== draft.restWindow
       || saved.longBreakWindow !== draft.longBreakWindow
       || saved.quietWindow !== draft.quietWindow
+      || saved.workActionBar !== draft.workActionBar
       || saved.restConfirm !== draft.restConfirm
       || saved.restEndConfirm !== draft.restEndConfirm
       || saved.skipBreakAllowed !== draft.skipBreakAllowed
@@ -152,6 +160,7 @@ function RestPage() {
       setAppConfig(REST_WINDOW_KEY, draft.restWindow),
       setAppConfig(LONG_BREAK_WINDOW_KEY, draft.longBreakWindow),
       setAppConfig(QUIET_WINDOW_KEY, draft.quietWindow),
+      setAppConfig(WORK_ACTION_BAR_KEY, draft.workActionBar),
       setAppConfig(REST_CONFIRM_KEY, draft.restConfirm),
       setAppConfig(REST_END_CONFIRM_KEY, draft.restEndConfirm),
       setAppConfig(SKIP_BREAK_ALLOWED_KEY, draft.skipBreakAllowed),
@@ -263,6 +272,33 @@ function RestPage() {
                 ))}
               </Select>
             </FormControl>
+          </Box>
+
+          <Divider />
+
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 1.5,
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <SmartButtonOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              <Box>
+                <Typography>{t('rest:row.workActionBar')}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+                  {t('rest:row.workActionBarHint')}
+                </Typography>
+              </Box>
+            </Box>
+            <Switch
+              checked={draft.workActionBar === YES_NO.YES}
+              onChange={e => update('workActionBar', toYesNo(e.target.checked))}
+            />
           </Box>
 
           <Divider />

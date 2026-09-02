@@ -158,6 +158,14 @@ export type SkipBreakAllowed = YesNo;
 export const SKIP_BREAK_ALLOWED_KEY = 'skip_break_allowed';
 export const DEFAULT_SKIP_BREAK_ALLOWED: SkipBreakAllowed = YES_NO.YES;
 
+// 工作窗口操作栏显隐：No 时 WorkingView 底部操作栏（暂停/重置/休息，含上方横向分隔线）
+// 不渲染，窗口高度经 RO→fitPanel 链路自动收缩。纯前端消费（后端不读）；YesNo 配置，
+// 经 app-config-changed 实时热更新。
+export type WorkActionBar = YesNo;
+
+export const WORK_ACTION_BAR_KEY = 'work_action_bar';
+export const DEFAULT_WORK_ACTION_BAR: WorkActionBar = YES_NO.YES;
+
 // 跳过次数提醒阈值：今日累计「真正跳过休息」≥ 该值时，休息提醒弹窗（AlertingView）显示警示横幅。
 // 纯 UI 配置：后端不读取（与 appearance / rest_window 同类），仅前端 AlertingView 判断显隐。
 // 0 = 关闭提醒。与 BREAK_SKIP_MAX（单次休息防误触点击门槛）语义不同，勿混用。

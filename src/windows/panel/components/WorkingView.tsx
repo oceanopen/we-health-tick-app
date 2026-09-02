@@ -11,6 +11,7 @@ interface WorkingViewProps {
   progress: number;
   isPaused: boolean;
   nextBreakIsLong: boolean;
+  actionBarVisible: boolean;
   onToggle: () => void;
   onReset: () => void;
   onManualBreak: () => void;
@@ -21,6 +22,7 @@ export function WorkingView({
   progress,
   isPaused,
   nextBreakIsLong,
+  actionBarVisible,
   onToggle,
   onReset,
   onManualBreak,
@@ -45,48 +47,53 @@ export function WorkingView({
       <Typography variant="subtitle1">
         {t('panel:phaseWorking')}
       </Typography>
-      <Divider sx={{ width: '100%' }} />
-      <Box
-        sx={{
-          display: 'flex',
-          gap: 1.5,
-          justifyContent: 'center',
-          alignItems: 'center',
-          width: '100%',
-          px: 1,
-        }}
-      >
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <IconButton aria-label={toggleLabel} onClick={onToggle} size="small" color="secondary">
-            {isPaused ? <PlayArrowIcon /> : <PauseIcon />}
-          </IconButton>
-          <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
-            {toggleLabel}
-          </Typography>
-        </Box>
+      {/* 操作栏（含上方横向分隔线）整体显隐：隐藏后由 RO→fitPanel 链路自动收缩窗口高度。 */}
+      {actionBarVisible && (
+        <>
+          <Divider sx={{ width: '100%' }} />
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 1.5,
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: '100%',
+              px: 1,
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <IconButton aria-label={toggleLabel} onClick={onToggle} size="small" color="secondary">
+                {isPaused ? <PlayArrowIcon /> : <PauseIcon />}
+              </IconButton>
+              <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
+                {toggleLabel}
+              </Typography>
+            </Box>
 
-        <Divider orientation="vertical" flexItem />
+            <Divider orientation="vertical" flexItem />
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <IconButton aria-label={t('panel:action.reset')} onClick={onReset} size="small" color="secondary">
-            <ReplayIcon />
-          </IconButton>
-          <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
-            {t('panel:action.reset')}
-          </Typography>
-        </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <IconButton aria-label={t('panel:action.reset')} onClick={onReset} size="small" color="secondary">
+                <ReplayIcon />
+              </IconButton>
+              <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
+                {t('panel:action.reset')}
+              </Typography>
+            </Box>
 
-        <Divider orientation="vertical" flexItem />
+            <Divider orientation="vertical" flexItem />
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <IconButton aria-label={manualBreakLabel} onClick={onManualBreak} size="small" color="secondary">
-            <LocalCafeOutlinedIcon />
-          </IconButton>
-          <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
-            {manualBreakLabel}
-          </Typography>
-        </Box>
-      </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <IconButton aria-label={manualBreakLabel} onClick={onManualBreak} size="small" color="secondary">
+                <LocalCafeOutlinedIcon />
+              </IconButton>
+              <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
+                {manualBreakLabel}
+              </Typography>
+            </Box>
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
