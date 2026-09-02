@@ -6,7 +6,8 @@
   },
   "row": {
     "language": "Language",
-    "appearance": "Appearance"
+    "appearance": "Appearance",
+    "launchAtLogin": "Launch at Login"
   },
   "option": {
     "followSystem": "Follow system",

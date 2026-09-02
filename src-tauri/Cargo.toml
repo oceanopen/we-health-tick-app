@@ -54,6 +54,8 @@ tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+# 开机自启动：纯 Rust 驱动（shared/autostart.rs 经 ManagerExt 调用），前端不用 JS 绑定。
+tauri-plugin-autostart = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tokio = { version = "1", features = ["time"] }
 chrono = "0.4"

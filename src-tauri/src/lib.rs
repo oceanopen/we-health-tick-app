@@ -22,8 +22,7 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
     // quiet_hours 双形态一致性守卫：结构化 DEFAULT_QUIET_HOURS 与 read_quiet_hours
     // 运行时用的 DEFAULT_QUIET_HOURS_JSON 必须等值，漂移则启动即 panic（早暴露）。
     debug_assert!(
-        serde_json::to_string(&t::DEFAULT_QUIET_HOURS).unwrap()
-            == t::DEFAULT_QUIET_HOURS_JSON
+        serde_json::to_string(&t::DEFAULT_QUIET_HOURS).unwrap() == t::DEFAULT_QUIET_HOURS_JSON
     );
 
     Builder::<tauri::Wry>::new()
@@ -59,19 +58,40 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
         // —— 事件名（SSOT：shared/events.rs）——
         .constant("EVENT_TIMER_TICK", ev::EVENT_TIMER_TICK)
         .constant("EVENT_PHASE_CHANGED", ev::EVENT_PHASE_CHANGED)
-        .constant("EVENT_APP_CONFIG_CHANGED", ev::EVENT_APP_CONFIG_CHANGED)
-        .constant("EVENT_SETTINGS_NAVIGATE", ev::EVENT_SETTINGS_NAVIGATE)
-        .constant("EVENT_PANEL_FORM_CHANGED", ev::EVENT_PANEL_FORM_CHANGED)
+        .constant(
+            "EVENT_APP_CONFIG_CHANGED",
+            ev::EVENT_APP_CONFIG_CHANGED,
+        )
+        .constant(
+            "EVENT_SETTINGS_NAVIGATE",
+            ev::EVENT_SETTINGS_NAVIGATE,
+        )
+        .constant(
+            "EVENT_PANEL_FORM_CHANGED",
+            ev::EVENT_PANEL_FORM_CHANGED,
+        )
         // —— 配置 key：timer.rs 业务 11 项 ——
         .constant("WORK_DURATION_KEY", t::KEY_WORK_DURATION)
         .constant("BREAK_DURATION_KEY", t::KEY_BREAK_DURATION)
-        .constant("LONG_BREAK_ENABLED_KEY", t::KEY_LONG_BREAK_ENABLED)
-        .constant("LONG_BREAK_INTERVAL_KEY", t::KEY_LONG_BREAK_INTERVAL)
-        .constant("LONG_BREAK_DURATION_KEY", t::KEY_LONG_BREAK_DURATION)
+        .constant(
+            "LONG_BREAK_ENABLED_KEY",
+            t::KEY_LONG_BREAK_ENABLED,
+        )
+        .constant(
+            "LONG_BREAK_INTERVAL_KEY",
+            t::KEY_LONG_BREAK_INTERVAL,
+        )
+        .constant(
+            "LONG_BREAK_DURATION_KEY",
+            t::KEY_LONG_BREAK_DURATION,
+        )
         .constant("REST_CONFIRM_KEY", t::KEY_REST_CONFIRM)
         .constant("REST_END_CONFIRM_KEY", t::KEY_REST_END_CONFIRM)
         .constant("PAUSE_ON_IDLE_KEY", t::KEY_PAUSE_ON_IDLE)
-        .constant("IDLE_PAUSE_THRESHOLD_KEY", t::KEY_IDLE_PAUSE_THRESHOLD)
+        .constant(
+            "IDLE_PAUSE_THRESHOLD_KEY",
+            t::KEY_IDLE_PAUSE_THRESHOLD,
+        )
         .constant("QUIET_HOURS_KEY", t::KEY_QUIET_HOURS)
         .constant("REMINDERS_KEY", t::KEY_REMINDERS)
         .constant("BREAK_SKIP_MAX_KEY", t::KEY_BREAK_SKIP_MAX)
@@ -81,28 +101,72 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
         .constant("REST_WINDOW_KEY", ac::REST_WINDOW_KEY)
         .constant("DEFAULT_REST_WINDOW", ac::DEFAULT_REST_WINDOW)
         .constant("LONG_BREAK_WINDOW_KEY", ac::LONG_BREAK_WINDOW_KEY)
-        .constant("DEFAULT_LONG_BREAK_WINDOW", ac::DEFAULT_LONG_BREAK_WINDOW)
+        .constant(
+            "DEFAULT_LONG_BREAK_WINDOW",
+            ac::DEFAULT_LONG_BREAK_WINDOW,
+        )
         .constant("QUIET_WINDOW_KEY", ac::QUIET_WINDOW_KEY)
         .constant("DEFAULT_QUIET_WINDOW", ac::DEFAULT_QUIET_WINDOW)
+        .constant("LAUNCH_AT_LOGIN_KEY", ac::LAUNCH_AT_LOGIN_KEY)
+        .constant(
+            "DEFAULT_LAUNCH_AT_LOGIN",
+            ac::DEFAULT_LAUNCH_AT_LOGIN,
+        )
         // —— 默认值 / 范围（数值型）——
-        .constant("DEFAULT_WORK_DURATION", t::DEFAULT_WORK_DURATION_MIN)
-        .constant("DEFAULT_BREAK_DURATION", t::DEFAULT_BREAK_DURATION_MIN)
-        .constant("DEFAULT_LONG_BREAK_ENABLED", t::DEFAULT_LONG_BREAK_ENABLED)
-        .constant("DEFAULT_LONG_BREAK_INTERVAL", t::DEFAULT_LONG_BREAK_INTERVAL)
-        .constant("DEFAULT_LONG_BREAK_DURATION", t::DEFAULT_LONG_BREAK_DURATION_MIN)
+        .constant(
+            "DEFAULT_WORK_DURATION",
+            t::DEFAULT_WORK_DURATION_MIN,
+        )
+        .constant(
+            "DEFAULT_BREAK_DURATION",
+            t::DEFAULT_BREAK_DURATION_MIN,
+        )
+        .constant(
+            "DEFAULT_LONG_BREAK_ENABLED",
+            t::DEFAULT_LONG_BREAK_ENABLED,
+        )
+        .constant(
+            "DEFAULT_LONG_BREAK_INTERVAL",
+            t::DEFAULT_LONG_BREAK_INTERVAL,
+        )
+        .constant(
+            "DEFAULT_LONG_BREAK_DURATION",
+            t::DEFAULT_LONG_BREAK_DURATION_MIN,
+        )
         .constant("DEFAULT_REST_CONFIRM", t::DEFAULT_REST_CONFIRM)
-        .constant("DEFAULT_REST_END_CONFIRM", t::DEFAULT_REST_END_CONFIRM)
+        .constant(
+            "DEFAULT_REST_END_CONFIRM",
+            t::DEFAULT_REST_END_CONFIRM,
+        )
         .constant("DEFAULT_PAUSE_ON_IDLE", t::DEFAULT_PAUSE_ON_IDLE)
-        .constant("DEFAULT_IDLE_PAUSE_THRESHOLD", t::DEFAULT_IDLE_PAUSE_THRESHOLD)
-        .constant("MIN_IDLE_PAUSE_THRESHOLD", t::MIN_IDLE_PAUSE_THRESHOLD)
-        .constant("MAX_IDLE_PAUSE_THRESHOLD", t::MAX_IDLE_PAUSE_THRESHOLD)
-        .constant("DEFAULT_BREAK_SKIP_MAX", t::DEFAULT_BREAK_SKIP_MAX)
+        .constant(
+            "DEFAULT_IDLE_PAUSE_THRESHOLD",
+            t::DEFAULT_IDLE_PAUSE_THRESHOLD,
+        )
+        .constant(
+            "MIN_IDLE_PAUSE_THRESHOLD",
+            t::MIN_IDLE_PAUSE_THRESHOLD,
+        )
+        .constant(
+            "MAX_IDLE_PAUSE_THRESHOLD",
+            t::MAX_IDLE_PAUSE_THRESHOLD,
+        )
+        .constant(
+            "DEFAULT_BREAK_SKIP_MAX",
+            t::DEFAULT_BREAK_SKIP_MAX,
+        )
         .constant("MIN_BREAK_SKIP_MAX", t::MIN_BREAK_SKIP_MAX)
         .constant("MAX_BREAK_SKIP_MAX", t::MAX_BREAK_SKIP_MAX)
         // —— 默认值：结构化（quiet_hours / 提醒文案）——
         .constant("DEFAULT_QUIET_HOURS", t::DEFAULT_QUIET_HOURS)
-        .constant("DEFAULT_HEALTH_TEXTS", shared::reminder_texts::DEFAULT_HEALTH_TEXTS)
-        .constant("DEFAULT_WHISPER_TEXTS", shared::reminder_texts::DEFAULT_WHISPER_TEXTS)
+        .constant(
+            "DEFAULT_HEALTH_TEXTS",
+            shared::reminder_texts::DEFAULT_HEALTH_TEXTS,
+        )
+        .constant(
+            "DEFAULT_WHISPER_TEXTS",
+            shared::reminder_texts::DEFAULT_WHISPER_TEXTS,
+        )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -113,6 +177,19 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // 开机自启动：dev/release 用不同 app_name 隔离登录项标识（macOS LaunchAgent
+        // plist 文件名 / Windows Registry 键名），避免 dev 调试注册覆盖 release 的登录项。
+        // ⚠️ 勿用 `tauri build --debug`：会得到 release identifier + dev plist 名的组合，
+        // 启动回写污染 release 共享 DB 镜像（数据目录隔离依赖 tauri.dev.conf.json）。
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name(if cfg!(debug_assertions) {
+                    "we-health-tick-dev"
+                } else {
+                    "we-health-tick"
+                })
+                .build(),
+        )
         .invoke_handler(specta_builder.invoke_handler())
         .setup(move |app| {
             // macOS 隐藏 Dock 图标：将应用激活策略设为 Accessory（代理应用），
@@ -150,6 +227,8 @@ pub fn run() {
             // app_config 先于 panel::setup：panel 构建托盘菜单时需读 AppConfigState 解析语言偏好，
             // 否则首次启动会 fallback 到系统语言而忽略用户存的 language 偏好。
             shared::app_config::init(app)?;
+            // autostart 紧随 app_config：启动回写需写 DB 镜像；须在设置窗口（懒创建）前完成对齐。
+            shared::autostart::init(app.handle());
             windows::panel::setup(app)?;
             timer::init(app)?;
 

@@ -373,8 +373,7 @@ fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
         .ok()
         .flatten();
     let json = raw.as_deref().unwrap_or(DEFAULT_QUIET_HOURS_JSON);
-    let fallback: Vec<Period> =
-        serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
+    let fallback: Vec<Period> = serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
     let periods: Vec<Period> = serde_json::from_str(json).unwrap_or(fallback);
     periods
         .into_iter()

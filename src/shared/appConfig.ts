@@ -5,6 +5,7 @@ import type { QuietHourPeriod as QuietHourPeriodImport, YesNo } from './bindings
 import {
   commands,
   DEFAULT_IDLE_PAUSE_THRESHOLD as DEFAULT_IDLE_PAUSE_THRESHOLD_IMPORT,
+  DEFAULT_LAUNCH_AT_LOGIN as DEFAULT_LAUNCH_AT_LOGIN_IMPORT,
   DEFAULT_LONG_BREAK_ENABLED as DEFAULT_LONG_BREAK_ENABLED_IMPORT,
   DEFAULT_PAUSE_ON_IDLE as DEFAULT_PAUSE_ON_IDLE_IMPORT,
   DEFAULT_QUIET_HOURS as DEFAULT_QUIET_HOURS_IMPORT,
@@ -20,7 +21,7 @@ import {
 // 配置 key 名、默认值、MIN/MAX 范围的唯一可信源已迁至 Rust 侧——
 //   - timer.rs 业务 11 项（work/break_duration、break_skip_max、long_break_*、
 //     rest_confirm、rest_end_confirm、pause_on_idle、idle_pause_threshold、quiet_hours、reminders）
-//   - shared/app_config.rs 4 项（language、rest_window、long_break_window、quiet_window）
+//   - shared/app_config.rs 5 项（language、rest_window、long_break_window、quiet_window、launch_at_login）
 //   - shared/events.rs 事件名、shared/reminder_texts.rs 默认文案
 // 经 lib.rs build_specta_builder().constant() 自动导出到 ./bindings（as const），
 // 本文件 re-export 保持消费方 import 路径稳定。修改常量值：改 Rust → `pnpm gen:bindings`，
@@ -51,6 +52,7 @@ export {
   DEFAULT_WORK_DURATION,
   IDLE_PAUSE_THRESHOLD_KEY,
   LANGUAGE_KEY,
+  LAUNCH_AT_LOGIN_KEY,
   LONG_BREAK_DURATION_KEY,
   LONG_BREAK_ENABLED_KEY,
   LONG_BREAK_INTERVAL_KEY,
@@ -107,11 +109,16 @@ export type RestEndConfirm = YesNo;
 // YesNo 配置，后端 timer.rs 每秒现读（同 quiet_hours），改设置 ≤1s 生效。
 export type PauseOnIdle = YesNo;
 
+// 开机自启动：系统登录项状态的本地镜像（系统优先：启动时后端 autostart 模块以系统
+// 真实状态回写本配置；保存时经事件监听同步系统登录项）。YesNo 配置。
+export type LaunchAtLogin = YesNo;
+
 // YesNo 语义配置的默认值适配层：Rust SSOT 导出 bool，DB 存储 Y/N，
 // 消费方（RestPage/PlanPage/useTimerState 等）统一拿 YesNo。
 export const DEFAULT_REST_CONFIRM: YesNo = boolToYesNo(DEFAULT_REST_CONFIRM_IMPORT);
 export const DEFAULT_REST_END_CONFIRM: YesNo = boolToYesNo(DEFAULT_REST_END_CONFIRM_IMPORT);
 export const DEFAULT_PAUSE_ON_IDLE: YesNo = boolToYesNo(DEFAULT_PAUSE_ON_IDLE_IMPORT);
+export const DEFAULT_LAUNCH_AT_LOGIN: YesNo = boolToYesNo(DEFAULT_LAUNCH_AT_LOGIN_IMPORT);
 
 // 离开暂停的空闲阈值（秒）：idle 超该值且 pause_on_idle 开启 → 冻结工作倒计时。
 // number 配置，后端 timer.rs 每秒现读（同 quiet_hours）。STEP 仅前端 Slider 用，后端不校验。

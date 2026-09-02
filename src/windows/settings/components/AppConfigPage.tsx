@@ -1,7 +1,8 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { Appearance, Language } from '@src/shared/appConfig';
+import type { Appearance, Language, LaunchAtLogin } from '@src/shared/appConfig';
 import LanguageIcon from '@mui/icons-material/Language';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import PowerSettingsNewOutlinedIcon from '@mui/icons-material/PowerSettingsNewOutlined';
 import {
   Box,
   Button,
@@ -9,15 +10,21 @@ import {
   FormControl,
   MenuItem,
   Select,
+  Switch,
   Typography,
 } from '@mui/material';
 import {
   APPEARANCE_KEY,
   DEFAULT_APPEARANCE,
   DEFAULT_LANGUAGE,
+  DEFAULT_LAUNCH_AT_LOGIN,
   getAppConfig,
   LANGUAGE_KEY,
+  LAUNCH_AT_LOGIN_KEY,
+  parseYesNo,
   setAppConfig,
+  toYesNo,
+  YES_NO,
 } from '@src/shared/appConfig';
 import {
   appearanceOptions,
@@ -33,12 +40,15 @@ function AppConfigPage() {
   const [draftLanguage, setDraftLanguage] = useState<Language>(DEFAULT_LANGUAGE);
   const [savedAppearance, setSavedAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
   const [draftAppearance, setDraftAppearance] = useState<Appearance>(DEFAULT_APPEARANCE);
+  const [savedLaunchAtLogin, setSavedLaunchAtLogin] = useState<LaunchAtLogin>(DEFAULT_LAUNCH_AT_LOGIN);
+  const [draftLaunchAtLogin, setDraftLaunchAtLogin] = useState<LaunchAtLogin>(DEFAULT_LAUNCH_AT_LOGIN);
 
   useEffect(() => {
     Promise.all([
       getAppConfig(LANGUAGE_KEY),
       getAppConfig(APPEARANCE_KEY),
-    ]).then(([lang, appearance]) => {
+      getAppConfig(LAUNCH_AT_LOGIN_KEY),
+    ]).then(([lang, appearance, launchAtLogin]) => {
       if (lang === 'system' || lang === 'zh-CN' || lang === 'en') {
         setSavedLanguage(lang);
         setDraftLanguage(lang);
@@ -47,27 +57,36 @@ function AppConfigPage() {
         setSavedAppearance(appearance);
         setDraftAppearance(appearance);
       }
+      const launch = parseYesNo(launchAtLogin, DEFAULT_LAUNCH_AT_LOGIN);
+      setSavedLaunchAtLogin(launch);
+      setDraftLaunchAtLogin(launch);
     });
   }, []);
 
   const dirty
-    = draftLanguage !== savedLanguage || draftAppearance !== savedAppearance;
+    = draftLanguage !== savedLanguage
+      || draftAppearance !== savedAppearance
+      || draftLaunchAtLogin !== savedLaunchAtLogin;
 
   const handleReset = () => {
     setDraftLanguage(DEFAULT_LANGUAGE);
     setDraftAppearance(DEFAULT_APPEARANCE);
+    setDraftLaunchAtLogin(DEFAULT_LAUNCH_AT_LOGIN);
   };
   const handleCancel = () => {
     setDraftLanguage(savedLanguage);
     setDraftAppearance(savedAppearance);
+    setDraftLaunchAtLogin(savedLaunchAtLogin);
   };
   const handleSave = async () => {
     await Promise.all([
       setAppConfig(LANGUAGE_KEY, draftLanguage),
       setAppConfig(APPEARANCE_KEY, draftAppearance),
+      setAppConfig(LAUNCH_AT_LOGIN_KEY, draftLaunchAtLogin),
     ]);
     setSavedLanguage(draftLanguage);
     setSavedAppearance(draftAppearance);
+    setSavedLaunchAtLogin(draftLaunchAtLogin);
   };
 
   return (
@@ -139,6 +158,28 @@ function AppConfigPage() {
                 ))}
               </Select>
             </FormControl>
+          </Box>
+
+          <Divider />
+
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 1.5,
+              gap: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <PowerSettingsNewOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              <Typography>{t('settings:row.launchAtLogin')}</Typography>
+            </Box>
+            <Switch
+              checked={draftLaunchAtLogin === YES_NO.YES}
+              onChange={e => setDraftLaunchAtLogin(toYesNo(e.target.checked))}
+            />
           </Box>
         </Box>
       </Box>

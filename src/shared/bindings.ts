@@ -38,6 +38,8 @@ export const DEFAULT_IDLE_PAUSE_THRESHOLD = 60.0 as const;
 
 export const DEFAULT_LANGUAGE = "system" as const;
 
+export const DEFAULT_LAUNCH_AT_LOGIN = false as const;
+
 export const DEFAULT_LONG_BREAK_DURATION = 5 as const;
 
 export const DEFAULT_LONG_BREAK_ENABLED = true as const;
@@ -75,6 +77,8 @@ export const EVENT_TIMER_TICK = "timer-tick" as const;
 export const IDLE_PAUSE_THRESHOLD_KEY = "idle_pause_threshold" as const;
 
 export const LANGUAGE_KEY = "language" as const;
+
+export const LAUNCH_AT_LOGIN_KEY = "launch_at_login" as const;
 
 export const LONG_BREAK_DURATION_KEY = "long_break_duration" as const;
 

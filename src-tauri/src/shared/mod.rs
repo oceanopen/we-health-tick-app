@@ -1,4 +1,5 @@
 pub mod app_config;
+pub mod autostart;
 pub mod events;
 pub mod i18n;
 pub mod idle;

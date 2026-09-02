@@ -6,7 +6,8 @@
   },
   "row": {
     "language": "语言",
-    "appearance": "外观"
+    "appearance": "外观",
+    "launchAtLogin": "开机自启动"
   },
   "option": {
     "followSystem": "跟随系统",

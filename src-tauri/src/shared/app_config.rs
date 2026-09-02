@@ -36,6 +36,15 @@ pub const QUIET_WINDOW_TRAY: &str = "tray";
 pub const QUIET_WINDOW_TOP_RIGHT: &str = "topRight";
 pub const QUIET_WINDOW_FULLSCREEN: &str = "fullscreen";
 
+/// 开机自启动 key（后端 SSOT，经 Builder.constant 导出）。
+/// Y/N 存储（YesNo 约定），语义为系统登录项状态的本地镜像（系统优先）：
+/// 启动时 shared/autostart.rs 以系统真实状态回写本配置，保存时经事件监听
+/// 同步系统登录项。跨平台由 tauri-plugin-autostart 抹平（macOS LaunchAgent /
+/// Windows Registry / Linux XDG）。
+pub const LAUNCH_AT_LOGIN_KEY: &str = "launch_at_login";
+/// 默认值：false（未开启，与全新安装的系统登录项状态一致）。
+pub const DEFAULT_LAUNCH_AT_LOGIN: bool = false;
+
 pub struct AppConfigState(pub Mutex<Connection>);
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -98,6 +107,13 @@ pub fn set_app_config(
     key: String,
     value: String,
 ) -> Result<(), String> {
+    // 值未变化的写入跳过广播（emit 收口）：避免无差异事件触发订阅方副作用——
+    // 典型是 launch_at_login 在 Y 不变时重发会经监听器重建刚被用户手动删除的
+    // 登录项 plist（运行期"复活"）；对 language/appearance 等也省去无谓刷新。
+    let old_value = read_app_config_raw(&state, &key)?;
+    if old_value.as_deref() == Some(value.as_str()) {
+        return Ok(());
+    }
     write_app_config_raw(&state, &key, &value)?;
     app.emit(
         crate::shared::events::EVENT_APP_CONFIG_CHANGED,
