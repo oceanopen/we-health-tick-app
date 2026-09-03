@@ -231,7 +231,7 @@ export type TimerStatePayload = {
 	/**
 	 *  已完成的工作-休息轮数。长休息判定输入：
 	 *  `completed_cycles > 0 && completed_cycles % interval == 0`；
-	 *  仅正常完成 on_break_done 才递增，跳过休息不计入。
+	 *  正常完成 on_break_done 与真正跳过休息（skip_break 达到门槛）均递增——跳过也占用一轮休息名额。
 	 */
 	completedCycles: number,
 	/**  当前 Paused 的触发来源（manual / quiet / dnd）。仅 phase == Paused 时有意义。 */
