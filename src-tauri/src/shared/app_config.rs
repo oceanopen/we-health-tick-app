@@ -28,8 +28,8 @@ pub const REST_WINDOW_TRAY: &str = "tray";
 pub const REST_WINDOW_TOP_RIGHT: &str = "topRight";
 pub const REST_WINDOW_FULLSCREEN: &str = "fullscreen";
 
-/// 静音窗口形态 key（后端 SSOT，经 Builder.constant 导出）。
-/// 取值与读取语义同上（三形态均已实现），后端 panel.rs 在静音时段（quiet_hours）命中强制暂停时读取分派。
+/// 休息时段窗口形态 key（后端 SSOT，经 Builder.constant 导出）。
+/// 取值与读取语义同上（三形态均已实现），后端 panel.rs 在休息时段（quiet_hours）命中强制暂停时读取分派。
 pub const QUIET_WINDOW_KEY: &str = "quiet_window";
 pub const DEFAULT_QUIET_WINDOW: &str = QUIET_WINDOW_TRAY;
 pub const QUIET_WINDOW_TRAY: &str = "tray";

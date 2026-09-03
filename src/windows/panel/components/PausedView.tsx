@@ -1,4 +1,5 @@
-import type { QuietHourPeriod, QuietHours } from '@src/shared/appConfig';
+import type { DndHours, QuietHourPeriod, QuietHours } from '@src/shared/appConfig';
+import type { PauseSource } from '@src/shared/bindings';
 import PauseCircleFilledIcon from '@mui/icons-material/PauseCircleFilled';
 import { Box, Button, Typography, useTheme } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -6,8 +7,9 @@ import { PHASE_RING_COLORS } from '../phaseColors';
 
 interface PausedViewProps {
   remainingSeconds: number;
-  quietTriggered: boolean;
+  pauseSource: PauseSource;
   quietHours: QuietHours;
+  dndHours: DndHours;
   onResume: () => void;
 }
 
@@ -24,7 +26,12 @@ function nowHHmm(): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function findActiveQuietPeriod(periods: QuietHours, now: string): QuietHourPeriod | null {
+// 当前命中的时段条目（与后端 is_in_periods 同逻辑，含跨午夜 start > end）。
+// quiet_hours / dnd_hours 两列表共用；无命中返回 null。
+function findActivePeriod(
+  periods: readonly QuietHourPeriod[],
+  now: string,
+): QuietHourPeriod | null {
   for (const p of periods) {
     if (p.start <= p.end) {
       if (p.start <= now && now < p.end) {
@@ -37,15 +44,38 @@ function findActiveQuietPeriod(periods: QuietHours, now: string): QuietHourPerio
   return null;
 }
 
-export function PausedView({ remainingSeconds, quietTriggered, quietHours, onResume }: PausedViewProps) {
+// 时段暂停 icon 配色决策（颜色收敛，不新增色）：全部复用 PHASE_RING_COLORS——
+//   - 休息时段 / 手动暂停 = paused 灰（暂停类统一灰，二者靠标题「休息时段中/已暂停」区分）
+//   - 免打扰 = working 绿（静默让位于专注，视觉上等同工作中、不引起额外注意）
+
+export function PausedView({
+  remainingSeconds,
+  pauseSource,
+  quietHours,
+  dndHours,
+  onResume,
+}: PausedViewProps) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const pausedColor
-    = theme.palette.mode === 'light' ? PHASE_RING_COLORS.paused.light : PHASE_RING_COLORS.paused.dark;
-  const title = quietTriggered ? t('panel:quietHoursActive') : t('panel:phasePaused');
 
-  const activePeriod = quietTriggered ? findActiveQuietPeriod(quietHours, nowHHmm()) : null;
-  const showQuietRange = activePeriod !== null;
+  // 按暂停来源三态显式分派：manual（已暂停，可恢复）/ quiet（休息时段中，打断式）/
+  // dnd（免打扰时段中，非打断式）。后两者继续按钮禁用 + 显示命中时段范围 + 自动恢复提示。
+  const isQuiet = pauseSource === 'quiet';
+  const isDnd = pauseSource === 'dnd';
+  // icon 三态显式分派：dnd=working 绿；quiet/manual=paused 灰（见上方配色决策注释）。
+  const mode = theme.palette.mode === 'light' ? 'light' : 'dark';
+  const iconColor = isDnd
+    ? PHASE_RING_COLORS.working[mode]
+    : PHASE_RING_COLORS.paused[mode];
+  const title = isQuiet
+    ? t('panel:quietHoursActive')
+    : isDnd
+      ? t('panel:dndHoursActive')
+      : t('panel:phasePaused');
+
+  const periods = isQuiet ? quietHours : isDnd ? dndHours : null;
+  const activePeriod = periods ? findActivePeriod(periods, nowHHmm()) : null;
+  const showRange = activePeriod !== null;
   const displayText = activePeriod
     ? `${activePeriod.start}:00 - ${activePeriod.end}:00`
     : formatHMS(remainingSeconds);
@@ -61,7 +91,7 @@ export function PausedView({ remainingSeconds, quietTriggered, quietHours, onRes
         py: 1,
       }}
     >
-      <PauseCircleFilledIcon sx={{ fontSize: 120, color: pausedColor }} />
+      <PauseCircleFilledIcon sx={{ fontSize: 120, color: iconColor }} />
       <Typography variant="subtitle1" component="div">
         {title}
       </Typography>
@@ -76,11 +106,13 @@ export function PausedView({ remainingSeconds, quietTriggered, quietHours, onRes
       </Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
         <Typography variant="caption" align="center" color="text.secondary" sx={{ px: 1, opacity: 0.7 }}>
-          {showQuietRange ? t('panel:quietHoursRangeLabel') : t('panel:resumableRemainingLabel')}
+          {showRange
+            ? (isDnd ? t('panel:dndHoursRangeLabel') : t('panel:quietHoursRangeLabel'))
+            : t('panel:resumableRemainingLabel')}
         </Typography>
-        {quietTriggered && (
+        {(isQuiet || isDnd) && (
           <Typography variant="caption" align="center" color="text.secondary" sx={{ px: 1, opacity: 0.7 }}>
-            {t('panel:pausedAutoResumeHint')}
+            {t(isDnd ? 'panel:dndAutoResumeHint' : 'panel:pausedAutoResumeHint')}
           </Typography>
         )}
       </Box>
@@ -88,7 +120,7 @@ export function PausedView({ remainingSeconds, quietTriggered, quietHours, onRes
         variant="contained"
         fullWidth
         onClick={onResume}
-        disabled={quietTriggered}
+        disabled={isQuiet || isDnd}
         sx={{ mt: 1, textTransform: 'none' }}
       >
         {t('panel:action.resume')}

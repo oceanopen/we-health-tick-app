@@ -12,8 +12,10 @@
     "longBreakEnabled": "Long Break",
     "longBreakInterval": "Long Break Interval",
     "longBreakDuration": "Long Break Duration",
-    "workTime": "Work Hours",
-    "quietHours": "Quiet Hours"
+    "quietHours": "Quiet Hours",
+    "quietHoursHint": "Pauses the timer and shows a reminder window during these hours; resumes automatically after",
+    "dndHours": "Do Not Disturb",
+    "dndHoursHint": "Pauses reminders and the timer silently during these hours; resumes automatically after"
   },
   "option": {
     "longBreakEveryN": "Every {{count}} rounds"
@@ -25,6 +27,11 @@
     "add": "Add period",
     "empty": "No quiet hours"
   },
+  "dndHours": {
+    "add": "Add period",
+    "empty": "No do-not-disturb hours"
+  },
+  "periodRangeHint": "Applied on exact seconds: 12:00–13:00 pauses from 12:00:00 and auto-resumes at 13:00:00",
   "button": {
     "reset": "Reset",
     "cancel": "Cancel",

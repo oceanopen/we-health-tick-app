@@ -1,4 +1,3 @@
-import type { Phase } from '@src/shared/bindings';
 import { alpha, Box } from '@mui/material';
 import { commands } from '@src/shared/bindings';
 import { logOnError } from '@src/shared/commands';
@@ -45,13 +44,14 @@ export default function PanelApp() {
     todaySkipCount,
     breakPaused,
     quietHours,
+    dndHours,
     togglePause,
     reset,
     manualBreak,
     confirmBreak,
     confirmReturn,
     skipBreak,
-    quietTriggered,
+    pauseSource,
     remainingSeconds,
   } = useTimerState();
   // 镜像层：phase → URL 单向同步（replace-only，见 hook 头注释）。useTimerState 留在本组件
@@ -61,15 +61,18 @@ export default function PanelApp() {
   // 全屏仅存在于非 Working（Alerting 起接管、Working 退出），失焦隐藏天然豁免，无需特判。
   const form = usePanelForm();
   const isFullscreen = form === 'fullscreen';
-  const phaseRef = useRef<Phase>('working');
+  // 失焦自动隐藏判定（组合布尔，见 hideOnBlurRef 同步 effect）：
+  //   - Working 小窗（常态流）
+  //   - Paused(Dnd) 免打扰查看面板（「想看才看」流：托盘唤起、失焦/再点托盘收起）
+  // 其余阶段（Alerting/Breaking/Waiting/Paused manual|quiet）常驻桌面，由后端 phase-changed 唤起。
+  // 全屏形态显式豁免：免打扰面板理论上恒为 Tray 形态（后端 sync 归位），此处显式建模不依赖该隐含保证。
+  const hideOnBlurRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const currentWin = getCurrentWindow();
     const unlisten = currentWin.onFocusChanged(({ payload: focused }) => {
-      // 仅 Working 阶段失焦隐藏；Alerting/Breaking/Waiting/Paused 常驻桌面，由后端 phase-changed 事件唤起。
-      // 全屏形态仅存在于非 Working 阶段，此处条件天然不命中，零改动豁免。
-      if (!focused && phaseRef.current === 'working') {
+      if (!focused && hideOnBlurRef.current) {
         currentWin.hide();
       }
     });
@@ -80,10 +83,13 @@ export default function PanelApp() {
     };
   }, []);
 
-  // phase 由 useTimerState 独占订阅，此处同步到 ref 供 onFocusChanged 闭包读取（避免 stale closure）。
+  // phase / pauseSource / form 由各自 hook 独占订阅，此处合并同步到组合布尔 ref
+  // 供 onFocusChanged 闭包读取（避免 stale closure）。
   useEffect(() => {
-    phaseRef.current = phase;
-  }, [phase]);
+    hideOnBlurRef.current
+      = phase === 'working'
+        || (phase === 'paused' && pauseSource === 'dnd' && form !== 'fullscreen');
+  }, [phase, pauseSource, form]);
 
   // 任意 phase 切换 / reminder 变化导致 root 高度变化时，重新 fitPanel 让窗口高度跟随。
   // ResizeObserver 在 observe 后会异步触发一次首回调，等价于原 mount 即 fit 的语义。
@@ -224,8 +230,9 @@ export default function PanelApp() {
             element={(
               <PausedView
                 remainingSeconds={remainingSeconds}
-                quietTriggered={quietTriggered}
+                pauseSource={pauseSource}
                 quietHours={quietHours}
+                dndHours={dndHours}
                 onResume={togglePause}
               />
             )}

@@ -19,7 +19,7 @@ use crate::shared::i18n::{current_language, menu_text};
 use crate::shared::screen::{
     MonitorInfo, TaskbarEdge, detect_taskbar_edge, find_monitor_for_rect, find_monitor_for_tray,
 };
-use crate::shared::types::{Phase, TimerStatePayload};
+use crate::shared::types::{PauseSource, Phase, TimerStatePayload};
 
 const PANEL_WIDTH: f64 = 240.0;
 const DEFAULT_PANEL_HEIGHT: f64 = 320.0;
@@ -207,7 +207,7 @@ fn panel_form_by_window_config(app: &AppHandle, is_long_break: bool) -> PanelFor
     panel_form_from_key(app, key, tray, top_right, fullscreen)
 }
 
-// 读静音窗口形态配置（quiet_hours 命中强制暂停时唤起窗口用）。
+// 读休息时段窗口形态配置（quiet_hours 命中强制暂停时唤起窗口用）。
 fn panel_form_by_quiet_window_config(app: &AppHandle) -> PanelForm {
     panel_form_from_key(
         app,
@@ -374,10 +374,16 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                 let app = tray.app_handle();
                 match app.get_webview_window("panel") {
                     Some(panel) if panel.is_visible().unwrap_or(false) => {
-                        // 非 Working（提醒/休息/等待/暂停）窗口常驻，不允许托盘点击隐藏
-                        // （与 settings.rs 关闭恢复、前端失焦自动隐藏的 Working 守卫语义对齐）；
-                        // 改走 show_panel 置顶唤起，窗口被遮挡时点托盘可找回。
-                        if crate::timer::current_phase(app) == Phase::Working {
+                        // 可收起类窗口（点托盘隐藏）：Working 小窗 + Paused(Dnd) 免打扰「想看才看」
+                        // 查看面板（与前端失焦自动隐藏的 hideOnBlur 守卫语义对齐）。
+                        // 其余非 Working（提醒/休息/等待/手动或休息时段暂停）窗口常驻，不允许托盘点击隐藏
+                        // （与 settings.rs 关闭恢复守卫语义对齐）；改走 show_panel 置顶唤起，
+                        // 窗口被遮挡时点托盘可找回。
+                        let phase = crate::timer::current_phase(app);
+                        let dismissible = phase == Phase::Working
+                            || (phase == Phase::Paused
+                                && crate::timer::current_pause_source(app) == PauseSource::Dnd);
+                        if dismissible {
                             let _ = panel.hide();
                         } else {
                             show_panel(app);
@@ -414,7 +420,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     //     topRight → 屏幕右上角，fullscreen → macOS 原生全屏（Alerting 起接管，
     //     期间热改配置 Breaking 读到新值即热切换），tray / 非法值 → 贴托盘。
     //   - Waiting：沿用当前形态（全屏保持至确认返回）。
-    //   - Paused：静音触发按 quiet_window 配置分派形态；手动暂停沿用当前形态不跳变。
+    //   - Paused：休息时段（Quiet）触发按 quiet_window 配置分派形态；免打扰（Dnd）收起不弹；
+    //     手动暂停沿用当前形态不跳变。
     //   - Working：重置贴托盘（sync 内部触发退出全屏 + 恢复小窗尺寸与托盘定位）。
     // 闭包持有 owned AppHandle（Clone + Send + Sync），满足 Listener 要求的 'static。
     app.handle().listen(
@@ -440,41 +447,47 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                             show_panel(&app_handle);
                         }
                         Phase::Paused => {
-                            // 静音时段触发的暂停：按静音窗口配置分派形态；手动暂停沿用当前形态不跳变。
-                            if payload
-                                .as_ref()
-                                .is_some_and(|p| p.quiet_triggered)
-                            {
-                                sync_panel_form(
-                                    &app_handle,
-                                    panel_form_by_quiet_window_config(&app_handle),
-                                );
+                            // 按暂停来源分派（含 Paused→Paused 来源切换事件，timer.rs 时段
+                            // quiet↔dnd 重叠边界发出；单事件单分支处理形态，不闪窗）：
+                            //   - Quiet（休息时段，打断式）：按 quiet_window 配置分派形态 + 弹窗常驻
+                            //   - Dnd（免打扰，非打断式）：收起不弹 + 显式归位 Tray 形态——
+                            //     若从 Alerting 全屏被切走，仅 hide 会留下「Fullscreen 形态的隐藏窗」，
+                            //     托盘点击时会 show 出全屏窗；sync(Tray) 幂等退出全屏恢复小窗定位
+                            //   - Manual（手动暂停）：沿用当前形态不跳变，弹窗常驻
+                            match payload.as_ref().map(|p| p.pause_source) {
+                                Some(PauseSource::Quiet) => {
+                                    sync_panel_form(
+                                        &app_handle,
+                                        panel_form_by_quiet_window_config(&app_handle),
+                                    );
+                                    show_panel(&app_handle);
+                                }
+                                Some(PauseSource::Dnd) => {
+                                    sync_panel_form(&app_handle, PanelForm::Tray);
+                                    hide_panel(&app_handle);
+                                }
+                                Some(PauseSource::Manual) | None => {
+                                    show_panel(&app_handle);
+                                }
                             }
-                            show_panel(&app_handle);
                         }
                         Phase::Working => {
                             // sync 到 Tray 统一处理：Fullscreen 时退出全屏并显式恢复小窗尺寸
                             // （exit 内部含贴托盘定位）。幂等：已是 Tray 时零副作用。
                             sync_panel_form(&app_handle, PanelForm::Tray);
-                            // 静音时段结束自动重开工作：不显示工作窗口，收起回归工作流。
-                            let resumed_from_quiet = payload
-                                .as_ref()
-                                .is_some_and(|p| p.resumed_from_quiet);
+                            // 时段暂停结束自动重开工作（quiet/dnd 共用）：不显示工作窗口，收起回归工作流。
+                            let auto_resumed = payload.as_ref().is_some_and(|p| p.auto_resumed);
                             match prev_phase {
                                 // 从休息侧进入 Working（跳过 / 我回来了 / 休息窗口重置）：
                                 // 收起窗口回归工作流，需要时点托盘唤起。
                                 Some(Phase::Breaking)
                                 | Some(Phase::Waiting)
                                 | Some(Phase::Alerting) => {
-                                    if let Some(panel) = app_handle.get_webview_window("panel") {
-                                        let _ = panel.hide();
-                                    }
+                                    hide_panel(&app_handle);
                                 }
-                                // 静音结束自动恢复（Paused → Working）：同样收起窗口，不显示工作状态。
-                                Some(Phase::Paused) if resumed_from_quiet => {
-                                    if let Some(panel) = app_handle.get_webview_window("panel") {
-                                        let _ = panel.hide();
-                                    }
+                                // 时段结束自动恢复（Paused → Working）：同样收起窗口，不显示工作状态。
+                                Some(Phase::Paused) if auto_resumed => {
+                                    hide_panel(&app_handle);
                                 }
                                 // Working 自身重置 / 手动 Paused 恢复 / 启动初始化：保持原可见状态。
                                 // 可见时原地重定位回托盘位（如 topRight 点完按钮滞留右上角），
@@ -587,6 +600,14 @@ pub fn show_panel(app: &AppHandle) {
         let _ = panel.set_focus();
     } else {
         create_panel(app, &tray);
+    }
+}
+
+// 收起 panel（若存在）：show_panel 的对仗入口。窗口不存在（尚未懒创建）为 no-op。
+// 调用点：Paused(Dnd) 免打扰收起、从休息侧/时段结束进 Working 的收起。
+pub fn hide_panel(app: &AppHandle) {
+    if let Some(panel) = app.get_webview_window("panel") {
+        let _ = panel.hide();
     }
 }
 

@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Listener, Manager, State};
 use crate::shared::app_config::{AppConfigState, read_app_config_conn, write_app_config_conn};
 use crate::shared::reminder_texts::{DEFAULT_HEALTH_TEXTS, DEFAULT_WHISPER_TEXTS};
 use crate::shared::time::{now_epoch, now_hhmm, today_string};
-use crate::shared::types::{Phase, QuietHourPeriod, TimerStatePayload, YesNo};
+use crate::shared::types::{PauseSource, Phase, QuietHourPeriod, TimerStatePayload, YesNo};
 
 // ============================================================
 // 内部状态
@@ -32,12 +32,13 @@ struct TimerInner {
     /// 进入 Paused 前的阶段，恢复时回到这里（M2 toggle_pause 使用）。
     /// 例如 working → paused 时存 Working，恢复时回到 working。
     paused_phase: Option<Phase>,
-    /// 当前 Paused 是否由 quietHours 静音触发（true）vs 用户手动暂停（false）。
-    /// M3 quietHours 判断使用：
-    ///   - 静音命中 → apply_enter_quiet_paused 设为 true；静音结束时自动 start_work 新一轮
-    ///   - 用户手动 → apply_enter_paused 设为 false；不自动恢复，等用户点继续
-    ///   - apply_resume 检测 true 时返回 false（静音期间忽略 toggle_pause）
-    paused_by_quiet: bool,
+    /// 当前 Paused 的触发来源（manual / quiet / dnd），仅 phase == Paused 时有意义。
+    ///   - 休息/免打扰时段命中 → apply_enter_pause_window 写入 Quiet/Dnd；
+    ///     时段全部结束时自动 start_work 新一轮（作废当前轮，不恢复原进度）
+    ///   - 用户手动 → apply_enter_paused 写入 Manual；不自动恢复，等用户点继续
+    ///   - apply_resume 对 Quiet/Dnd 返回 false（时段暂停期间忽略 toggle_pause）
+    ///   - 重叠边界来源切换（quiet↔dnd）由 tick 判定块直接更新本字段，不切 phase
+    paused_source: PauseSource,
     /// 已完成的工作-休息轮数。M3 长休息判定输入：
     /// `completed_cycles > 0 && completed_cycles % long_break_interval == 0`。
     /// 正常完成 on_break_done 与真正跳过休息（skip_break）均递增——跳过也占用一轮休息名额。
@@ -113,8 +114,8 @@ pub const DEFAULT_REST_CONFIRM: bool = true;
 
 // 休息后确认：true 休息结束进 Waiting 等用户点「我回来了」；false 休息结束自动进入
 // Working（跳过 Waiting）。与前端 REST_END_CONFIRM_KEY / DEFAULT_REST_END_CONFIRM 对齐。
-// 场景：run_timer_loop Breaking 归零时刻现读分流。静音时段优先：quiet 检查在 phase 推进前，
-// Breaking 被强制切 Paused 不会走到归零分支，故无需在读取处再做静音判断。
+// 场景：run_timer_loop Breaking 归零时刻现读分流。时段暂停优先：时段判定在 phase 推进前，
+// Breaking 被强制切 Paused 不会走到归零分支，故无需在读取处再做时段判断。
 pub const KEY_REST_END_CONFIRM: &str = "rest_end_confirm";
 pub const DEFAULT_REST_END_CONFIRM: bool = true;
 
@@ -145,7 +146,7 @@ pub const KEY_REMINDERS: &str = "reminders";
 // quiet_hours：JSON 数组 [{start: "HH:mm", end: "HH:mm"}]，schema 见 shared/types.rs
 // QuietHourPeriod（derive Type，随 bindings 导出）；支持跨午夜（start > end）。
 pub const KEY_QUIET_HOURS: &str = "quiet_hours";
-// 默认静音时段。DB 无值 / 解析失败时回退此项，避免「前端显示 2 项但后端不静音」的兜底不一致。
+// 默认休息时段。DB 无值 / 解析失败时回退此项，避免「前端显示 2 项但后端不暂停」的兜底不一致。
 // 运行时读取（read_quiet_hours）仍走 JSON 字符串解析；前端常量导出见 DEFAULT_QUIET_HOURS。
 pub const DEFAULT_QUIET_HOURS_JSON: &str =
     "[{\"start\":\"12:00\",\"end\":\"14:00\"},{\"start\":\"18:00\",\"end\":\"18:30\"}]";
@@ -161,6 +162,23 @@ pub const DEFAULT_QUIET_HOURS: &[QuietHourPeriod] = &[
         end: "18:30",
     },
 ];
+
+// 休息时段总开关（YesNo）：N 时 quiet_hours 列表不再参与暂停判定（列表配置保留）。
+// 默认 Y——存量用户升级后行为逐字节不变（此前无开关、恒检测）。
+pub const KEY_QUIET_HOURS_ENABLED: &str = "quiet_hours_enabled";
+pub const DEFAULT_QUIET_HOURS_ENABLED: bool = true;
+
+// 免打扰时段：与 quiet_hours 同 schema（QuietHourPeriod 数组、支持跨午夜），但命中为
+// 非打断式暂停——不弹窗、已有窗口收起、点托盘可查看（PauseSource::Dnd）。
+pub const KEY_DND_HOURS: &str = "dnd_hours";
+// 默认无免打扰时段：空数组即「未配置」，不回退任何非空默认。
+pub const DEFAULT_DND_HOURS_JSON: &str = "[]";
+// 结构化默认值：仅作 constant 导出源（read_dnd_hours 运行时用 _JSON 兜底）。
+pub const DEFAULT_DND_HOURS: &[QuietHourPeriod] = &[];
+
+// 免打扰时段总开关（YesNo）：默认 N，新功能静默待启。
+pub const KEY_DND_HOURS_ENABLED: &str = "dnd_hours_enabled";
+pub const DEFAULT_DND_HOURS_ENABLED: bool = false;
 
 // 拿 TimerInner 锁，poisoned 时自动恢复（避免线程 panic 级联导致整个状态机死锁）。
 // 场景：所有需要读写 TimerInner 的同步代码块入口。
@@ -364,28 +382,88 @@ fn read_idle_pause_threshold(conn: &Connection) -> f64 {
 // 无法反序列化短生命周期 JSON（借用检查），schema 一致由 JSON 形态保证。
 // 每秒被 run_timer_loop 调用一次，开销可忽略（quiet_hours 通常 < 5 项）。
 fn read_quiet_hours(conn: &Connection) -> Vec<(String, String)> {
-    #[derive(serde::Deserialize)]
-    struct Period {
-        start: String,
-        end: String,
-    }
-    let raw = read_app_config_conn(conn, KEY_QUIET_HOURS)
-        .ok()
-        .flatten();
-    let json = raw.as_deref().unwrap_or(DEFAULT_QUIET_HOURS_JSON);
-    let fallback: Vec<Period> = serde_json::from_str(DEFAULT_QUIET_HOURS_JSON).unwrap_or_default();
-    let periods: Vec<Period> = serde_json::from_str(json).unwrap_or(fallback);
-    periods
-        .into_iter()
-        .map(|p| (p.start, p.end))
-        .collect()
+    read_period_list(conn, KEY_QUIET_HOURS, DEFAULT_QUIET_HOURS_JSON)
 }
 
-// 判断某 HH:mm 时刻是否落在任一静音时段内。
+// 读 dnd_hours：与 read_quiet_hours 同 schema / 同容错分支，唯默认值为 "[]"——
+// 免打扰时段无内置默认，未配置 / 损坏均解析为空（空 = 无免打扰）。
+fn read_dnd_hours(conn: &Connection) -> Vec<(String, String)> {
+    read_period_list(conn, KEY_DND_HOURS, DEFAULT_DND_HOURS_JSON)
+}
+
+// quiet_hours / dnd_hours 共用的时段列表解析核心（fallback_json 为无值 / 解析失败兜底）。
+// 容错与前端 parsePeriods 对齐（避免「前端显示 X、后端按 Y 暂停」的兜底脱节）：
+//   - DB 无值 / 非 JSON / 非数组 → 回退 fallback_json 解析结果
+//   - 数组（含空数组）→ 逐条容错过滤：仅保留 start/end 均为 string 的条目，
+//     混合合法/非法时取合法子集（整体不作废）；空数组 = 用户显式清空，原样返回
+fn read_period_list(conn: &Connection, key: &str, fallback_json: &str) -> Vec<(String, String)> {
+    let raw = read_app_config_conn(conn, key).ok().flatten();
+    let parsed: Option<Vec<(String, String)>> = raw.as_deref().and_then(|json| {
+        serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .and_then(|v| {
+                v.as_array().map(|arr| {
+                    arr.iter()
+                        .filter_map(|item| {
+                            let start = item.get("start")?.as_str()?.to_string();
+                            let end = item.get("end")?.as_str()?.to_string();
+                            Some((start, end))
+                        })
+                        .collect()
+                })
+            })
+    });
+    match parsed {
+        Some(periods) => periods,
+        None => {
+            #[derive(serde::Deserialize)]
+            struct Period {
+                start: String,
+                end: String,
+            }
+            serde_json::from_str::<Vec<Period>>(fallback_json)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|p| (p.start, p.end))
+                .collect()
+        }
+    }
+}
+
+// 读 quiet_hours_enabled（YesNo），容错回退默认（DB 无值 / 非法 → 默认开启）。
+// 仿 read_pause_on_idle 写法（parse 失败也回退默认），而非 read_long_break_enabled 的
+// unwrap_or(false)——后者会把「DB 脏值」错判成关闭，与前端 parseYesNo 语义不一致。
+// 场景：run_timer_loop 每秒现读，休息时段判定总开关。
+fn read_quiet_hours_enabled(conn: &Connection) -> bool {
+    read_app_config_conn(conn, KEY_QUIET_HOURS_ENABLED)
+        .ok()
+        .flatten()
+        .map(|s| {
+            s.parse::<YesNo>()
+                .map(|y| y.is_yes())
+                .unwrap_or(DEFAULT_QUIET_HOURS_ENABLED)
+        })
+        .unwrap_or(DEFAULT_QUIET_HOURS_ENABLED)
+}
+
+// 读 dnd_hours_enabled（YesNo），容错回退默认（DB 无值 / 非法 → 默认关闭）。
+fn read_dnd_hours_enabled(conn: &Connection) -> bool {
+    read_app_config_conn(conn, KEY_DND_HOURS_ENABLED)
+        .ok()
+        .flatten()
+        .map(|s| {
+            s.parse::<YesNo>()
+                .map(|y| y.is_yes())
+                .unwrap_or(DEFAULT_DND_HOURS_ENABLED)
+        })
+        .unwrap_or(DEFAULT_DND_HOURS_ENABLED)
+}
+
+// 判断某 HH:mm 时刻是否落在任一时段列表内（quiet_hours / dnd_hours 共用的纯区间判定）。
 // - 同日时段（start ≤ end，如 12:00-14:00）：start <= hhmm && hhmm < end
 // - 跨午夜时段（start > end，如 22:00-06:00）：hhmm >= start || hhmm < end
 // 注：用字符串比较合法，因为 "HH:mm" 定长格式字典序等价于时间序（"09:00" < "12:00" < "22:00"）。
-fn is_in_quiet_periods(periods: &[(String, String)], hhmm: &str) -> bool {
+fn is_in_periods(periods: &[(String, String)], hhmm: &str) -> bool {
     periods.iter().any(|(start, end)| {
         if start <= end {
             // 同日时段：[start, end)
@@ -395,6 +473,25 @@ fn is_in_quiet_periods(periods: &[(String, String)], hhmm: &str) -> bool {
             hhmm >= start.as_str() || hhmm < end.as_str()
         }
     })
+}
+
+// 统一时段命中判定：当前时刻命中的暂停来源；两类时段均不命中（或开关关闭）返回 None。
+// 免打扰优先：同时命中时返回 Dnd（不弹窗，更强的不打扰意图，如培训/网课场景）。
+// 判定顺序即优先级，tick 循环每秒调用（开销可忽略）。
+fn active_pause_source(
+    quiet_enabled: bool,
+    quiet_periods: &[(String, String)],
+    dnd_enabled: bool,
+    dnd_periods: &[(String, String)],
+    hhmm: &str,
+) -> Option<PauseSource> {
+    if dnd_enabled && is_in_periods(dnd_periods, hhmm) {
+        return Some(PauseSource::Dnd);
+    }
+    if quiet_enabled && is_in_periods(quiet_periods, hhmm) {
+        return Some(PauseSource::Quiet);
+    }
+    None
 }
 
 // 从 reminders 配置随机抽取两条：返回 (whisper, health)。
@@ -454,7 +551,7 @@ fn fresh_working(conn: &Connection) -> TimerInner {
         remaining_seconds: total_seconds,
         total_seconds,
         paused_phase: None,
-        paused_by_quiet: false,
+        paused_source: PauseSource::Manual,
         completed_cycles: 0,
         break_skip_count: 0,
         today_skip_count: read_today_skip_count(conn),
@@ -493,7 +590,7 @@ fn apply_start_work(inner: &mut TimerInner, work_total_secs: i64, now: i64) {
     inner.remaining_seconds = work_total_secs;
     inner.total_seconds = work_total_secs;
     inner.paused_phase = None;
-    inner.paused_by_quiet = false;
+    inner.paused_source = PauseSource::Manual;
     inner.break_skip_count = 0;
     inner.current_whisper_reminder = String::new();
     inner.current_health_reminder = String::new();
@@ -539,7 +636,7 @@ fn apply_start_break(inner: &mut TimerInner, break_total_secs: i64, is_long: boo
     inner.is_long_break = is_long;
     inner.break_skip_count = 0;
     inner.paused_phase = None;
-    inner.paused_by_quiet = false;
+    inner.paused_source = PauseSource::Manual;
     inner.break_paused = false;
     inner.break_start_epoch = Some(now);
     inner.last_skip_epoch = None;
@@ -554,42 +651,49 @@ fn apply_on_break_done(inner: &mut TimerInner) {
     inner.target_epoch = 0;
 }
 
-// 进入 Paused：仅 Working / Breaking 可暂停；保存原 phase 到 paused_phase。
-// 用户手动暂停（paused_by_quiet = false）：不自动恢复，等用户点继续。
+// 进入 Paused（手动）：仅 Working / Breaking 可暂停；保存原 phase 到 paused_phase。
+// 手动暂停（Manual）：不自动恢复，等用户点继续。
 fn apply_enter_paused(inner: &mut TimerInner) -> bool {
     if inner.phase != Phase::Working && inner.phase != Phase::Breaking {
         return false;
     }
     inner.paused_phase = Some(inner.phase);
-    inner.paused_by_quiet = false;
+    inner.paused_source = PauseSource::Manual;
     inner.phase = Phase::Paused;
     true
 }
 
-// 进入 Paused（静音触发）：任意非 Paused 阶段都强制进 Paused。
+// 进入 Paused（时段触发，source 由调用方经 active_pause_source 判定后显式传入）：
+// 任意非 Paused 阶段都强制进 Paused。Quiet（休息时段，打断式）与 Dnd（免打扰，非打断式）
+// 共用本函数，行为差异（弹窗 vs 收起）由 panel.rs 按 payload.pause_source 分派。
 // 与 apply_enter_paused 区别：
 //   - 适用阶段更广（Alerting / Waiting 也会被打断）
-//   - paused_by_quiet = true；静音结束时由 tick 自动 start_work 新一轮（不恢复原进度）
-fn apply_enter_quiet_paused(inner: &mut TimerInner) -> bool {
+//   - 时段结束时由 tick 自动 start_work 新一轮（不恢复原进度，作废当前轮）
+fn apply_enter_pause_window(inner: &mut TimerInner, source: PauseSource) -> bool {
     if inner.phase == Phase::Paused {
         return false;
     }
+    debug_assert!(matches!(
+        source,
+        PauseSource::Quiet | PauseSource::Dnd
+    ));
     inner.paused_phase = Some(inner.phase);
-    inner.paused_by_quiet = true;
+    inner.paused_source = source;
     inner.phase = Phase::Paused;
     true
 }
 
 // 从 Paused 恢复：根据 paused_phase 重设（working 重设 target_epoch；breaking 保持 remaining 递减）。
-// ⚠️ 静音触发的 paused（paused_by_quiet=true）不允许手动恢复：返回 false，toggle_pause 忽略；
-//    等系统在 tick 中检测静音结束后自动 start_work。
+// ⚠️ 时段触发的 paused（Quiet/Dnd）不允许手动恢复：返回 false，toggle_pause 忽略；
+//    等系统在 tick 中检测两类时段全部结束后自动 start_work。
 fn apply_resume(inner: &mut TimerInner, now: i64) -> bool {
     if inner.phase != Phase::Paused {
         return false;
     }
-    if inner.paused_by_quiet {
-        // 静音期间，用户手动「继续」无效
-        return false;
+    match inner.paused_source {
+        // 时段暂停期间，用户手动「继续」无效
+        PauseSource::Quiet | PauseSource::Dnd => return false,
+        PauseSource::Manual => {}
     }
     let prev = inner.paused_phase.unwrap_or(Phase::Working);
     inner.phase = prev;
@@ -617,9 +721,9 @@ fn build_payload(inner: &TimerInner, prev_phase: Option<Phase>) -> TimerStatePay
         break_skip_count: inner.break_skip_count,
         today_skip_count: inner.today_skip_count,
         completed_cycles: inner.completed_cycles,
-        quiet_triggered: inner.paused_by_quiet,
+        pause_source: inner.paused_source,
         break_paused: inner.break_paused,
-        resumed_from_quiet: false,
+        auto_resumed: false,
     }
 }
 
@@ -653,11 +757,8 @@ fn emit_phase_changed(app: &AppHandle, payload: TimerStatePayload) {
 // 1Hz 定时器主循环：在 init 中 spawn 一次，永久运行（与应用同生命周期）。
 // 每秒执行：
 //   1. 跨天判断（save_date != today → fresh_working + emit phase-changed）
-//   2. M3 quietHours 静音判断（每秒检查）：
-//      - 命中静音 + 非 Paused → apply_enter_quiet_paused + emit phase-changed
-//      - 不命中 + paused_by_quiet=true → apply_start_work（新一轮，不恢复原进度）
-//      - 其他组合（已 Paused / 用户手动 paused / 非 Paused 不命中）→ 不操作
-//   3. 按当前 phase 推进（若未被 quiet 切换）：
+//   2. 时段暂停判断（每秒检查，休息/免打扰统一判定，见下方转移表）
+//   3. 按当前 phase 推进（若未被时段切到 Paused）：
 //      - Working：按 target_epoch 重算 remaining；归零 → on_work_done → Alerting 或直接 Breaking
 //      - Breaking：remaining -= 1；归零 → on_break_done → Waiting
 //      - Alerting / Waiting / Paused：不递减、不切换
@@ -688,21 +789,35 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                 }
             }
 
-            // 一次性读 quiet_hours + work_duration（M3 quiet 判断 + 自动 start_work 共用，
-            // 避免在 quiet 分支里再锁一次 AppConfigState）。
-            // 锁失败时回退空 quiet_periods（视为无静音）+ 默认 work 时长。
-            let (quiet_periods, work_min, pause_on_idle, idle_pause_threshold) = {
+            // 一次性批量读配置（时段判定 + 自动 start_work + Working 冻结共用，
+            // 避免各分支里再锁 AppConfigState）。
+            // 锁失败时保守回退：休息时段开关默认开 + 空列表（等价无暂停）+ 默认 work 时长。
+            let (
+                quiet_enabled,
+                quiet_periods,
+                dnd_enabled,
+                dnd_periods,
+                work_min,
+                pause_on_idle,
+                idle_pause_threshold,
+            ) = {
                 let app_config_state = app.state::<AppConfigState>();
                 match app_config_state.0.lock() {
                     Ok(conn) => (
+                        read_quiet_hours_enabled(&conn),
                         read_quiet_hours(&conn),
+                        read_dnd_hours_enabled(&conn),
+                        read_dnd_hours(&conn),
                         read_work_duration_minutes(&conn),
                         read_pause_on_idle(&conn),
                         read_idle_pause_threshold(&conn),
                     ),
                     Err(e) => {
-                        log::warn!("app_config lock failed, skip quiet check: {e}");
+                        log::warn!("app_config lock failed, skip period pause check: {e}");
                         (
+                            DEFAULT_QUIET_HOURS_ENABLED,
+                            Vec::new(),
+                            DEFAULT_DND_HOURS_ENABLED,
                             Vec::new(),
                             DEFAULT_WORK_DURATION_MIN,
                             DEFAULT_PAUSE_ON_IDLE,
@@ -712,29 +827,53 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                 }
             };
 
-            // M3 quietHours 静音判断（每秒检查，开销可忽略）
+            // 时段暂停判断（每秒检查，开销可忽略）：休息（quiet，打断式）/ 免打扰（dnd，非打断式）
+            // 统一判定，免打扰优先。五分支显式转移表（全取值覆盖，无排除法兜底）：
+            //   ① 非 Paused + 命中 → 强制进 Paused（Alerting/Breaking/Waiting 一并打断，本轮作废）
+            //   ② Paused + 命中来源 != 当前来源且当前为时段来源 → 来源切换（quiet↔dnd 重叠边界，
+            //      不切 phase 不闪窗，panel.rs 以 Paused→Paused 事件按新来源调整窗口形态）
+            //   ③ Paused + 全部不命中 + 时段来源 → 作废本轮自动 start_work（quiet/dnd 共用退出）
+            //   ④ Paused + Manual → 无操作（手动暂停不被时段接管，也不自动恢复）
+            //   ⑤ 非 Paused + 不命中 → 无操作
             let now = now_epoch();
-            let in_quiet = is_in_quiet_periods(&quiet_periods, &now_hhmm());
-            if in_quiet {
-                // 命中静音：任意非 Paused 阶段强制进 Paused（静音触发）
-                if state.phase != Phase::Paused {
+            let hit = active_pause_source(
+                quiet_enabled,
+                &quiet_periods,
+                dnd_enabled,
+                &dnd_periods,
+                &now_hhmm(),
+            );
+            match (state.phase, hit, state.paused_source) {
+                // ① 进入：任意非 Paused 阶段强制进 Paused（来源显式传入）
+                (phase, Some(src), _) if phase != Phase::Paused => {
                     let prev = state.phase;
-                    apply_enter_quiet_paused(&mut state);
+                    apply_enter_pause_window(&mut state, src);
                     phase_change_payload = Some(build_payload(&state, Some(prev)));
                 }
-                // 已 Paused 时无操作：静音触发则保持；用户手动 paused（paused_by_quiet=false）也保持
-            } else if state.phase == Phase::Paused && state.paused_by_quiet {
-                // 不命中 + 静音触发的 paused → 自动 start_work 新一轮（不恢复原进度，照搬参考项目）
-                let prev = state.phase;
-                apply_start_work(&mut state, (work_min as i64) * 60, now);
-                state.save_date = today_string();
-                // 标记「静音结束自动恢复」：panel.rs 据此收起窗口，不显示工作状态。
-                let mut payload = build_payload(&state, Some(prev));
-                payload.resumed_from_quiet = true;
-                phase_change_payload = Some(payload);
+                // ② 来源切换：仅在时段暂停之间切换（Manual 免疫，落入 ④）
+                (Phase::Paused, Some(src), PauseSource::Quiet | PauseSource::Dnd)
+                    if src != state.paused_source =>
+                {
+                    state.paused_source = src;
+                    // prev_phase = Some(Paused)：panel.rs 以「Paused→Paused」识别来源切换，
+                    // 按新来源单次 sync 窗口形态（dnd 收起 / quiet 弹窗），不闪窗。
+                    phase_change_payload = Some(build_payload(&state, Some(Phase::Paused)));
+                }
+                // ③ 退出：两类时段全部不命中才恢复（重叠时只要任一命中，hit 非 None 不触发）
+                (Phase::Paused, None, PauseSource::Quiet | PauseSource::Dnd) => {
+                    let prev = state.phase;
+                    apply_start_work(&mut state, (work_min as i64) * 60, now);
+                    state.save_date = today_string();
+                    // 标记「时段结束自动恢复」：panel.rs 据此收起窗口，不显示工作状态。
+                    let mut payload = build_payload(&state, Some(prev));
+                    payload.auto_resumed = true;
+                    phase_change_payload = Some(payload);
+                }
+                // ④ Manual 暂停 + 命中/不命中 / ⑤ 非 Paused 不命中 / 已同来源命中保持：无操作
+                _ => {}
             }
 
-            // phase 推进（若 quiet 切到了 Paused 或 Working，下方 match 会自然落到对应分支处理新 phase）
+            // phase 推进（若时段判定切到了 Paused 或 Working，下方 match 会自然落到对应分支处理新 phase）
             match state.phase {
                 Phase::Working => {
                     // 离开冻结（锁屏/休眠/AFK）：pause_on_idle 开启且系统空闲超阈值时，
@@ -834,7 +973,8 @@ async fn run_timer_loop(app: AppHandle, inner: Arc<Mutex<TimerInner>>) {
                 }
                 Phase::Alerting | Phase::Waiting | Phase::Paused => {
                     // 这些阶段 tick 中不推进：Alerting 等用户确认；Waiting 等用户回来；
-                    // Paused 等用户恢复或 M3 quietHours 结束。remaining 保持当前值。
+                    // Paused 等手动恢复（Manual）或时段全部结束自动 start_work（Quiet/Dnd，见上方转移表）。
+                    // remaining 保持当前值。
                 }
             }
 
@@ -972,6 +1112,17 @@ pub fn current_phase(app: &AppHandle) -> Phase {
     match state.inner.lock() {
         Ok(inner) => inner.phase,
         Err(_) => Phase::Working,
+    }
+}
+
+// 读取当前暂停来源：供 panel.rs 托盘点击判断「免打扰暂停面板可收起」。
+// 非 Paused 阶段返回 Manual 惯例值；锁 poisoned 时同样回退 Manual
+// （保守：托盘走不可收起分支，改唤起而非误收起）。
+pub fn current_pause_source(app: &AppHandle) -> PauseSource {
+    let state = app.state::<TimerState>();
+    match state.inner.lock() {
+        Ok(inner) => inner.paused_source,
+        Err(_) => PauseSource::Manual,
     }
 }
 
@@ -1207,4 +1358,175 @@ pub fn skip_break(app: AppHandle, state: State<'_, TimerState>) -> Result<(), St
         emit_phase_changed(&app, p);
     }
     Ok(())
+}
+
+// ============================================================
+// 单元测试：时段判定与暂停来源转移（纯函数，不依赖 Tauri 运行时）
+// ============================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn periods(list: &[(&str, &str)]) -> Vec<(String, String)> {
+        list.iter()
+            .map(|(s, e)| (s.to_string(), e.to_string()))
+            .collect()
+    }
+
+    fn working_inner() -> TimerInner {
+        TimerInner {
+            phase: Phase::Working,
+            target_epoch: 1000,
+            remaining_seconds: 600,
+            total_seconds: 600,
+            paused_phase: None,
+            paused_source: PauseSource::Manual,
+            completed_cycles: 0,
+            break_skip_count: 0,
+            today_skip_count: 0,
+            current_whisper_reminder: String::new(),
+            current_health_reminder: String::new(),
+            is_long_break: false,
+            save_date: today_string(),
+            break_paused: false,
+            break_start_epoch: None,
+            last_skip_epoch: None,
+        }
+    }
+
+    // —— is_in_periods：区间判定（同日 / 跨午夜 / 边界含排）——
+
+    #[test]
+    fn is_in_periods_same_day_window() {
+        let p = periods(&[("12:00", "14:00")]);
+        assert!(!is_in_periods(&p, "11:59"));
+        assert!(is_in_periods(&p, "12:00")); // start 含入
+        assert!(is_in_periods(&p, "13:30"));
+        assert!(!is_in_periods(&p, "14:00")); // end 排他
+    }
+
+    #[test]
+    fn is_in_periods_overnight_window() {
+        let p = periods(&[("22:00", "06:00")]);
+        assert!(is_in_periods(&p, "23:00"));
+        assert!(is_in_periods(&p, "03:00"));
+        assert!(!is_in_periods(&p, "06:00"));
+        assert!(!is_in_periods(&p, "15:00"));
+    }
+
+    #[test]
+    fn is_in_periods_empty_list_never_hits() {
+        assert!(!is_in_periods(&[], "12:00"));
+    }
+
+    // —— active_pause_source：统一判定 + 免打扰优先 + 开关门控 ——
+
+    #[test]
+    fn active_pause_source_none_when_both_disabled() {
+        let quiet = periods(&[("12:00", "14:00")]);
+        let dnd = periods(&[("12:00", "14:00")]);
+        assert_eq!(
+            active_pause_source(false, &quiet, false, &dnd, "13:00"),
+            None
+        );
+    }
+
+    #[test]
+    fn active_pause_source_quiet_when_enabled_and_hit() {
+        let quiet = periods(&[("12:00", "14:00")]);
+        assert_eq!(
+            active_pause_source(true, &quiet, false, &[], "13:00"),
+            Some(PauseSource::Quiet)
+        );
+    }
+
+    #[test]
+    fn active_pause_source_dnd_wins_on_overlap() {
+        // 重叠时刻：dnd 判定在前 → Some(Dnd)，不弹窗
+        let quiet = periods(&[("12:00", "14:00")]);
+        let dnd = periods(&[("13:00", "16:00")]);
+        assert_eq!(
+            active_pause_source(true, &quiet, true, &dnd, "13:30"),
+            Some(PauseSource::Dnd)
+        );
+        // dnd 开关关闭 → 回落 quiet
+        assert_eq!(
+            active_pause_source(true, &quiet, false, &dnd, "13:30"),
+            Some(PauseSource::Quiet)
+        );
+    }
+
+    // —— apply_enter_pause_window / apply_resume：进入与手动恢复免疫 ——
+
+    #[test]
+    fn enter_pause_window_from_any_non_paused_phase() {
+        for phase in [
+            Phase::Working,
+            Phase::Alerting,
+            Phase::Breaking,
+            Phase::Waiting,
+        ] {
+            let mut inner = working_inner();
+            inner.phase = phase;
+            assert!(apply_enter_pause_window(
+                &mut inner,
+                PauseSource::Dnd
+            ));
+            assert_eq!(inner.phase, Phase::Paused);
+            assert_eq!(inner.paused_source, PauseSource::Dnd);
+            assert_eq!(inner.paused_phase, Some(phase));
+        }
+        // 已 Paused：不重复进入（来源切换由 tick 判定块直写，不经此函数）
+        let mut inner = working_inner();
+        inner.phase = Phase::Paused;
+        assert!(!apply_enter_pause_window(
+            &mut inner,
+            PauseSource::Quiet
+        ));
+    }
+
+    #[test]
+    fn resume_rejected_for_period_sources_allowed_for_manual() {
+        // 时段暂停：手动恢复被拒（等 tick 自动 start_work）
+        for source in [PauseSource::Quiet, PauseSource::Dnd] {
+            let mut inner = working_inner();
+            assert!(apply_enter_pause_window(&mut inner, source));
+            assert!(!apply_resume(&mut inner, 2000));
+            assert_eq!(inner.phase, Phase::Paused);
+        }
+        // 手动暂停：恢复回原 phase 并重设 target_epoch
+        let mut inner = working_inner();
+        assert!(apply_enter_paused(&mut inner));
+        assert!(apply_resume(&mut inner, 2000));
+        assert_eq!(inner.phase, Phase::Working);
+        assert_eq!(inner.target_epoch, 2000 + 600);
+    }
+
+    // —— apply_start_work：作废当前轮、来源归位 Manual（时段结束退出的语义基础）——
+
+    #[test]
+    fn start_work_resets_pause_source() {
+        let mut inner = working_inner();
+        assert!(apply_enter_pause_window(
+            &mut inner,
+            PauseSource::Quiet
+        ));
+        apply_start_work(&mut inner, 1800, 5000);
+        assert_eq!(inner.phase, Phase::Working);
+        assert_eq!(inner.paused_source, PauseSource::Manual);
+        assert_eq!(inner.remaining_seconds, 1800);
+        assert_eq!(inner.target_epoch, 5000 + 1800);
+    }
+
+    // —— build_payload：pause_source 序列化（serde 小写传输契约）——
+
+    #[test]
+    fn payload_serializes_pause_source_lowercase() {
+        let mut inner = working_inner();
+        inner.phase = Phase::Paused;
+        inner.paused_source = PauseSource::Dnd;
+        let json = serde_json::to_string(&build_payload(&inner, None)).unwrap();
+        assert!(json.contains("\"pauseSource\":\"dnd\""));
+    }
 }

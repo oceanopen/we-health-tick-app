@@ -23,5 +23,8 @@
   "breakActivityPaused": "Activity detected, countdown paused",
   "skipWarning": "Breaks skipped today, take care",
   "resumableRemainingLabel": "Time until next break after resume",
-  "quietHoursRangeLabel": "Currently in quiet hours"
+  "quietHoursRangeLabel": "Currently in quiet hours",
+  "dndHoursActive": "Do Not Disturb Active",
+  "dndHoursRangeLabel": "Currently in do-not-disturb hours",
+  "dndAutoResumeHint": "Auto resumes after do-not-disturb hours"
 }

@@ -1,59 +1,61 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
-import type { LongBreakEnabled, QuietHourPeriod } from '@src/shared/appConfig';
-import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
+import type {
+  DndHoursEnabled,
+  LongBreakEnabled,
+  QuietHourPeriod,
+  QuietHoursEnabled,
+} from '@src/shared/appConfig';
+import type { PeriodItem } from './PeriodListEditor';
 import AvTimerOutlinedIcon from '@mui/icons-material/AvTimerOutlined';
-import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
+import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 import FreeBreakfastOutlinedIcon from '@mui/icons-material/FreeBreakfastOutlined';
 import HourglassEmptyOutlinedIcon from '@mui/icons-material/HourglassEmptyOutlined';
 import NightsStayOutlinedIcon from '@mui/icons-material/NightsStayOutlined';
 import RepeatOutlinedIcon from '@mui/icons-material/RepeatOutlined';
-import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import SelfImprovementOutlinedIcon from '@mui/icons-material/SelfImprovementOutlined';
 import {
   Box,
   Button,
   Divider,
   FormControl,
-  IconButton,
   MenuItem,
   Select,
   Slider,
   Switch,
-  TextField,
   Typography,
 } from '@mui/material';
 import {
   BREAK_DURATION_KEY,
+  decodeDndHours,
   decodeQuietHours,
   DEFAULT_BREAK_DURATION,
+  DEFAULT_DND_HOURS,
+  DEFAULT_DND_HOURS_ENABLED,
   DEFAULT_LONG_BREAK_DURATION,
   DEFAULT_LONG_BREAK_ENABLED,
   DEFAULT_LONG_BREAK_INTERVAL,
   DEFAULT_QUIET_HOURS,
+  DEFAULT_QUIET_HOURS_ENABLED,
   DEFAULT_WORK_DURATION,
-  DEFAULT_WORK_END_TIME,
-  DEFAULT_WORK_START_TIME,
-  encodeQuietHours,
+  DND_HOURS_ENABLED_KEY,
+  DND_HOURS_KEY,
+  encodePeriods,
   getAppConfig,
   LONG_BREAK_DURATION_KEY,
   LONG_BREAK_ENABLED_KEY,
   LONG_BREAK_INTERVAL_KEY,
   parseYesNo,
+  QUIET_HOURS_ENABLED_KEY,
   QUIET_HOURS_KEY,
   setAppConfig,
   toYesNo,
   WORK_DURATION_KEY,
-  WORK_END_TIME_KEY,
-  WORK_START_TIME_KEY,
   YES_NO,
 } from '@src/shared/appConfig';
 import { longBreakIntervalOptions } from '@src/shared/settingOption';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-interface QuietHourItem extends QuietHourPeriod {
-  id: number;
-}
+import { PeriodListEditor } from './PeriodListEditor';
 
 interface AppPlanConfig {
   workDuration: number;
@@ -61,9 +63,10 @@ interface AppPlanConfig {
   longBreakEnabled: LongBreakEnabled;
   longBreakInterval: number;
   longBreakDuration: number;
-  workStartTime: string;
-  workEndTime: string;
-  quietHours: QuietHourItem[];
+  quietHoursEnabled: QuietHoursEnabled;
+  quietHours: PeriodItem[];
+  dndHoursEnabled: DndHoursEnabled;
+  dndHours: PeriodItem[];
 }
 
 const DEFAULT_APP_PLAN_CONFIG: AppPlanConfig = {
@@ -72,20 +75,26 @@ const DEFAULT_APP_PLAN_CONFIG: AppPlanConfig = {
   longBreakEnabled: DEFAULT_LONG_BREAK_ENABLED,
   longBreakInterval: DEFAULT_LONG_BREAK_INTERVAL,
   longBreakDuration: DEFAULT_LONG_BREAK_DURATION,
-  workStartTime: DEFAULT_WORK_START_TIME,
-  workEndTime: DEFAULT_WORK_END_TIME,
+  quietHoursEnabled: DEFAULT_QUIET_HOURS_ENABLED,
   quietHours: DEFAULT_QUIET_HOURS.map((p, i) => ({ ...p, id: i + 1 })),
+  dndHoursEnabled: DEFAULT_DND_HOURS_ENABLED,
+  // 断言说明：bindings 的 DEFAULT_DND_HOURS 为 `[] as const`（空元组，元素类型 never 不可展开），
+  // 断言回通用时段数组以取 SSOT 默认值；默认为空时 map 结果同 `[]`。
+  dndHours: (DEFAULT_DND_HOURS as readonly QuietHourPeriod[]).map((p, i) => ({ ...p, id: i + 1 })),
 };
 
 function PlanPage() {
   const { t } = useTranslation();
   const [saved, setSaved] = useState<AppPlanConfig>(DEFAULT_APP_PLAN_CONFIG);
   const [draft, setDraft] = useState<AppPlanConfig>(DEFAULT_APP_PLAN_CONFIG);
-  const quietHourIdRef = useRef(DEFAULT_APP_PLAN_CONFIG.quietHours.length);
+  // 双列表（quietHours / dndHours）共享的单调 id 计数器：覆盖「DB 加载」与「新增行」
+  // 两个分配点。初值 = DEFAULT quietHours 的最大初始 id，此后分配值严格大于默认 id 段；
+  // React key 仅要求列表内唯一，reset 回 DEFAULT 列表（id 1..n）不与分配值冲突。
+  const periodIdRef = useRef(DEFAULT_APP_PLAN_CONFIG.quietHours.length);
 
-  const allocateQuietHourId = () => {
-    quietHourIdRef.current += 1;
-    return quietHourIdRef.current;
+  const allocatePeriodId = () => {
+    periodIdRef.current += 1;
+    return periodIdRef.current;
   };
 
   useEffect(() => {
@@ -95,19 +104,21 @@ function PlanPage() {
       getAppConfig(LONG_BREAK_ENABLED_KEY),
       getAppConfig(LONG_BREAK_INTERVAL_KEY),
       getAppConfig(LONG_BREAK_DURATION_KEY),
-      getAppConfig(WORK_START_TIME_KEY),
-      getAppConfig(WORK_END_TIME_KEY),
+      getAppConfig(QUIET_HOURS_ENABLED_KEY),
       getAppConfig(QUIET_HOURS_KEY),
-    ]).then(([wd, bd, lbe, lbi, lbdu, wst, wet, qh]) => {
+      getAppConfig(DND_HOURS_ENABLED_KEY),
+      getAppConfig(DND_HOURS_KEY),
+    ]).then(([wd, bd, lbe, lbi, lbdu, qhe, qh, dnde, dnh]) => {
       const next: AppPlanConfig = {
         workDuration: wd ? Number(wd) : DEFAULT_WORK_DURATION,
         breakDuration: bd ? Number(bd) : DEFAULT_BREAK_DURATION,
         longBreakEnabled: parseYesNo(lbe, DEFAULT_LONG_BREAK_ENABLED),
         longBreakInterval: lbi ? Number(lbi) : DEFAULT_LONG_BREAK_INTERVAL,
         longBreakDuration: lbdu ? Number(lbdu) : DEFAULT_LONG_BREAK_DURATION,
-        workStartTime: wst ?? DEFAULT_WORK_START_TIME,
-        workEndTime: wet ?? DEFAULT_WORK_END_TIME,
-        quietHours: decodeQuietHours(qh).map(p => ({ ...p, id: allocateQuietHourId() })),
+        quietHoursEnabled: parseYesNo(qhe, DEFAULT_QUIET_HOURS_ENABLED),
+        quietHours: decodeQuietHours(qh).map(p => ({ ...p, id: allocatePeriodId() })),
+        dndHoursEnabled: parseYesNo(dnde, DEFAULT_DND_HOURS_ENABLED),
+        dndHours: decodeDndHours(dnh).map(p => ({ ...p, id: allocatePeriodId() })),
       };
       setSaved(next);
       setDraft(next);
@@ -118,45 +129,16 @@ function PlanPage() {
     setDraft(prev => ({ ...prev, [key]: value }));
   };
 
-  const updateQuietHour = (
-    index: number,
-    field: keyof QuietHourPeriod,
-    value: string,
-  ) => {
-    setDraft(prev => ({
-      ...prev,
-      quietHours: prev.quietHours.map((p, i) =>
-        i === index ? { ...p, [field]: value } : p,
-      ),
-    }));
-  };
-
-  const addQuietHour = () => {
-    setDraft(prev => ({
-      ...prev,
-      quietHours: [
-        ...prev.quietHours,
-        { id: allocateQuietHourId(), start: '12:00', end: '13:00' },
-      ],
-    }));
-  };
-
-  const removeQuietHour = (index: number) => {
-    setDraft(prev => ({
-      ...prev,
-      quietHours: prev.quietHours.filter((_, i) => i !== index),
-    }));
-  };
-
   const dirty
     = saved.workDuration !== draft.workDuration
       || saved.breakDuration !== draft.breakDuration
       || saved.longBreakEnabled !== draft.longBreakEnabled
       || saved.longBreakInterval !== draft.longBreakInterval
       || saved.longBreakDuration !== draft.longBreakDuration
-      || saved.workStartTime !== draft.workStartTime
-      || saved.workEndTime !== draft.workEndTime
-      || JSON.stringify(saved.quietHours) !== JSON.stringify(draft.quietHours);
+      || saved.quietHoursEnabled !== draft.quietHoursEnabled
+      || JSON.stringify(saved.quietHours) !== JSON.stringify(draft.quietHours)
+      || saved.dndHoursEnabled !== draft.dndHoursEnabled
+      || JSON.stringify(saved.dndHours) !== JSON.stringify(draft.dndHours);
 
   const handleReset = () => setDraft(DEFAULT_APP_PLAN_CONFIG);
   const handleCancel = () => setDraft(saved);
@@ -168,17 +150,19 @@ function PlanPage() {
       setAppConfig(LONG_BREAK_ENABLED_KEY, draft.longBreakEnabled),
       setAppConfig(LONG_BREAK_INTERVAL_KEY, String(draft.longBreakInterval)),
       setAppConfig(LONG_BREAK_DURATION_KEY, String(draft.longBreakDuration)),
-      setAppConfig(WORK_START_TIME_KEY, draft.workStartTime),
-      setAppConfig(WORK_END_TIME_KEY, draft.workEndTime),
+      setAppConfig(QUIET_HOURS_ENABLED_KEY, draft.quietHoursEnabled),
       setAppConfig(
         QUIET_HOURS_KEY,
-        encodeQuietHours(draft.quietHours.map(({ id: _id, ...rest }) => rest)),
+        encodePeriods(draft.quietHours.map(({ id: _id, ...rest }) => rest)),
+      ),
+      setAppConfig(DND_HOURS_ENABLED_KEY, draft.dndHoursEnabled),
+      setAppConfig(
+        DND_HOURS_KEY,
+        encodePeriods(draft.dndHours.map(({ id: _id, ...rest }) => rest)),
       ),
     ]);
     setSaved(draft);
   };
-
-  const timeInputSx = { width: 120 };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -357,35 +341,38 @@ function PlanPage() {
             overflow: 'hidden',
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              px: 2,
-              py: 1.5,
-              gap: 2,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <ScheduleOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-              <Typography>{t('plan:row.workTime')}</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TextField
-                type="time"
-                size="small"
-                value={draft.workStartTime}
-                onChange={e => update('workStartTime', e.target.value)}
-                sx={timeInputSx}
+          <Box sx={{ px: 2, py: 1.5 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+                mb: 1,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <NightsStayOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                <Box>
+                  <Typography>{t('plan:row.quietHours')}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+                    {t('plan:row.quietHoursHint')}
+                  </Typography>
+                </Box>
+              </Box>
+              <Switch
+                checked={draft.quietHoursEnabled === YES_NO.YES}
+                onChange={e => update('quietHoursEnabled', toYesNo(e.target.checked))}
               />
-              <Typography color="text.secondary">—</Typography>
-              <TextField
-                type="time"
-                size="small"
-                value={draft.workEndTime}
-                onChange={e => update('workEndTime', e.target.value)}
-                sx={timeInputSx}
+            </Box>
+            <Box sx={{ pl: 4.25 }}>
+              <PeriodListEditor
+                periods={draft.quietHours}
+                emptyKey="plan:quietHours.empty"
+                addKey="plan:quietHours.add"
+                allocateId={allocatePeriodId}
+                disabled={draft.quietHoursEnabled === YES_NO.NO}
+                onChange={next => update('quietHours', next)}
               />
             </Box>
           </Box>
@@ -393,49 +380,38 @@ function PlanPage() {
           <Divider />
 
           <Box sx={{ px: 2, py: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-              <NightsStayOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-              <Typography>{t('plan:row.quietHours')}</Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+                mb: 1,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <DoNotDisturbOnOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                <Box>
+                  <Typography>{t('plan:row.dndHours')}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+                    {t('plan:row.dndHoursHint')}
+                  </Typography>
+                </Box>
+              </Box>
+              <Switch
+                checked={draft.dndHoursEnabled === YES_NO.YES}
+                onChange={e => update('dndHoursEnabled', toYesNo(e.target.checked))}
+              />
             </Box>
             <Box sx={{ pl: 4.25 }}>
-              {draft.quietHours.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ py: 0.5 }}>
-                  {t('plan:quietHours.empty')}
-                </Typography>
-              )}
-              {draft.quietHours.map((p, i) => (
-                <Box
-                  key={p.id}
-                  sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}
-                >
-                  <TextField
-                    type="time"
-                    size="small"
-                    value={p.start}
-                    onChange={e => updateQuietHour(i, 'start', e.target.value)}
-                    sx={timeInputSx}
-                  />
-                  <Typography color="text.secondary">—</Typography>
-                  <TextField
-                    type="time"
-                    size="small"
-                    value={p.end}
-                    onChange={e => updateQuietHour(i, 'end', e.target.value)}
-                    sx={timeInputSx}
-                  />
-                  <IconButton size="small" onClick={() => removeQuietHour(i)}>
-                    <CloseOutlinedIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              ))}
-              <Button
-                size="small"
-                startIcon={<AddOutlinedIcon />}
-                onClick={addQuietHour}
-                color="inherit"
-              >
-                {t('plan:quietHours.add')}
-              </Button>
+              <PeriodListEditor
+                periods={draft.dndHours}
+                emptyKey="plan:dndHours.empty"
+                addKey="plan:dndHours.add"
+                allocateId={allocatePeriodId}
+                disabled={draft.dndHoursEnabled === YES_NO.NO}
+                onChange={next => update('dndHours', next)}
+              />
             </Box>
           </Box>
         </Box>

@@ -25,6 +25,24 @@ pub enum Phase {
 }
 
 // ============================================================
+// PauseSource：Paused 阶段的触发来源
+// ============================================================
+
+/// 当前 Paused 阶段的触发来源（仅 phase == Paused 时有意义，其余阶段恒为 Manual 惯例值）。
+/// 前端 PausedView 据此三态分派展示；panel.rs 据此决定弹窗 / 收起；tick 据此决定恢复规则。
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum PauseSource {
+    /// 用户手动暂停（toggle_pause）：不自动恢复，等用户点继续。
+    #[default]
+    Manual,
+    /// 休息时段（quiet_hours）命中：打断式（弹窗常驻），时段全部结束后自动 start_work 全新一轮。
+    Quiet,
+    /// 免打扰时段（dnd_hours）命中：非打断式（收起不弹，托盘可查看），时段全部结束后自动 start_work 全新一轮。
+    Dnd,
+}
+
+// ============================================================
 // TimerStatePayload：timer-tick / phase-changed / get_timer_state 共用
 // ============================================================
 
@@ -63,17 +81,17 @@ pub struct TimerStatePayload {
     pub today_skip_count: u32,
     /// 已完成的工作-休息轮数。长休息判定输入：
     /// `completed_cycles > 0 && completed_cycles % interval == 0`；
-    /// 仅正常完成 on_break_done 才递增，跳过休息不计入。
+    /// 正常完成 on_break_done 与真正跳过休息（skip_break 达到门槛）均递增——跳过也占用一轮休息名额。
     pub completed_cycles: u32,
-    /// 当前 Paused 是否由 quietHours 静音时段触发（vs 用户手动暂停）。
-    pub quiet_triggered: bool,
+    /// 当前 Paused 的触发来源（manual / quiet / dnd）。仅 phase == Paused 时有意义。
+    pub pause_source: PauseSource,
     /// Breaking 阶段是否因检测到鼠标活动而软暂停（不切 phase，仅冻结倒计时）。
     /// 前端 BreakingView 据此显隐「检测到操作，倒计时已暂停」横幅。
     pub break_paused: bool,
-    /// 本次 phase 切换是否由静音时段结束自动恢复触发（quiet pause → 自动 start_work 新一轮）。
+    /// 本次 phase 切换是否由时段暂停结束自动恢复触发（quiet / dnd pause → 自动 start_work 新一轮）。
     /// 仅 phase-changed 事件中 Paused→Working 时有意义：panel.rs 据此决定收起而非显示工作窗口。
     /// timer-tick / get_timer_state 恒为 false。
-    pub resumed_from_quiet: bool,
+    pub auto_resumed: bool,
 }
 
 // ============================================================
@@ -92,10 +110,10 @@ pub struct AppConfigChangedPayload {
 }
 
 // ============================================================
-// QuietHourPeriod：静音时段（quiet_hours 配置 + 默认值共享）
+// QuietHourPeriod：时段条目（quiet_hours / dnd_hours 配置 + 默认值共享）
 // ============================================================
 
-/// 静音时段单条 {start, end}（"HH:mm"，支持跨午夜 start > end）。
+/// 时段单条 {start, end}（"HH:mm"，支持跨午夜 start > end）。
 /// quiet_hours 配置 JSON 的 schema + DEFAULT_QUIET_HOURS 常量导出共用；
 /// 前端 appConfig.ts 的 QuietHourPeriod / decodeQuietHours 与此对齐。
 /// 字段用 &'static str 而非 String：DEFAULT_QUIET_HOURS 是 const 表达式，

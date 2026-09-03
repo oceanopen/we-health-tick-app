@@ -1,15 +1,18 @@
 import type { TimerStatePayload } from '@src/shared/bindings';
 import {
   BREAK_SKIP_MAX_KEY,
+  decodeDndHours,
   decodeQuietHours,
   decodeSkipCountReminder,
   DEFAULT_BREAK_SKIP_MAX,
+  DEFAULT_DND_HOURS,
   DEFAULT_LONG_BREAK_ENABLED,
   DEFAULT_LONG_BREAK_INTERVAL,
   DEFAULT_QUIET_HOURS,
   DEFAULT_SKIP_BREAK_ALLOWED,
   DEFAULT_SKIP_COUNT_REMINDER,
   DEFAULT_WORK_ACTION_BAR,
+  DND_HOURS_KEY,
   LONG_BREAK_ENABLED_KEY,
   LONG_BREAK_INTERVAL_KEY,
   MAX_BREAK_SKIP_MAX,
@@ -43,9 +46,9 @@ const INITIAL_STATE: TimerStatePayload = {
   breakSkipCount: 0,
   todaySkipCount: 0,
   completedCycles: 0,
-  quietTriggered: false,
+  pauseSource: 'manual',
   breakPaused: false,
-  resumedFromQuiet: false,
+  autoResumed: false,
 };
 
 function formatDisplayTime(seconds: number): string {
@@ -98,11 +101,12 @@ function checkNextBreakIsLong(enabled: boolean, interval: number, completedCycle
 export function useTimerState() {
   const [state, setState] = useState<TimerStatePayload>(INITIAL_STATE);
 
-  // break_skip_max / quiet_hours：经 useAppConfigValue 订阅（mount 读 + app-config-changed 实时刷新，
-  // 用户在设置页改完后 panel 立即更新），解码在模块级 decode 函数中完成。
-  // quiet_hours 供 PausedView 在 quietTriggered 时显示休息时段范围（如 "22:00:00 - 07:00:00"）。
+  // break_skip_max / quiet_hours / dnd_hours：经 useAppConfigValue 订阅（mount 读 + app-config-changed
+  // 实时刷新，用户在设置页改完后 panel 立即更新），解码在模块级 decode 函数中完成。
+  // quiet_hours / dnd_hours 供 PausedView 按暂停来源显示对应时段范围（如 "22:00:00 - 07:00:00"）。
   const breakSkipMax = useAppConfigValue(BREAK_SKIP_MAX_KEY, decodeBreakSkipMax, DEFAULT_BREAK_SKIP_MAX);
   const quietHours = useAppConfigValue(QUIET_HOURS_KEY, decodeQuietHours, DEFAULT_QUIET_HOURS);
+  const dndHours = useAppConfigValue(DND_HOURS_KEY, decodeDndHours, DEFAULT_DND_HOURS);
   // 跳过次数提醒阈值（纯 UI 配置）：AlertingView 据此 + state.todaySkipCount 判断是否显示警示横幅。
   const skipCountReminder = useAppConfigValue(SKIP_COUNT_REMINDER_KEY, decodeSkipCountReminder, DEFAULT_SKIP_COUNT_REMINDER);
   // 长休息开关与间隔（「休息」按钮长休息文案预判输入；与 breakSkipMax 同订阅模式）。
@@ -176,8 +180,9 @@ export function useTimerState() {
     workActionBarVisible,
     skipCountReminder,
     quietHours,
+    dndHours,
     completedCycles: state.completedCycles,
-    quietTriggered: state.quietTriggered,
+    pauseSource: state.pauseSource,
     displayTime,
     progress,
     isPaused,

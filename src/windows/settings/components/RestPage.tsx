@@ -2,12 +2,12 @@ import type { SelectChangeEvent } from '@mui/material/Select';
 import type { IdlePauseThreshold, PauseOnIdle, RestConfirm, RestEndConfirm, RestWindow, SkipBreakAllowed, SkipCountReminder, WorkActionBar } from '@src/shared/appConfig';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
+import NightsStayOutlinedIcon from '@mui/icons-material/NightsStayOutlined';
 import PauseCircleOutlinedIcon from '@mui/icons-material/PauseCircleOutlined';
 import ReplayOutlinedIcon from '@mui/icons-material/ReplayOutlined';
 import SelfImprovementOutlinedIcon from '@mui/icons-material/SelfImprovementOutlined';
 import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined';
 import SmartButtonOutlinedIcon from '@mui/icons-material/SmartButtonOutlined';
-import VolumeOffOutlinedIcon from '@mui/icons-material/VolumeOffOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import WeekendOutlinedIcon from '@mui/icons-material/WeekendOutlined';
 import {
@@ -256,7 +256,7 @@ function RestPage() {
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <VolumeOffOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+              <NightsStayOutlinedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               <Typography>{t('rest:row.quietWindow')}</Typography>
             </Box>
             <FormControl size="small" sx={{ minWidth: 140 }}>

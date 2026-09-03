@@ -24,6 +24,10 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
     debug_assert!(
         serde_json::to_string(&t::DEFAULT_QUIET_HOURS).unwrap() == t::DEFAULT_QUIET_HOURS_JSON
     );
+    // dnd_hours 双形态一致性守卫（对称防护，默认空数组）。
+    debug_assert!(
+        serde_json::to_string(&t::DEFAULT_DND_HOURS).unwrap() == t::DEFAULT_DND_HOURS_JSON
+    );
 
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -70,7 +74,7 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
             "EVENT_PANEL_FORM_CHANGED",
             ev::EVENT_PANEL_FORM_CHANGED,
         )
-        // —— 配置 key：timer.rs 业务 11 项 ——
+        // —— 配置 key：timer.rs 业务（清单以本注册列表为准）——
         .constant("WORK_DURATION_KEY", t::KEY_WORK_DURATION)
         .constant("BREAK_DURATION_KEY", t::KEY_BREAK_DURATION)
         .constant(
@@ -93,6 +97,12 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
             t::KEY_IDLE_PAUSE_THRESHOLD,
         )
         .constant("QUIET_HOURS_KEY", t::KEY_QUIET_HOURS)
+        .constant(
+            "QUIET_HOURS_ENABLED_KEY",
+            t::KEY_QUIET_HOURS_ENABLED,
+        )
+        .constant("DND_HOURS_KEY", t::KEY_DND_HOURS)
+        .constant("DND_HOURS_ENABLED_KEY", t::KEY_DND_HOURS_ENABLED)
         .constant("REMINDERS_KEY", t::KEY_REMINDERS)
         .constant("BREAK_SKIP_MAX_KEY", t::KEY_BREAK_SKIP_MAX)
         // —— 配置 key + 默认值：shared/app_config.rs（i18n / 窗口形态）——
@@ -135,6 +145,14 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
         )
         .constant("DEFAULT_REST_CONFIRM", t::DEFAULT_REST_CONFIRM)
         .constant(
+            "DEFAULT_QUIET_HOURS_ENABLED",
+            t::DEFAULT_QUIET_HOURS_ENABLED,
+        )
+        .constant(
+            "DEFAULT_DND_HOURS_ENABLED",
+            t::DEFAULT_DND_HOURS_ENABLED,
+        )
+        .constant(
             "DEFAULT_REST_END_CONFIRM",
             t::DEFAULT_REST_END_CONFIRM,
         )
@@ -157,8 +175,9 @@ pub fn build_specta_builder() -> Builder<tauri::Wry> {
         )
         .constant("MIN_BREAK_SKIP_MAX", t::MIN_BREAK_SKIP_MAX)
         .constant("MAX_BREAK_SKIP_MAX", t::MAX_BREAK_SKIP_MAX)
-        // —— 默认值：结构化（quiet_hours / 提醒文案）——
+        // —— 默认值：结构化（quiet_hours / dnd_hours / 提醒文案）——
         .constant("DEFAULT_QUIET_HOURS", t::DEFAULT_QUIET_HOURS)
+        .constant("DEFAULT_DND_HOURS", t::DEFAULT_DND_HOURS)
         .constant(
             "DEFAULT_HEALTH_TEXTS",
             shared::reminder_texts::DEFAULT_HEALTH_TEXTS,

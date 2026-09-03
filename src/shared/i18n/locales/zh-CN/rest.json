@@ -5,7 +5,7 @@
   "row": {
     "restWindow": "休息窗口",
     "longBreakWindow": "长休息窗口",
-    "quietWindow": "静音窗口",
+    "quietWindow": "休息时段窗口",
     "workActionBar": "工作窗口操作栏",
     "workActionBarHint": "关闭后，工作阶段将无暂停、重置、手动休息入口",
     "restConfirm": "休息前确认",

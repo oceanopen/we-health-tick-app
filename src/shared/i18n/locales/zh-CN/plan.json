@@ -12,8 +12,10 @@
     "longBreakEnabled": "长休息",
     "longBreakInterval": "长休息间隔",
     "longBreakDuration": "长休息时长",
-    "workTime": "工作时间",
-    "quietHours": "休息时段"
+    "quietHours": "休息时段",
+    "quietHoursHint": "时段内暂停计时并弹窗提醒，结束后自动恢复",
+    "dndHours": "免打扰时段",
+    "dndHoursHint": "时段内暂停提醒与计时且不打扰，结束后自动恢复"
   },
   "option": {
     "longBreakEveryN": "每 {{count}} 轮"
@@ -25,6 +27,11 @@
     "add": "添加时段",
     "empty": "暂无休息时段"
   },
+  "dndHours": {
+    "add": "添加时段",
+    "empty": "暂无免打扰时段"
+  },
+  "periodRangeHint": "按整点生效：如 12:00–13:00 即 12:00:00 起暂停，至 13:00:00 自动恢复",
   "button": {
     "reset": "重置",
     "cancel": "取消",

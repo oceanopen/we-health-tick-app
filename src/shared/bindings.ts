@@ -32,6 +32,10 @@ export const DEFAULT_BREAK_DURATION = 1 as const;
 
 export const DEFAULT_BREAK_SKIP_MAX = 1 as const;
 
+export const DEFAULT_DND_HOURS = [] as const;
+
+export const DEFAULT_DND_HOURS_ENABLED = false as const;
+
 export const DEFAULT_HEALTH_TEXTS = ["起来走走，活动一下身体","远眺窗外，放松眼睛","喝杯水，补充水分","做几个简单的拉伸动作","深呼吸，放松身心","活动手腕，预防鼠标手","闭眼休息，让大脑放松","伸展脊柱，改善坐姿"] as const;
 
 export const DEFAULT_IDLE_PAUSE_THRESHOLD = 60.0 as const;
@@ -52,6 +56,8 @@ export const DEFAULT_PAUSE_ON_IDLE = true as const;
 
 export const DEFAULT_QUIET_HOURS = [{"end":"14:00","start":"12:00"},{"end":"18:30","start":"18:00"}] as const;
 
+export const DEFAULT_QUIET_HOURS_ENABLED = true as const;
+
 export const DEFAULT_QUIET_WINDOW = "tray" as const;
 
 export const DEFAULT_REST_CONFIRM = true as const;
@@ -63,6 +69,10 @@ export const DEFAULT_REST_WINDOW = "tray" as const;
 export const DEFAULT_WHISPER_TEXTS = ["成功只有一个 ———— 按照自己的方式，去度过人生。","世界上只有一种真正的英雄主义，那就是在认清生活的真相后依然热爱生活。","这个世界上有很多人，很多种选择，最低的是温饱，然后是利益，就是钱，超越钱的，是名望、权利，但是在超越这些所有东西之上还有一样东西，叫智慧。... 因为我知道我懂的越来越多，只有智慧和知识，内在强大，让你自己懂得很多，对这个世界你有充分的了解，你就不会有畏惧。","因为我要告诉你，所谓千秋霸业，万古流芳，以及一切的一切，只是粪土。先变成粪，再变成土。现在你不明白，将来你会明白，将来不明白，就再等将来，如果一辈子都不明白，也行。","长期的困难生活，最能磨炼一个人的意志。有很多人在遇到困难后，只能怨天尤人，得过且过，而另外一些人虽然也不得不在困难面前低头，但他们的心从未屈服，他们不断地努力，相信一定能够取得最后的胜利。","当你感到畏惧和痛苦，支撑不下去的时候，你应该同时意识到，决定你命运的时候到了。 因为畏惧并不是消极的，事实上，它是一个人真正强大的开始，也是成为英雄的起点。 不懂得畏惧的人不知道什么是困难，也无法战胜困难。 只有懂得畏惧的人，才能唤起自己的力量。 只有懂得畏惧的人，才有勇气去战胜畏惧。 懂得畏惧的可怕，还能超越它、征服它的人，就是英雄。","所谓道，是天下所有规律的总和，是最根本的法则，只要能够了解道，就可以明了世间所有的一切。","滚滚长江东逝水，浪花淘尽英雄。是非成败转头空，青山依旧在，几度夕阳红。 白发渔樵江渚上，惯看秋月春风。一壶浊酒喜相逢，古今多少事，都付笑谈中。","无论有多么伟大正直的理想，要实现它，还必须懂得两个字——变通。只有变通，只有切合实际的行动，才能适应这个变化万千的世界。"] as const;
 
 export const DEFAULT_WORK_DURATION = 30 as const;
+
+export const DND_HOURS_ENABLED_KEY = "dnd_hours_enabled" as const;
+
+export const DND_HOURS_KEY = "dnd_hours" as const;
 
 export const EVENT_APP_CONFIG_CHANGED = "app-config-changed" as const;
 
@@ -97,6 +107,8 @@ export const MIN_BREAK_SKIP_MAX = 1 as const;
 export const MIN_IDLE_PAUSE_THRESHOLD = 30.0 as const;
 
 export const PAUSE_ON_IDLE_KEY = "pause_on_idle" as const;
+
+export const QUIET_HOURS_ENABLED_KEY = "quiet_hours_enabled" as const;
 
 export const QUIET_HOURS_KEY = "quiet_hours" as const;
 
@@ -144,13 +156,25 @@ export type PanelForm =
 "fullscreen";
 
 /**
+ *  当前 Paused 阶段的触发来源（仅 phase == Paused 时有意义，其余阶段恒为 Manual 惯例值）。
+ *  前端 PausedView 据此三态分派展示；panel.rs 据此决定弹窗 / 收起；tick 据此决定恢复规则。
+ */
+export type PauseSource = 
+/**  用户手动暂停（toggle_pause）：不自动恢复，等用户点继续。 */
+"manual" | 
+/**  休息时段（quiet_hours）命中：打断式（弹窗常驻），时段全部结束后自动 start_work 全新一轮。 */
+"quiet" | 
+/**  免打扰时段（dnd_hours）命中：非打断式（收起不弹，托盘可查看），时段全部结束后自动 start_work 全新一轮。 */
+"dnd";
+
+/**
  *  当前状态机阶段。前端 PanelApp 据此切换 5 种 UI 分支
  *  （Working/Alerting/Breaking/Waiting/Paused 各一个视图）。
  */
 export type Phase = "working" | "alerting" | "breaking" | "waiting" | "paused";
 
 /**
- *  静音时段单条 {start, end}（"HH:mm"，支持跨午夜 start > end）。
+ *  时段单条 {start, end}（"HH:mm"，支持跨午夜 start > end）。
  *  quiet_hours 配置 JSON 的 schema + DEFAULT_QUIET_HOURS 常量导出共用；
  *  前端 appConfig.ts 的 QuietHourPeriod / decodeQuietHours 与此对齐。
  *  字段用 &'static str 而非 String：DEFAULT_QUIET_HOURS 是 const 表达式，
@@ -210,19 +234,19 @@ export type TimerStatePayload = {
 	 *  仅正常完成 on_break_done 才递增，跳过休息不计入。
 	 */
 	completedCycles: number,
-	/**  当前 Paused 是否由 quietHours 静音时段触发（vs 用户手动暂停）。 */
-	quietTriggered: boolean,
+	/**  当前 Paused 的触发来源（manual / quiet / dnd）。仅 phase == Paused 时有意义。 */
+	pauseSource: PauseSource,
 	/**
 	 *  Breaking 阶段是否因检测到鼠标活动而软暂停（不切 phase，仅冻结倒计时）。
 	 *  前端 BreakingView 据此显隐「检测到操作，倒计时已暂停」横幅。
 	 */
 	breakPaused: boolean,
 	/**
-	 *  本次 phase 切换是否由静音时段结束自动恢复触发（quiet pause → 自动 start_work 新一轮）。
+	 *  本次 phase 切换是否由时段暂停结束自动恢复触发（quiet / dnd pause → 自动 start_work 新一轮）。
 	 *  仅 phase-changed 事件中 Paused→Working 时有意义：panel.rs 据此决定收起而非显示工作窗口。
 	 *  timer-tick / get_timer_state 恒为 false。
 	 */
-	resumedFromQuiet: boolean,
+	autoResumed: boolean,
 };
 
 /**

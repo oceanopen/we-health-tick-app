@@ -5,7 +5,7 @@ use crate::shared::i18n::{current_language, menu_text};
 use crate::shared::screen::{
     DEFAULT_SIZE, SETTINGS_RATIO, find_monitor_for_tray, ratio_size, work_area_center,
 };
-use crate::shared::types::Phase;
+use crate::shared::types::{PauseSource, Phase};
 
 // async：WebviewWindowBuilder::build() 在 Windows 上于同步 #[tauri::command] 中会触发 wry#583
 // 死锁（白屏 + 主线程卡死）；改 async 让 IPC 线程不阻塞消息泵。macOS 无此问题（WKWebView 无 COM 模型）。
@@ -61,8 +61,13 @@ pub async fn show_settings_window(
                     api.prevent_close();
                     let _ = w.hide();
                     // show_settings_window 打开时主动 hide 了 panel；非 Working 阶段需恢复常驻。
+                    // 免打扰暂停（Paused+Dnd）例外：它是「收起不弹、想看才看」的静默状态，
+                    // 恢复常驻会闪现面板又随失焦消失，违背非打断式语义（与托盘 dismissible 守卫对齐）。
                     let app = w.app_handle();
-                    if crate::timer::current_phase(app) != Phase::Working {
+                    let phase = crate::timer::current_phase(app);
+                    let dnd_paused = phase == Phase::Paused
+                        && crate::timer::current_pause_source(app) == PauseSource::Dnd;
+                    if phase != Phase::Working && !dnd_paused {
                         crate::windows::panel::show_panel(app);
                     }
                 }

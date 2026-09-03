@@ -23,5 +23,8 @@
   "breakActivityPaused": "检测到操作，倒计时已暂停",
   "skipWarning": "今日多次跳过休息，注意健康",
   "resumableRemainingLabel": "恢复后距离下次休息剩余时间",
-  "quietHoursRangeLabel": "当前时间在休息时段中"
+  "quietHoursRangeLabel": "当前时间在休息时段中",
+  "dndHoursActive": "免打扰时段中",
+  "dndHoursRangeLabel": "当前时间在免打扰时段中",
+  "dndAutoResumeHint": "免打扰时段结束后自动恢复"
 }
